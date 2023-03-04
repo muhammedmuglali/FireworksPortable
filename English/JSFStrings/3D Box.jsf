@@ -1,0 +1,9 @@
+﻿
+// English
+
+var __tooltips = new Object();
+
+__tooltips["rotation"] = "Rotation/Perspective";
+__tooltips["rotate"] = "Rotate";
+__tooltips["focallength"] = "FocalLength";
+__tooltips["none"] = "(none)";

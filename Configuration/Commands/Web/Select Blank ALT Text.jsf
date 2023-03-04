@@ -1,0 +1,68 @@
+﻿//--not for batch--
+// Copyright (c) 2000 Macromedia. All rights reserved.
+
+// Run the webLayer function
+webLayer = GetWebLayer();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Select Blank ALT Text.jsf");
+var message = __tooltips["message"];
+
+// Check to make that the webLayer has objects on it
+if(webLayer != null) {
+	// Check to see if there are blank alt tags
+	if(!ContainsBlankWebObjects(webLayer)) {
+		alert(message);
+	}
+	else {
+		// Create an array to hold the new selection.
+		var newSelection = new Array();
+
+		// Put the blank alt tags into the array
+		for (i in theWebLayer.elements) {
+			oldAltTag = theWebLayer.elements[i].altText;
+				// check for both null and the empty string ""
+				if(oldAltTag == null || oldAltTag == "")
+					newSelection[newSelection.length] = theWebLayer.elements[i];
+		}
+
+		// Have Fireworks select the objects in the new array
+		fw.selection = newSelection;
+	}
+}
+
+
+// -----------------------------------------------------------
+function GetWebLayer()
+{
+	theWebLayer = null;
+
+	// Get the layers list
+	layers = fw.getDocumentDOM().layers;
+	for (layerIndex in layers) {
+		if (layers[layerIndex].layerType == "web"){
+			theWebLayer = fw.getDocumentDOM().frames[0].layers[layerIndex];
+
+			break;
+		}
+	}
+
+	return theWebLayer;
+}
+
+// -----------------------------------------------------------
+function ContainsBlankWebObjects(aLayer) {
+
+	if(aLayer != null) {
+
+		for (i in aLayer.elements) {
+			// Firworks sometimes returns NULL, and sometimes the empty string ""
+			if(aLayer.elements[i].altText == null || aLayer.elements[i].altText == "")
+				return(true);
+		}
+	}
+
+	// No blank objects found
+	return(false);
+}
+
+// -----------------------------------------------------------

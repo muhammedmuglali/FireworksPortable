@@ -1,0 +1,6 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["openclose"] = "Open/Close Spiral";
+__tooltips["spirals"]   = "Spirals";

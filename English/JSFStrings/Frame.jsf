@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["WidthToolTip"] = "Frame width";
+__tooltips["FillToolTip"] = "Fill pattern";
+__tooltips["RepositionToolTip"] = "Drag to reposition over another object";
+__tooltips["cornerToolTip"] = "Click to switch corners";

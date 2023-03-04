@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["missingFont"] = "Text in this document uses fonts not available on your system.";
+__tooltips["oldText"] = "This file contains text which was created using a previous version of Fireworks.";
+__tooltips["exportAsBitmap"] = "Click OK to export all such text as images.";
+__tooltips["fileName"] = "Enter the File name.";

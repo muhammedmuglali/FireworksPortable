@@ -1,0 +1,16 @@
+﻿// English
+
+var __jQuerytooltips = new Object();
+
+__jQuerytooltips["missingFonts"] = "Missing Fonts have been replaced with font-family Helvetica, Arial, sans-serif";
+__jQuerytooltips["overwrite"] = /*File name*/"already exists. Do you want to replace it?";
+__jQuerytooltips["active"] = "Please open a valid jQuery template, and retry.";
+__jQuerytooltips["fileName"] = "Enter the CSS File name.";
+__jQuerytooltips["folderName"] = "Enter the Sprites folder name.";
+__jQuerytooltips["filePermission"] = "You don't have permission to save in this location. Contact the administrator to obtain permission.";
+__jQuerytooltips["nojQueryData"] = "This file doesn't contain any jQuery data. Do you want to export the file?" ;
+__jQuerytooltips["missingTemplate"] = "The template file is missing.";
+__jQuerytooltips["enterIconName"] = "Enter the icon name.";
+__jQuerytooltips["invalidIconName"] = "Please enter a valid icon name.";
+__jQuerytooltips["cannotAddIcon"] = "Icon placeholder could not be created. Please open a valid jQuery template, and retry.";
+__jQuerytooltips["cannotExportSprites"] = "Sprites could not be exported for jQuery theme.";

@@ -1,0 +1,30 @@
+/**** Script to launch Adobe Device Central ****/
+/**** deviceCentralTargetName should have the BridgeTalk specifier name for Device Central ****/
+
+var deviceCentralTargetName = "devicecentral-3.5";
+var appStatus = BridgeTalk.isRunning(deviceCentralTargetName);
+
+if (!appStatus)
+{
+	BridgeTalk.launch(deviceCentralTargetName);
+}
+else
+{
+	BridgeTalk.bringToFront(deviceCentralTargetName);
+}	
+
+//Check whether Device Central is running after the previous call since both the calls
+//have no return value. We are not sure DC was indeed launched.
+
+var runStatus = BridgeTalk.isRunning(deviceCentralTargetName);
+
+/* We call app.newDocument() to make the DC open the new document tab of Fireworks */
+
+if(runStatus)
+{
+	var bt = new BridgeTalk;
+	bt.target = deviceCentralTargetName;
+	bt.body = "app.newDocument();";
+	bt.send();
+}
+

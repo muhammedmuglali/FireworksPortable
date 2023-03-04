@@ -1,0 +1,75 @@
+<workspace version="1">
+	<dock anchor="right" content="palette toolbar" is-closed="false">
+		<tab-pane mode="icon" preferred-iconic-length="173" layout-mode="auto-flow">
+			<tab-group active-palette="00711CB4" is-closed="false">
+				<palette id="00711CB4" is-closed="false" preferred-unconstrained-size="268 261" preferred-constrained-size="268 272" current-state="1" is-minimized="false" app-data="43409" host-cached-sizes="false"/>
+				<palette id="00681D18" is-closed="false" preferred-unconstrained-size="243 300" preferred-constrained-size="243 286" current-state="1" is-minimized="false" app-data="43418" host-cached-sizes="false"/>
+				<palette id="00381AA8" is-closed="false" preferred-unconstrained-size="200 300" preferred-constrained-size="200 300" current-state="1" is-minimized="false" app-data="48601" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="00321284" is-closed="false">
+				<palette id="00321284" is-closed="false" preferred-unconstrained-size="243 369" preferred-constrained-size="268 272" current-state="1" is-minimized="false" app-data="35798" host-cached-sizes="false"/>
+				<palette id="005A1B36" is-closed="false" preferred-unconstrained-size="243 285" preferred-constrained-size="243 280" current-state="1" is-minimized="false" app-data="43410" host-cached-sizes="false"/>
+				<palette id="00881C1A" is-closed="false" preferred-unconstrained-size="268 300" preferred-constrained-size="268 911" current-state="1" is-minimized="false" app-data="43412" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="0013173E" is-closed="false">
+				<palette id="0013173E" is-closed="false" preferred-unconstrained-size="243 300" preferred-constrained-size="268 270" current-state="1" is-minimized="false" app-data="43415" host-cached-sizes="false"/>
+				<palette id="005404C2" is-closed="false" preferred-unconstrained-size="208 400" preferred-constrained-size="208 400" current-state="1" is-minimized="false" app-data="48605" host-cached-sizes="false"/>
+				<palette id="0026196E" is-closed="false" preferred-unconstrained-size="211 131" preferred-constrained-size="211 131" current-state="1" is-minimized="false" app-data="43408" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="003E0588" is-closed="false">
+				<palette id="003E0588" is-closed="false" preferred-unconstrained-size="230 300" preferred-constrained-size="268 265" current-state="1" is-minimized="true" app-data="48607" host-cached-sizes="false"/>
+				<palette id="005710DE" is-closed="false" preferred-unconstrained-size="220 300" preferred-constrained-size="220 300" current-state="1" is-minimized="false" app-data="48606" host-cached-sizes="false"/>
+				<palette id="00411D64" is-closed="false" preferred-unconstrained-size="220 300" preferred-constrained-size="215 300" current-state="1" is-minimized="false" app-data="48608" host-cached-sizes="false"/>
+				<palette id="0050094A" is-closed="false" preferred-unconstrained-size="220 300" preferred-constrained-size="243 280" current-state="1" is-minimized="false" app-data="43422" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="007A076C" is-closed="false">
+				<palette id="007A076C" is-closed="false" preferred-unconstrained-size="243 300" preferred-constrained-size="268 280" current-state="1" is-minimized="true" app-data="43416" host-cached-sizes="false"/>
+				<palette id="00680BCE" is-closed="false" preferred-unconstrained-size="243 255" preferred-constrained-size="243 249" current-state="1" is-minimized="false" app-data="45816" host-cached-sizes="false"/>
+			</tab-group>
+		</tab-pane>
+	</dock>
+	<dock anchor="left" content="palette toolbar" is-closed="false">
+		<toolbar id="00291672" origin="1 24" size-variant="vertical-wide" is-closed="false" app-data="ToolPalette"/>
+	</dock>
+	<dock anchor="top" content="control-bar" is-closed="false">
+		<control-bar id="002E16F4" origin="0 0" size="778 28" is-closed="false" app-data="MainToolBar"/>
+	</dock>
+	<dock anchor="bottom" content="palette" is-closed="false">
+		<tab-pane mode="expanded" preferred-iconic-length="0" layout-mode="auto-flow">
+			<tab-group active-palette="001920F4" is-closed="false">
+				<palette id="001920F4" is-closed="false" preferred-unconstrained-size="923 105" preferred-constrained-size="923 105" current-state="1" is-minimized="false" app-data="35586" host-cached-sizes="false"/>
+				<palette id="00740F76" is-closed="false" preferred-unconstrained-size="214 300" preferred-constrained-size="923 200" current-state="1" is-minimized="false" app-data="48609" host-cached-sizes="false"/>
+			</tab-group>
+		</tab-pane>
+	</dock>
+	<dock anchor="none" content="palette toolbar" origin="621 113" is-closed="true">
+		<tab-pane mode="icon" preferred-iconic-length="151" layout-mode="manual">
+			<tab-group active-palette="00100B06" is-closed="false">
+				<palette id="00100B06" is-closed="false" preferred-unconstrained-size="243 114" preferred-constrained-size="243 114" current-state="1" is-minimized="false" app-data="43404" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="00200E84" is-closed="false">
+				<palette id="00200E84" is-closed="false" preferred-unconstrained-size="243 142" preferred-constrained-size="268 142" current-state="1" is-minimized="false" app-data="43405" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="00710F56" is-closed="false">
+				<palette id="00710F56" is-closed="false" preferred-unconstrained-size="243 300" preferred-constrained-size="243 280" current-state="1" is-minimized="false" app-data="43414" host-cached-sizes="false"/>
+			</tab-group>
+			<tab-group active-palette="00830524" is-closed="false">
+				<palette id="00830524" is-closed="false" preferred-unconstrained-size="243 285" preferred-constrained-size="243 300" current-state="1" is-minimized="false" app-data="43413" host-cached-sizes="false"/>
+			</tab-group>
+		</tab-pane>
+	</dock>
+	<dock anchor="none" content="palette toolbar" origin="416 161" is-closed="true">
+		<tab-pane mode="icon" preferred-iconic-length="77" layout-mode="manual">
+			<tab-group active-palette="0064034C" is-closed="false">
+				<palette id="0064034C" is-closed="false" preferred-unconstrained-size="243 320" preferred-constrained-size="268 320" current-state="1" is-minimized="false" app-data="43402" host-cached-sizes="false"/>
+			</tab-group>
+		</tab-pane>
+	</dock>
+	<dock anchor="none" content="palette toolbar" origin="298 602" is-closed="true">
+		<tab-pane mode="expanded" preferred-iconic-length="0" layout-mode="manual">
+			<tab-group active-palette="00571106" is-closed="false">
+				<palette id="00571106" is-closed="false" preferred-unconstrained-size="600 300" preferred-constrained-size="923 200" current-state="1" is-minimized="false" app-data="48602" host-cached-sizes="false"/>
+			</tab-group>
+		</tab-pane>
+	</dock>
+</workspace>

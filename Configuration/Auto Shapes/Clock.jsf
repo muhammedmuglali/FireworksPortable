@@ -1,0 +1,467 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Clock.jsf");
+gTT[0]=__tooltips["settime"];
+gTT[1]=__tooltips["minute"];
+gTT[2]=__tooltips["hour"] ;
+gTT[3]=__tooltips["changetick"];
+gTT[4]=__tooltips["entertime"] ;
+gTT[5]=__tooltips["incorrect"];
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCPD      = 0.552;
+var gPI2      = Math.PI/2;	//  90 degrees
+var gPI       = Math.PI;	// 180 degrees
+var g2PI      = 2*Math.PI;	// 360 degrees
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var r   = 85;
+	var c   = {x:cmp.x, y:cmp.y};
+	var d   = new Date;
+	var t   = d.getHours() + ":" + d.getMinutes();//"20:04";
+
+	var c0, c1, c2, c3;
+
+	smartShape.elem.controlPoints.length = 4;
+
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x;
+	c0.y                 = c.y;
+	c0.toolTip           = gTT[0];
+	c0.toolTipTracksDrag = true;
+	c0.type              = "default";
+
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.toolTip           = gTT[1];
+	c1.toolTipTracksDrag = true;
+	c1.type              = "default";
+
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.toolTip           = gTT[2];
+	c2.toolTipTracksDrag = true;
+	c2.type              = "default";
+
+	c3                   = smartShape.elem.controlPoints[3];
+	c3.x                 = c.x-R-8;
+	c3.y                 = c.y;
+	c3.name              = "1";
+	c3.toolTip           = gTT[3];
+	c3.toolTipTracksDrag = true;
+	c3.type              = "default";
+
+	smartShape.elem.elements.length = 0;
+
+	createClock(R, r, t);
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var params;
+
+	switch (cpIdx)
+	{
+		case 1:
+		case 2:
+			params = smartShape.GetDefaultMoveParms();
+
+			smartShape.elem.controlPoints[cpIdx].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+			smartShape.elem.elements[cpIdx-1].contours[0].nodes[1].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c3    = smartShape.elem.controlPoints[3];
+
+	switch (cpIdx)
+	{
+		case 0:
+			var t = prompt(gTT[4],"");
+
+			if ((t!="") && (t!=null))
+				setTime(t);
+
+			break;
+
+		case 3:
+			c3.name = (parseInt(c3.name)+1)&3;
+
+			createTicks(c3.name);
+
+		default:
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function moveNode(n, x, y)
+{
+	n.x = n.predX = n.succX = x;
+	n.y = n.predY = n.succY = y;
+}
+
+function addElement(element, bc, fc)
+{
+	element.elements[element.elements.length] = new Path;
+
+	var e = element.elements[element.elements.length-1];
+
+	e.contours[0] = new Contour;
+	e.contours[0].nodes.length = 0;
+
+	e.opacity = 100;
+
+	if (bc!="")
+	{
+		e.pathAttributes.brush = {	alphaRemap:"none",
+									angle:0, 
+									antiAliased:true, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Basic", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:10, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"brush", 
+									flowRate:0, 
+									maxCount:14, 
+									minSize:1, 
+									name:"bn_Soft Line", 
+									numDashes:0, 
+									shape:"square", 
+									softenMode:"bell curve", 
+									softness:50, 
+									spacing:6, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = bc;
+	}
+	else
+		e.pathAttributes.brush = null;
+
+	if (fc!="")
+	{
+		e.pathAttributes.fill = {	category:"fc_Solid", 
+									ditherColors:[ "#000000", "#000000" ], 
+									edgeType:"antialiased", 
+									feather:0, 
+									gradient:null, 
+									name:"fn_Normal", 
+									pattern:null, 
+									shape:"solid", 
+									stampingMode:"blend opaque", 
+									textureBlend:0, 
+									webDitherTransparent:false };
+		e.pathAttributes.fillColor = fc;
+	}
+	else
+		e.pathAttributes.fill = null
+}
+
+function addCircle(contour, c, r)
+{
+	var cpd = r*gCPD;
+
+	addPathPointBez(contour, c.x,   c.y-r, c.x-cpd, c.y-r,   c.x+cpd, c.y-r  );//0
+	addPathPointBez(contour, c.x+r, c.y,   c.x+r,   c.y-cpd, c.x+r,   c.y+cpd);//1
+	addPathPointBez(contour, c.x,   c.y+r, c.x+cpd, c.y+r,   c.x-cpd, c.y+r  );//2
+	addPathPointBez(contour, c.x-r, c.y,   c.x-r,   c.y+cpd, c.x-r,   c.y-cpd);//3
+
+	contour.isClosed = true;
+}
+
+function createClock(R, r, t)
+{
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var e     = 0;
+	var mSize = r-5;
+	var hSize = r-25;
+	var tMode = parseInt(c3.name);
+
+	// minute
+	addElement(smartShape.elem, "#000000", "");
+	smartShape.elem.elements[e].pathAttributes.brush.diameter = 3;
+	addPathPoint(smartShape.elem.elements[e].contours[0], c0.x, c0.y);
+	addPathPoint(smartShape.elem.elements[e].contours[0], c0.x, c0.y-mSize);
+	c1.x = c0.x;
+	c1.y = c0.y-mSize;
+
+	// hour
+	e++;
+	addElement(smartShape.elem, "#000000", "");
+	smartShape.elem.elements[e].pathAttributes.brush.diameter = 6;
+	addPathPoint(smartShape.elem.elements[e].contours[0], c0.x, c0.y);
+	addPathPoint(smartShape.elem.elements[e].contours[0], c0.x, c0.y-hSize);
+	c2.x = c0.x;
+	c2.y = c0.y-hSize;
+
+	setTime(t);
+
+	// ticks
+	e++;
+	smartShape.elem.elements[e] = new Group;
+
+	createTicks(tMode);
+
+	// clock face
+	e++;
+	addElement(smartShape.elem, "", "#FFFFFF");
+	addCircle(smartShape.elem.elements[e].contours[0], {x:c0.x,y:c0.y}, r);
+
+	// outer ring
+	e++;
+	addElement(smartShape.elem, "#000000", "#FF0000");
+	smartShape.elem.elements[e].contours[1] = new Contour;
+	smartShape.elem.elements[e].contours[1].nodes.length = 0;
+	smartShape.elem.elements[e].effectList = {	category:"UNUSED",
+												effects:[ {	AngleSoftness:3, 
+															BevelContrast:75, 
+															BevelType:0, 
+															BevelWidth:(R-r)*2/3, 
+															ButtonState:0, 
+															DownBlendColor:"#0000003f", 
+															EdgeThreshold:0, 
+															EffectIsVisible:true, 
+															EffectMoaID:"{7fe61102-6ce2-11d1-8c76000502701850}", 
+															EmbossFaceColor:"#ffffff00", 
+															GlowStartDistance:0, 
+															GlowWidth:0, 
+															HiliteColor:"#ffffff", 
+															HitBlendColor:"#ffffff3f", 
+															LightAngle:135, 
+															LightDistance:100, 
+															MaskSoftness:0, 
+															OuterBevelColor:"#df0000", 
+															ShadowColor:"#000000", 
+															ShowObject:false, 
+															SlopeMultiplier:1, 
+															SlopeType:1, 
+															category:"Inner Bevel", 
+															name:"Inner Bevel" } ], 
+												name:"UNUSED" };
+	addCircle(smartShape.elem.elements[e].contours[0], {x:c0.x,y:c0.y}, R);
+	addCircle(smartShape.elem.elements[e].contours[1], {x:c0.x,y:c0.y}, r);
+}
+
+function setTime(t)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var t_ = t.split(":");
+	var h  = parseInt(parseFloat(t_[0]));
+	var m  = parseInt(parseFloat(t_[1]));
+	var mr = dist(c0.x, c0.y, c1.x, c1.y);
+	var hr = dist(c0.x, c0.y, c2.x, c2.y);
+	var ma, ha;
+	var mx, my, hx, hy;
+
+	if ( (t_.length<2) || isNaN(h) || isNaN(m) )
+	{
+		alert(gTT[5]);
+		return -1;
+	}
+
+	if ((h<0)||(h>24))
+		h = 0;
+	else if ((h>12)||(h==24))
+		h -= 12;
+
+	if ((m<0)||(m>59))
+		m = 0;
+
+	ma = -gPI2 + g2PI*m/60;
+
+	mx = c0.x + mr*Math.cos(ma);
+	my = c0.y + mr*Math.sin(ma);
+
+	moveNode(smartShape.elem.elements[0].contours[0].nodes[1], mx, my);
+
+	c1.x = mx;
+	c1.y = my;
+
+	ha = -gPI2 + g2PI*(h/12) + (g2PI/12)*(m/60);
+
+	hx = c0.x + hr*Math.cos(ha);
+	hy = c0.y + hr*Math.sin(ha);
+
+	moveNode(smartShape.elem.elements[1].contours[0].nodes[1], hx, hy);
+
+	c2.x = hx;
+	c2.y = hy;
+}
+
+function createTicks(tMode)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var e  = smartShape.elem.elements[2];
+	var r  = dist(c0.x, c0.y, c1.x, c1.y);
+	var a, x, y;
+	var i, j;
+
+	if (tMode==0)
+	{
+		e.elements.length = 0;
+	}
+	else
+	{
+		for (i=0,a=-gPI2; i<4; i++,a+=gPI2)
+		{
+			addElement(e, "#000000", "");
+
+			x = c0.x + r*Math.cos(a);
+			y = c0.y + r*Math.sin(a);
+
+			addPathPoint(e.elements[i].contours[0], x, y);
+
+			x = c0.x + (r-12)*Math.cos(a);
+			y = c0.y + (r-12)*Math.sin(a);
+
+			addPathPoint(e.elements[i].contours[0], x, y);
+		}
+
+		if (tMode>1)
+		{
+			for (a=-gPI2*2/3; i<12; i++,a+=gPI2/3)
+			{
+				addElement(e, "#000000", "");
+
+				x = c0.x + r*Math.cos(a);
+				y = c0.y + r*Math.sin(a);
+
+				addPathPoint(e.elements[i].contours[0], x, y);
+
+				x = c0.x + (r-7)*Math.cos(a);
+				y = c0.y + (r-7)*Math.sin(a);
+
+				addPathPoint(e.elements[i].contours[0], x, y);
+
+				if (i&1)
+					a += gPI2/3;
+			}
+		}
+
+		if (tMode>2)
+		{
+			for (j=1,a=-gPI2*14/15; i<60; i++,j++,a+=gPI2/15)
+			{
+				addElement(e, "#000000", "");
+
+				x = c0.x + r*Math.cos(a);
+				y = c0.y + r*Math.sin(a);
+
+				addPathPoint(e.elements[i].contours[0], x, y);
+
+				x = c0.x + (r-3)*Math.cos(a);
+				y = c0.y + (r-3)*Math.sin(a);
+
+				addPathPoint(e.elements[i].contours[0], x, y);
+
+				if (j%4==0)
+					a += gPI2/15;
+			}
+		}
+	}
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

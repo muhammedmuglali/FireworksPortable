@@ -1,0 +1,810 @@
+﻿/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+/*============================================================================*/
+/*                                Polygon tool                                */
+/*============================================================================*/
+/*
+
+The Polygon tool allows the users to create the following shapes:-
+- polygon (single or split) of between 3 and 25 sides
+- polygon (single or split) of between 3 and 25 sides, with a 'hole'
+- polygon (single or split) with variable number of sections
+
+The default polygon has the following:-
+
+- One control point in the centre of the circle.
+  (smartShape.elem.controlPoints[0])
+  This control point cannot be moved. Clicking this control point snaps the
+  control point for the inner polygon to the centre.
+  Shift-clicking will reset any rotation applied to the polygon by the
+  control point 2, but retains the sizes of both the outer and inner
+  polygons.
+
+- One control point in the centre of the cirlce.
+  (smartShape.elem.controlPoints[1])
+  This control point controls the inner polygon.
+
+- One control point at the top of the polygon.
+  (smartShape.elem.controlPoints[2])
+  This control point controls the scale and rotation of the polygon, as well
+  as the rotation of the inner polygon.
+  Shift-clicking will constrain it to circular movement. The inner polygon
+  will also follow it in a circular fashion.
+
+- One control point to the left of the polygon.
+  (smartShape.elem.controlPoints[3])
+  This control point determines the number of corners/sides of the polygon.
+  The minimum and maximum number of corners/sides are currently set to
+  3 and 25, respectively, as they were in the previous versions of
+  Fireworks.
+  Shift-dragging this control point converts the polygon from being a single
+  polygon to a set of multiple sections (split mode); dragging without Shift
+  will revert this to being a single polygon.
+  NB: shift-dragging may slow the update down; suggested use would be to drag
+  the control point to get the desired number of sides, and then shift-click
+  and hold on the control point for a second or two until the preview for the
+  multiple sections are visible.
+
+- One control point to the right of the polygon.
+  (smartShape.elem.controlPoints[3])
+  This control point determines the number of sections of the polygon.
+  This works for both single and split/multiple modes.
+
+- One element (smartShape.elem.elements[0]) for the polygon itself.
+  This element contains 2 contours: contours[0] & contours[1] for outer and
+  inner polygons, respectively.
+*/
+
+/*============================================================================*/
+/*                             Default functions                              */
+/*============================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+		InsertSmartShapeAt(true);
+		break;
+
+	case "EndDragInsert":
+		EndDragInsert();
+		break;
+
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt(false);
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	case "RedrawSmartShape":
+		RedrawSmartShape();
+		break;
+}
+
+function InsertSmartShapeAt(dragIns)
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Smart Polygon.jsf");
+	var t    = __tooltips;
+
+	smartShape.elem.customData["tooltips"] = t;
+
+	var k = new Object();
+	k.maxNodes = 25;	// max number of corners/sides
+	k.minNodes = 3;		// min number of corners/sides
+
+	smartShape.elem.customData["constants"] = k;
+
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var N   = 7;
+	var c   = {x:cmp.x+R, y:cmp.y+R};
+	var r   = 0;
+
+	var c0, c1, c2, c3, c4, c5;
+
+	// add 5 control points
+	smartShape.elem.controlPoints.length = 5;
+
+	// control point for the centre - remains fixed
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x;
+	c0.y                 = c.y;
+	c0.name              = "";
+	c0.toolTip           = t.inner;
+	c0.toolTipTracksDrag = false;
+
+	// control point for inner polygon
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.x                 = c.x;
+	c1.y                 = c.y;
+	c1.name              = "";
+	c1.toolTip           = t.inner;
+	c1.toolTipTracksDrag = true;
+
+	// control point for scale & rotate
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.x                 = c.x;
+	c2.y                 = c.y - R;
+	c2.name              = "";
+	c2.toolTip           = t.scale;
+	c2.toolTipTracksDrag = true;
+
+	c4 = {x:c0.x-R, y:c0.y-R};
+	c5 = {x:c0.x-R, y:c0.y+R};
+
+	// control point for num of corners/sides
+	c3                   = smartShape.elem.controlPoints[3];
+	c3.x                 = c.x - R;
+	c3.y                 = c5.y - ((c5.y-c4.y)*5/k.maxNodes);
+	c3.name              = "single";
+	c3.toolTip           = t.sides + ": 7; " + t.altopt;
+	c3.toolTipTracksDrag = true;
+
+	c4                   = smartShape.elem.controlPoints[4];
+	c4.x                 = c.x + R;
+	c4.y                 = c.y - R;
+	c4.name              = "7,7";
+	c4.toolTip           = t.sections + ": 7";
+	c4.toolTipTracksDrag = true;
+
+	// allocate space for the shape
+	smartShape.elem.elements[0] = new Path;
+
+	// create a default polygon
+	createPolygon(R, r, N, N);
+
+	a += Math.PI/2;
+
+	if (a<0)
+		a += (2*Math.PI);
+
+	smartShape.elem.customData["shapeName"] = "polygon";
+	smartShape.elem.customData["nodes"]     = N;
+	smartShape.elem.customData["sides"]     = N;
+	smartShape.elem.customData["radius0"]   = R;
+	smartShape.elem.customData["radius1"]   = r;
+	smartShape.elem.customData["split"]     = false;
+	smartShape.elem.customData["rotation"]  = 0;
+	smartShape.elem.customData["maxNodes"]  = k.maxNodes;
+	smartShape.elem.customData["minNodes"]  = k.minNodes;
+
+	if (dragIns)
+	{
+		smartShape.constrainDragInsertAspect = true;
+
+		var c_     = {x:c.x-R ,y:c.y-R};
+		var	params = smartShape.GetDefaultMoveParms();
+		var i, n;
+
+		for (i=0; i<N; i++)
+		{
+			n = smartShape.elem.elements[0].contours[0].nodes[i];
+			params.deltaXtoX = (n.x-c_.x)/(2*R);
+			params.deltaYtoY = (n.y-c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(params);
+		}
+
+		for (i=0; i<smartShape.elem.controlPoints.length; i++)
+		{
+			n = smartShape.elem.controlPoints[i];
+			params.deltaXtoX = (n.x-c_.x)/(2*R);
+			params.deltaYtoY = (n.y-c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(params);
+		}
+	}
+}
+
+function EndDragInsert()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var n0 = smartShape.elem.elements[0].contours[0].nodes[0];
+	var R  = Math.abs(Math.round(c0.y - n0.y));
+
+	smartShape.elem.customData["radius0"] = R;
+	smartShape.elem.customData["radius1"] = 0;
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx  = smartShape.currentControlPointIndex;
+	var cpLen  = smartShape.elem.controlPoints.length;
+	var c0     = smartShape.elem.controlPoints[0];
+	var c1     = smartShape.elem.controlPoints[1];
+	var c2     = smartShape.elem.controlPoints[2];
+	var c3     = smartShape.elem.controlPoints[3];
+	var c4     = smartShape.elem.controlPoints[4];
+	var R      = dist(c0.x, c0.y, c2.x, c2.y);
+	var r      = dist(c0.x, c0.y, c1.x, c1.y);
+	var single = (c3.name == "single");
+	var ns     = (c4.name).split(",");
+	var N      = parseInt(ns[0]);
+	var S      = parseInt(ns[1]);
+
+	var params, params_, a, i, j;
+
+	switch (cpIdx)
+	{
+		// centre control point
+		case 0:
+			// Shift-clicking resets the rotation and control point positions
+			if (smartShape.altOptKeyDown)
+			{
+				c1.x = c0.x;
+				c1.y = c0.y - r;
+				c2.x = c0.x;
+				c2.y = c0.y - R;
+
+				c0.name = "reset_rotation";
+			}
+			// else, reset/remove inner polygon
+			else
+			{
+				a       = evalAngle(c2.x-c0.x, c2.y-c0.y);
+				c1.x    = c0.x + Math.cos(a);
+				c1.y    = c0.y + Math.sin(a);
+				r       = 0;
+				c0.name = "";
+			}
+
+		// inner polygon control point
+		case 1:
+			// this control point moves in polygon fashion, but does not rotate
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaRtoR = 1.0;
+			params.minRadius = 0;
+			params.maxRadius = dist(c0.x, c0.y, c2.x, c2.y);
+			params.rotate    = false;
+
+			c1.RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+			// if there was no inner polygon, create a tiny one
+			if (r==0)
+			{
+				if (single)
+					createPolygon(R, 1, N, S);
+				else
+					createSplitPolygon(R, 1, N, S);
+			}
+
+			// inner polygon resizes in polygon fashion, but does not rotate
+			if (single)
+			{
+				if (N==S)
+					for (i=0; i<N; i++)
+						smartShape.elem.elements[0].contours[1].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+				else
+					for (i=smartShape.elem.elements[0].contours[0].nodes.length-1; i>S; i--)
+						smartShape.elem.elements[0].contours[0].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+			}
+			else
+			{
+				for (i=0; i<S; i++)
+				{
+					smartShape.elem.elements[i].contours[0].nodes[2].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+					smartShape.elem.elements[i].contours[0].nodes[3].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+				}
+			}
+
+			break;
+
+		// scale/rotate control point
+		case 2:
+			params  = smartShape.GetDefaultMoveParms();
+			params_ = smartShape.GetDefaultMoveParms();
+
+			// Shift-clicking constrains to rotation only
+			if (smartShape.altOptKeyDown)
+			{
+				smartShape.elem.controlPoints[1].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+				smartShape.elem.controlPoints[2].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+				if (single)
+				{
+					// if "closed", register circular move for outer and innter polygons
+					if (N==S)
+					{
+						for (i=0; i<N; i++)
+						{
+							smartShape.elem.elements[0].contours[0].nodes[i].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+							if (r>0)
+								smartShape.elem.elements[0].contours[1].nodes[i].RegisterCircularMove({x:c0.x, y:c0.y}, params_);
+						}
+					}
+					// if "open", register circular move for all nodes on contours[0]
+					else
+					{
+						for (i=0; i<=S; i++)
+							smartShape.elem.elements[0].contours[0].nodes[i].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+						if (r > 0)
+						{
+							for (;i<=(S*2)+1; i++)
+								smartShape.elem.elements[0].contours[0].nodes[i].RegisterCircularMove({x:c0.x, y:c0.y}, params_);
+						}
+					}
+				}
+				else
+				{
+					// split mode: register circular move for all four nodes per section
+					for (i=0; i<S; i++)
+					{
+						smartShape.elem.elements[i].contours[0].nodes[0].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+						smartShape.elem.elements[i].contours[0].nodes[1].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+						smartShape.elem.elements[i].contours[0].nodes[2].RegisterCircularMove({x:c0.x, y:c0.y}, params_);
+						smartShape.elem.elements[i].contours[0].nodes[3].RegisterCircularMove({x:c0.x, y:c0.y}, params_);
+					}
+				}
+			}
+			// else, resizes/rotates freely
+			else
+			{
+				params.deltaRtoR  = 1.0;
+				params_.deltaRtoR = r/R;	// inner polygon resizes proportionally
+
+				smartShape.elem.controlPoints[1].RegisterPolygonMove({x:c0.x, y:c0.y}, params_);
+				smartShape.elem.controlPoints[2].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+				if (single)
+				{
+					// if "closed", register polygon move for outer and innter polygons
+					if (N==S)
+					{
+						for (i=0; i<N; i++)
+						{
+							smartShape.elem.elements[0].contours[0].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+							if (r>0)
+								smartShape.elem.elements[0].contours[1].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params_);
+						}
+					}
+					// if "open", register polygon move for all nodes on contours[0]
+					else
+					{
+						for (i=0; i<=S; i++)
+							smartShape.elem.elements[0].contours[0].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+						if (r > 0)
+						{
+							for (;i<=(S*2)+1; i++)
+								smartShape.elem.elements[0].contours[0].nodes[i].RegisterPolygonMove({x:c0.x, y:c0.y}, params_);
+						}
+					}
+				}
+				else
+				{
+					// split mode: register polygon move for all four nodes per section
+					for (i=0; i<S; i++)
+					{
+						smartShape.elem.elements[i].contours[0].nodes[0].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+						smartShape.elem.elements[i].contours[0].nodes[1].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+						smartShape.elem.elements[i].contours[0].nodes[2].RegisterPolygonMove({x:c0.x, y:c0.y}, params_);
+						smartShape.elem.elements[i].contours[0].nodes[3].RegisterPolygonMove({x:c0.x, y:c0.y}, params_);
+					}
+				}
+
+				c2.name = "resize";
+			}
+			break;
+	}
+}
+
+function DragControlPoint()
+{
+	var t     = smartShape.elem.customData["tooltips"];
+	var k     = smartShape.elem.customData["constants"];
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var R     = dist(c0.x, c0.y, c2.x, c2.y);
+	var r     = dist(c0.x, c0.y, c1.x, c1.y);
+	var cm    = smartShape.currentMousePos;
+	var N, S;
+
+	switch (cpIdx)
+	{
+		// number of corners/sides
+		case 3:
+		case 4:
+			cp = smartShape.elem.controlPoints[cpIdx];
+
+			// follow mouse movement
+			cp.y = cm.y;
+
+			// moves between min & max
+			if (cp.y < c0.y-R)
+			{
+				cp.y = c0.y - R;
+				N    = (cpIdx==3)? k.maxNodes : (Math.round((k.maxNodes-k.minNodes)*(c0.y+R-c3.y)/(2*R)) + k.minNodes);
+				S    = (cpIdx==4)? N          : (Math.round((N-1)*(c0.y+R-c4.y)/(2*R)) + 1);
+			}
+			else if (cp.y > c0.y+R)
+			{
+				cp.y = c0.y + R;
+				N    = (cpIdx==3)? k.minNodes : (Math.round((k.maxNodes-k.minNodes)*(c0.y+R-c3.y)/(2*R)) + k.minNodes);
+				S    = (cpIdx==4)? 1          : (Math.round((N-1)*(c0.y+R-c4.y)/(2*R)) + 1);
+			}
+			else
+			{
+				N = Math.round((k.maxNodes-k.minNodes)*(c0.y+R-c3.y)/(2*R)) + k.minNodes;
+				S = Math.round((c0.y+R-c4.y)/((2*R)/(N-1))) + 1;
+			}
+
+			c3.toolTip = t.sides + ": " + N + "; " + t.altopt;
+			c4.toolTip = t.sections + ": " + S;
+			c4.name    = N + "," + S;
+
+			if ( (cpIdx==3) && (smartShape.altOptKeyDown) )
+			{
+				c3.name = "split";
+				createSplitPolygon(R, r, N, S);
+			}
+			else
+			{
+				if ( (cpIdx==4) && (c3.name=="split") )
+				{
+					createSplitPolygon(R, r, N, S);
+				}
+				else
+				{
+					c3.name = "single";
+
+					smartShape.elem.elements.length = 1;
+
+					createPolygon(R, r, N, S);
+				}
+			}
+
+			smartShape.elem.customData["nodes"] = c3.toolTip.split(": ")[1];
+			smartShape.elem.customData["sides"] = c4.toolTip.split(": ")[1];
+			smartShape.elem.customData["split"] = (c3.name=="split");
+
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var t      = smartShape.elem.customData["tooltips"];
+	var k      = smartShape.elem.customData["constants"];
+	var cpIdx  = smartShape.currentControlPointIndex;
+	var cpLen  = smartShape.elem.controlPoints.length;
+	var c0     = smartShape.elem.controlPoints[0];
+	var c1     = smartShape.elem.controlPoints[1];
+	var c2     = smartShape.elem.controlPoints[2];
+	var c3     = smartShape.elem.controlPoints[3];
+	var c4     = smartShape.elem.controlPoints[4];
+	var R      = dist(c0.x, c0.y, c2.x, c2.y);
+	var r      = dist(c0.x, c0.y, c1.x, c1.y);
+	var single = (c3.name == "single");
+	var ns     = (c4.name).split(",");
+	var N      = parseInt(ns[0]);
+	var S      = parseInt(ns[1]);
+	var a;
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 1:
+			// if control point 1 is close enough to be the centre...
+			if ( dist(c0.x, c0.y, c1.x, c1.y) <= fw.getPref("SnapDistance") )
+			{
+				// snap to centre; inner radius = 0
+				c1.x = c0.x;
+				c1.y = c0.y;
+
+				c0.toolTip = t.inner;
+
+				if (single)
+				{
+					// remove all nodes on inner polygon
+					smartShape.elem.elements[0].contours.length = 1;
+				}
+				else
+					createSplitPolygon(R, 0, N, S);
+			}
+			else
+				c0.toolTip = t.reset;
+
+			// if rotate only, redraw polygon
+			if (c0.name == "reset_rotation")
+			{
+				if (single)
+					createPolygon(R, r, N, S);
+				else
+					createSplitPolygon(R, r, N, S);
+			}
+
+			smartShape.elem.customData["radius0"] = R;
+			smartShape.elem.customData["radius1"] = r;
+
+			break;
+
+		case 2:
+			// if the polygon was scaled, reposition control point 3 & 4
+			if (c2.name == "resize")
+			{
+				c3.x = c0.x - R;
+				c3.y = (c0.y+R) - Math.round((2*R)*(N-k.minNodes)/(k.maxNodes-k.minNodes));
+
+				if (c3.y < c0.y-R) c3.y = c0.y - R;
+				if (c3.y > c0.y+R) c3.y = c0.y + R;
+
+				c4.x = c0.x + R;
+				c4.y = (c0.y+R) - Math.round((2*R)*(S-1)/(N-1));
+
+				if (c4.y < c0.y-R) c4.y = c0.y - R;
+				if (c4.y > c0.y+R) c4.y = c0.y + R;
+
+				c2.name = "";
+			}
+
+			a = evalAngle((c2.x-c0.x),(c2.y-c0.y))+Math.PI/2;
+
+			if (a<0)
+				a += (2*Math.PI);
+
+			smartShape.elem.customData["radius0"]  = R;
+			smartShape.elem.customData["radius1"]  = r;
+			smartShape.elem.customData["rotation"] = rad2deg(a);
+
+			break;
+	}
+}
+
+function RedrawSmartShape()
+{
+	var t  = smartShape.elem.customData["tooltips"];
+	var k  = smartShape.elem.customData["constants"];
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var c4 = smartShape.elem.controlPoints[4];
+	var R  = parseInt(smartShape.elem.customData["radius0"]);
+	var r  = parseInt(smartShape.elem.customData["radius1"]);
+	var N  = parseInt(smartShape.elem.customData["nodes"]);
+	var S  = parseInt(smartShape.elem.customData["sides"]);
+	var a  = deg2rad(parseFloat(smartShape.elem.customData["rotation"]));
+
+	c1.x = c0.x + (r * Math.sin(a));
+	c1.y = c0.y + (r * -Math.cos(a));
+
+	c2.x = c0.x + (R * Math.sin(a));
+	c2.y = c0.y + (R * -Math.cos(a));
+
+	c3.x = c0.x - R;
+	c3.y = (c0.y+R) - Math.round((2*R)*(N-k.minNodes)/(k.maxNodes-k.minNodes));
+
+	if (c3.y < c0.y-R) c3.y = c0.y - R;
+	if (c3.y > c0.y+R) c3.y = c0.y + R;
+
+	c4.x = c0.x + R;
+	c4.y = (c0.y+R) - Math.round((2*R)*(S-1)/(N-1));
+
+	if (c4.y < c0.y-R) c4.y = c0.y - R;
+	if (c4.y > c0.y+R) c4.y = c0.y + R;
+
+	c3.toolTip = t.sides + ": " + N + "; " + t.altopt;
+	c4.toolTip = t.sections + ": " + S;
+
+	c3.name = (smartShape.elem.customData["split"])? "split" : "single";
+
+	c4.name = N + "," + S;
+
+	if (c3.name == "single")
+	{
+		smartShape.elem.elements.length = 1;
+
+		createPolygon(R, r, N, S);
+	}
+	else
+		createSplitPolygon(R, r, N, S);
+}
+
+/*============================================================================*/
+/*                             Utility functions                              */
+/*============================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/(Math.PI*2); }
+
+// converts Degrees to Radians
+function deg2rad(a) { return (a/360)*(Math.PI*2); }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+/*----------------------------------------------------------------------------*/
+/* createPolygon                                                              */
+/*                                                                            */
+/*   Description: creates a polygon as element e, with outer radius R,        */
+/*                inner radius r, N sides, and S sections                     */
+/*                                                                            */
+/*     Arguments: R - outer radius                                            */
+/*                r - inner radius                                            */
+/*                N - number of sides                                         */
+/*                S - number of sections                                      */
+/*                                                                            */
+/*       Returns: none                                                        */
+/*----------------------------------------------------------------------------*/
+function createPolygon(R, r, N, S)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c2 = smartShape.elem.controlPoints[2];
+	var a_ = evalAngle(c2.x-c0.x, c2.y-c0.y);
+	var da = (2*Math.PI)/N;
+	var closed = (N==S);
+	var I  = (closed)? S : S+1;
+	var a, i, x, y;
+	var contour;
+
+	smartShape.elem.elements[0].contours[0] = new Contour;
+	contour = smartShape.elem.elements[0].contours[0];
+	contour.nodes.length = 0;
+
+	for (i=0; i<I; i++,a_+=da)
+	{
+		a = (a_>Math.PI)? (a_-(2*Math.PI)) : a_;
+
+		x = c0.x + R * Math.cos(a);
+		y = c0.y + R * Math.sin(a);
+
+		addPathPoint(contour, x, y);
+	}
+	contour.isClosed = closed;
+
+	if (r > 0)
+	{
+		smartShape.elem.elements[0].contours[1] = new Contour;
+		smartShape.elem.elements[0].contours[1].nodes.length = 0;
+
+		contour = smartShape.elem.elements[0].contours[(closed)?1:0];
+
+		for (a_-=da; i>0; i--,a_-=da)
+		{
+			a = (a_>Math.PI)? a_-(2*Math.PI) : a_;
+
+			x = c0.x + r * Math.cos(a);
+			y = c0.y + r * Math.sin(a);
+
+			addPathPoint(contour, x, y);
+		}
+	}
+	else
+	{
+		smartShape.elem.elements[0].contours.length = 1;
+
+		contour = smartShape.elem.elements[0].contours[0];
+
+		if (!closed)
+		{
+			addPathPoint(contour, c0.x, c0.y);
+		}
+	}
+
+	contour.isClosed = true;
+}
+
+/*----------------------------------------------------------------------------*/
+/* createSplitPolygon                                                         */
+/*                                                                            */
+/*   Description: creates a polygon in split mode with outer radius R,        */
+/*                inner radius r, N sides, and S sections                     */
+/*                                                                            */
+/*     Arguments: R - outer radius                                            */
+/*                r - inner radius                                            */
+/*                N - number of sides                                         */
+/*                S - number of sections                                      */
+/*                                                                            */
+/*       Returns: none                                                        */
+/*----------------------------------------------------------------------------*/
+function createSplitPolygon(R, r, N, S)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c2 = smartShape.elem.controlPoints[2];
+	var a_ = evalAngle(c2.x-c0.x, c2.y-c0.y);
+	var da = (2*Math.PI)/N;
+	var a0, a1, i, x0, y0, x1, y1;
+	var contour;
+
+	// remove inner polygon
+	smartShape.elem.elements[0].contours.length = 1;
+
+	for (i=0; i<S; i++,a_+=da)
+	{
+		// if the required element does not exist, create one
+		if (i >= smartShape.elem.elements.length)
+		{
+			smartShape.elem.elements[i] = new Path;
+			smartShape.elem.elements[i].contours[0] = new Contour;
+		}
+
+		smartShape.elem.elements[i].blendMode      = smartShape.elem.elements[0].blendMode;
+		smartShape.elem.elements[i].effectList     = smartShape.elem.elements[0].effectList;
+		smartShape.elem.elements[i].opacity        = smartShape.elem.elements[0].opacity;
+		smartShape.elem.elements[i].pathAttributes = smartShape.elem.elements[0].pathAttributes;
+
+		// remove all nodes
+		contour = smartShape.elem.elements[i].contours[0];
+		contour.nodes.length = 0;
+
+		a0 = (a_>Math.PI)? a_-(2*Math.PI) : a_;
+		a1 = a0 + da;
+		a1 = (a1>Math.PI)? a1-(2*Math.PI) : a1;
+
+		// add four nodes per section
+		x0 = c0.x + R * Math.cos(a0);
+		y0 = c0.y + R * Math.sin(a0);
+		addPathPoint(contour, x0, y0);
+
+		x1 = c0.x + R * Math.cos(a1);
+		y1 = c0.y + R * Math.sin(a1);
+		addPathPoint(contour, x1, y1);
+
+		x1 = c0.x + r * Math.cos(a1);
+		y1 = c0.y + r * Math.sin(a1);
+		addPathPoint(contour, x1, y1);
+
+		x0 = c0.x + r * Math.cos(a0);
+		y0 = c0.y + r * Math.sin(a0);
+		addPathPoint(contour, x0, y0);
+
+		// close contour
+		contour.isClosed = true;
+	}
+
+	// remove any extra elements
+	smartShape.elem.elements.length = S;
+}
+
+/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/

@@ -1,0 +1,15 @@
+﻿//English
+
+var __tooltips = new Object();
+var __customdata = new Object();
+
+__tooltips["head"] = "Head";
+__tooltips["of"] = "of";
+__tooltips["resize"] = "Resize";
+
+__customdata["head1"] = "Head1";
+__customdata["head2"] = "Head2";
+__customdata["tail"] = "Tail";
+__customdata["box"] = "Box";
+__customdata["none"] = "None";
+			

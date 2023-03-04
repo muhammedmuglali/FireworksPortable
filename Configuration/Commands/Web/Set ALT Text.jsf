@@ -1,0 +1,81 @@
+﻿// Copyright (c) 2000 Macromedia. All rights reserved.
+
+// Run the webLayer function
+webLayer = GetWebLayer();
+
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Set ALT Text.jsf");
+var alertMessage = __tooltips["alertMessage"];
+var promptMessage = __tooltips["promptMessage"];
+
+// Check to make that the webLayer has objects on it
+if(webLayer != null) {
+	// Check to make sure that the web layer and the
+	// default alt tag are blank
+	if(!ContainsBlankWebObjects(webLayer) && !DefaultAltTextIsBlank()) {
+		alert(alertMessage);
+	}
+	else {
+		// Prompt for the new alt tag
+		altTag = prompt(promptMessage);
+		// Check to make sure the user input something
+		if (altTag != null){
+
+			// set the default alt tag for the document
+			if (DefaultAltTextIsBlank()) {
+				fw.getDocumentDOM().defaultAltText = altTag;
+			}
+
+			// set the alt tag for the elements
+			for (i in theWebLayer.elements) {
+				oldAltTag = theWebLayer.elements[i].altText;
+				// Firworks sometimes returns NULL, and sometimes
+				//  the empty string ""
+				if(oldAltTag == null || oldAltTag == "")
+					theWebLayer.elements[i].altText = altTag;
+			}
+		}
+	}
+}
+
+// -----------------------------------------------------------
+function GetWebLayer()
+{
+	theWebLayer = null;
+
+	// Get the layers list
+	layers = fw.getDocumentDOM().layers;
+	for (layerIndex in layers) {
+		if (layers[layerIndex].layerType == "web"){
+			theWebLayer = fw.getDocumentDOM().frames[0].layers[layerIndex];
+
+			break;
+		}
+	}
+
+	return theWebLayer;
+}
+
+// -----------------------------------------------------------
+function ContainsBlankWebObjects(aLayer) {
+
+	if(aLayer != null) {
+
+		for (i in aLayer.elements) {
+			// Firworks sometimes returns NULL, and sometimes the empty string ""
+			if(aLayer.elements[i].altText == null || aLayer.elements[i].altText == "")
+				return(true);
+		}
+	}
+
+	// No blank objects found
+	return(false);
+}
+
+// -----------------------------------------------------------
+
+function DefaultAltTextIsBlank() {
+	return(fw.getDocumentDOM().defaultAltText == null || fw.getDocumentDOM().defaultAltText == "");
+}
+
+// -----------------------------------------------------------

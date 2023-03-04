@@ -1,0 +1,44 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	Widget.elem.customData["flexClassName"] = "TextInput";
+
+	var currValues = new Array();
+
+	currValues.push({ name:"color",         type:"Color",   value:"#0B333C" });
+	currValues.push({ name:"disabledColor", type:"Color",   value:"#AAB3B3" });
+	currValues.push({ name:"enabled",       type:"Boolean", value:"true"    });
+	currValues.push({ name:"text",          type:"Text",    value:"Text"    });
+
+	currValues.push({ name:"MXML", type:"MXML", value:"<mx:TextInput color='$0' disabledColor='$1' enabled='$2' text='$3'/>" });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var vals    = Widget.elem.customData["currentValues"];
+	var state   = vals[0].value.split(",")[0];
+	var enabled = vals[2].value;
+	var obj;
+
+	obj = Widget.GetObjectByName("text");
+	obj.pathAttributes.fillColor = vals[(enabled)?0:1].value;
+	obj.textChars = vals[3].value;
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+	default: break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

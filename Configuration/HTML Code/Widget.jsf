@@ -1,0 +1,57 @@
+function fwalert( alertText )
+{
+	//alert( alertText );
+}
+
+var currentValues = null;
+
+if( Widget && Widget.elem )
+{
+	fwalert("Checking Current Values");
+	currentValues = Widget.elem.customData["currentValues"];
+}
+
+
+function setDefaultValues()
+{
+	try
+	{
+		fwalert("Set Default Values Called");
+
+	}catch(expn)
+	{
+
+	}
+}
+
+
+function applyCurrentValues()
+{
+	try
+	{
+		fwalert("Apply Default Values called");
+
+	}catch( excep )
+	{
+		fwalert( "Exception = " + excep );
+	}	
+}
+
+
+switch( Widget.opCode )
+{
+  case 1:
+  {
+	//setDefaultValues();
+	break;
+  }
+  case 2:
+  {	
+	if( !currentValues )
+	{
+		setDefaultValues();
+	}
+	applyCurrentValues();	
+	break;
+  }
+ }

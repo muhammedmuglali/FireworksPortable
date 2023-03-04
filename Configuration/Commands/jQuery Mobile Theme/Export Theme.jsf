@@ -1,0 +1,295 @@
+﻿var entireCSS = "";
+
+function __main()
+{	
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+	localizedString = __jQuerytooltips;
+		
+	if(fw.documents.length == 0)
+	{
+		alert(localizedString.active);	//The error message has already been localized.
+		return;
+	}
+	var swatchName = "";
+	var dom = fw.getDocumentDOM();
+	var numPages = dom.pagesCount;	
+	var currPage = dom.currentPageNum;
+	var myCSS = "";
+	var fromPreview = false;
+	var exportCurrentSwatch = false;
+	var folder = fw.browseForFolderURL();
+	if (folder!=null && folder!="")
+	{
+		cssFile = prompt(localizedString.fileName,"jQuery");
+		fileNameForAlert = cssFile + ".css";
+		if (cssFile!=null && cssFile!="")
+		{
+			cssFile = folder + "/" + cssFile;
+			cssFile = cssFile + ".css";
+			
+			//If file already exists,replace the file
+			var fileExists = Files.exists(cssFile);
+			var shouldReplace = true;
+			if(true == fileExists)
+				shouldReplace = fw.yesNoDialog(fileNameForAlert + " " + localizedString.overwrite);	//Should we show the entire path or just the file name?
+			if(true == shouldReplace)
+			{
+				fw.runScript(fw.appHtmlCodeDir + "/jQuery/generateCSS.jsf");
+				//The web layer names are not used. It is assumed that the file names will not change.
+				myCSS += entireCSS;
+				if(myCSS = "")
+				{
+					shouldExport = fw.yesNoDialog( localizedString.nojQueryData );
+					if(true == shouldExport)
+					{
+						__createAndWriteToFile(cssFile,myCSS);
+					}
+				}
+				else
+				{
+					myCSS = "@import url(\"icons-18-white.css\");\n@import url(\"icons-36-white.css\") only screen(-webkit-min-device-pixel-ratio: 1.5), only screen and (min--moz-device-pixel-ratio: 1.5), only screen and (min-resolution: 240dpi);\n" + myCSS;
+					__createAndWriteToFile(cssFile,myCSS);
+				}
+			}
+		}
+			
+	}
+	
+	dom.changeCurrentPage(currPage);
+	fw.getDocumentDOM().selectNone();
+	if(typeof invalidFont == 'undefined')
+	{
+	  invalidFont = false;
+	}
+	if( true == invalidFont)
+		alert(localizedString.missingFonts);
+	fromPreview = false;
+}
+
+//CSS Sprites export is also called from this function
+function __createAndWriteToFile(cssFile,entireCSS)
+{
+	//cssFile = cssFile + ".css";
+	var checkPermissions = Files.deleteFileIfExisting(cssFile);	//returns true in case file doesn't exists. Fails only when its not able to delete the file
+	if(checkPermissions == false)
+	{
+		alert(localizedString.filePermission);
+		return;
+	}
+	checkPermissions = Files.createFile(cssFile,".css","FW");
+	if(checkPermissions == false)
+	{
+		alert(localizedString.filePermission);
+		return;
+	}
+	//Opoen the CSS File
+	var fp = Files.open(cssFile,true);
+	fw.textOutputEncoding = "utf-8";
+
+	fp.write(entireCSS);
+	fp.close();	
+	fw.logPipEvent("jQuery Mobile Theme", null, "Export Theme");
+	//Get the path of the CSS file
+	var imgFolder = cssFile;
+	
+	// get the folder name of the CSS file
+	imgFolder = Files.getDirectory(imgFolder);
+	//imgFolder = imgFolder.substring(0,imgFolder.lastIndexOf("/"));
+	
+	__exportImages(imgFolder);
+	
+}
+
+
+function __exportImages(imgFolder)
+{
+	var imageFolder = imgFolder + "/images";
+	var folderExists = Files.exists(imageFolder);
+	// Create Images folder if doesnt Exist. should I append to the folder?
+	if(false == folderExists)
+	{
+		//Files.deleteFileIfExisting(imageFolder);
+		Files.createDirectory(imageFolder);
+	}
+	
+	var curPage = fw.getDocumentDOM().currentPageNum;
+	var numbrPages = fw.getDocumentDOM().pagesCount;
+	if((curPage != 0) && (numbrPages > 1))	//Change the current page to first page
+		fw.getDocumentDOM().changeCurrentPage(0);
+		
+	folderExists = Files.exists(imageFolder);
+	var successfulExport = false;
+	if(true == folderExists)
+	{
+		var sliceFrames = fw.getDocumentDOM().frames;
+		var webSliceLayerIndex = sliceFrames[0].topLayers.length;	//Get the number of top layer. This returns ony the top layers and not the sub layers.
+		
+		var topLayer = sliceFrames[0].topLayers[webSliceLayerIndex-1];	
+		var length = webSliceLayerIndex;	//Get the number of layers to get the index of sub layer of web layer.
+		var slices = topLayer.elemsandsublayers;
+		var cntk = slices.length - 1;
+		for(cntk = slices.length - 1 ; cntk >= 0 ; cntk--)
+		{	
+			if(("[object Text]"==(slices[cntk].toString())) && (undefined == (slices[cntk].textRuns.textRuns)))
+			{
+				continue;
+			}
+			else
+			{
+				if(slices[cntk].isLayer)
+				{
+					if(("icons-18-white" == slices[cntk].name) || ("icons-18-black" == slices[cntk].name) || ("icons-36-white" == slices[cntk].name) || ("icons-36-black" == slices[cntk].name) || ("ajax-loader" == slices[cntk].name))
+					{
+						var layerNum = parseInt(length) ; 
+						fw.getDocumentDOM().selectNone();
+						fw.getDocumentDOM().currentLayerNum = layerNum;
+						fw.getDocumentDOM().selectAllOnLayer(layerNum, false, false);
+						var sliceName = imageFolder+"/" + slices[cntk].name;
+						var suffixToDel = "";
+						var paddingVal = 0;
+						if(slices[cntk].name.search("white") != -1)
+							suffixToDel = "w";
+						else if(slices[cntk].name.search("black") != -1)
+							suffixToDel = "b"
+						if(slices[cntk].name.search("18") != -1)
+						{
+							suffixToDel = "_18"+suffixToDel;
+							paddingVal = 18;
+						}
+						else if(slices[cntk].name.search("36") != -1)	
+						{
+							suffixToDel = "_36"+suffixToDel;
+							paddingVal = 36;
+						}
+						else if("ajax-loader" == slices[cntk].name)
+						{
+							paddingVal = 3;
+						}
+						successfulExport = fw.exportCSSSpriteForJQuery(sliceName, "ui-icon-", suffixToDel, paddingVal);
+						fw.getDocumentDOM().selectNone();
+						length++;
+						if("ajax-loader" == slices[cntk].name)
+						{
+							Files.deleteFileIfExisting(sliceName + ".css");
+						}
+					}
+				}      		
+			}
+		}
+	}
+	fw.getDocumentDOM().selectNone();
+	if(successfulExport)
+	{
+		__replaceStringsInCSSFile(imageFolder);
+		successfulExport = false;
+	}
+}
+
+function __replaceStringsInCSSFile(folder)
+{
+	var cssFilesFolder = folder;
+	var cssFiles = Files.enumFiles(cssFilesFolder);
+	var fileLength = cssFiles.length;
+	var ind,fp;
+	ind=0;
+	for (ind=0; ind<fileLength; ind++)
+	{
+		fp = cssFiles[ind];
+		fp = Files.getFilename(cssFiles[ind]);
+		//fp = fp.substr(fp.lastIndexOf("/")+1);
+		if (fp.substr(0,1)=="_")
+		{
+			Files.deleteFileIfExisting(cssFiles[ind]);
+		}
+		else
+		{
+			var index = 0;
+			index = fp.lastIndexOf(".");
+			var fName = fp.substring(0,index);
+			if((fp.toLowerCase() == "icons-18-black.css") || (fp.toLowerCase() == "icons-36-black.css") || (fp.toLowerCase() == "icons-18-white.css") || (fp.toLowerCase() == "icons-36-white.css"))
+			{
+				var cssIndividualFile = cssFiles[ind];
+				var cssFilePtr = Files.open(cssIndividualFile,true);
+				css = "";
+				var cssClass = cssFilePtr.readline();
+				while(cssClass != null)	//Read every line of the page. Check on Mac
+				{
+					css += cssClass + "\n";
+					cssClass = cssFilePtr.readline();
+				}
+				cssFilePtr.close();
+				var replacedCSS = __replaceCSS(css, fName ); 
+				if(("" != replacedCSS) || (undefined != replacedCSS) || (null != replacedCSS))
+				{
+					__moveToParentDirectoryAndWriteCSS( cssFiles[ind], replacedCSS);
+				}
+				
+			}
+		}
+	}
+	CSSGlobalIconDisc = "";
+}
+
+function __replaceCSS( css, fName )
+{
+	var spriteCSS = css;
+	var baseClass = "." + fName;
+	var iconDiscColor = CSSGlobalIconDisc;
+	var replacedCSS = css;
+	replacedCSS = replacedCSS.replace(".ui-icon-search",".ui-icon-search,\n.ui-icon-searchfield:after");
+	var classesArray = css.split("\n");
+	spriteBaseClass =  classesArray[0];	//The first array item has the base class
+	replacedCSS = replacedCSS.replace(spriteBaseClass,"");	//Remove the base class
+	spriteBaseClass = spriteBaseClass.substring( spriteBaseClass.indexOf("{")+2,spriteBaseClass.indexOf(")")+1);	//Gives the background with only the URL
+	spriteBaseClass = spriteBaseClass.replace("background","background-image");	//Replace the background property name with background image.
+	spriteBaseClass = spriteBaseClass.replace("url(\"","url(\"images/");
+	var baseClassCSS = ".ui-icon,\n.ui-icon-searchfield:after {\n";
+	baseClassCSS += iconDiscColor ; //including the icon disc color which is obtained from generateCSS
+	baseClassCSS += "\t" + spriteBaseClass +";\n";	//Including the background image class.
+	baseClassCSS += "\tbackground-repeat: no-repeat;\n\t-moz-border-radius: 9px;\n\t-webkit-border-radius: 9px;\n\tborder-radius: 9px;\n}"
+	var isWhite = fName.search("white");
+	if(-1 != isWhite)	//Include the ui-icon-alt for white icons
+	{
+		baseClassCSS += "\n.ui-icon-alt {\nbackground: #fff;\nbackground: rgba(255,255,255,.3);\n";
+		baseClassCSS +=	spriteBaseClass.replace("white","black");
+		baseClassCSS +=	";\nbackground-repeat: no-repeat;\n}";
+	}
+	spriteCSS = baseClassCSS + replacedCSS;
+	return spriteCSS;
+}
+
+function __moveToParentDirectoryAndWriteCSS( cssFilename, replacedCSS)
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+	var localizedStringName = __jQuerytooltips;
+	//Since getDirectory gives the folder in which the CSS file is present, use getDirectory twice to get the parent folder of images folder where only the sprite images should be present.
+	var oldCSSFolderName = Files.getDirectory( cssFilename );
+	var newCSSFolderName = Files.getDirectory( oldCSSFolderName );
+	var newCSSfileName = Files.getFilename(cssFilename);
+	Files.deleteFileIfExisting(cssFilename);
+	Files.deleteFileIfExisting(newCSSFolderName + "/" + newCSSfileName);
+	checkPermissionToWrite = Files.createFile(newCSSFolderName + "/" + newCSSfileName,".css","FW");
+	if(checkPermissionToWrite == false)
+	{
+		alert(localizedStringName.filePermission);
+		return;
+	}
+	var	cssNewFilePtr = Files.open(newCSSFolderName + "/" + newCSSfileName,true);
+	cssNewFilePtr.write(replacedCSS);
+	cssNewFilePtr.close();
+}
+
+try
+{
+	__main();
+} 
+catch(FwErr)
+{
+		
+	if(FwErr == "Exit")
+		Files.deleteFileIfExisting(folder + "/" + imageFolder);
+	else
+		alert([FwErr, FwErr.lineNumber, FwErr.fileName].join("\n"));
+		
+}
+

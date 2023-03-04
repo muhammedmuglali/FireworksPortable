@@ -1,0 +1,47 @@
+function setDefaultValues()
+{
+	var values = new Array();
+
+	values.push({ name:"Text", type:"text", value:"Label" });
+	values.push({ name:"Text Color", type:"color", value:"#000000" });
+	values.push({ name:"Font Family", type:"font", value:"Verdana" });
+	values.push({ name:"Font Size", type:"number", value:"10" });
+	values.push({ name:"State", type:"ComboBox", value:"Normal,Normal,Over,Press,Disabled"});
+
+
+	Widget.elem.customData["currentValues"] = values;
+}
+
+function applyCurrentValues()
+{
+	var values = Widget.elem.customData["currentValues"];
+
+
+	Widget.GetObjectByName("label").textChars = values[0].value;
+	Widget.GetObjectByName("label").font = values[2].value;
+	Widget.GetObjectByName("label").fontsize = values[3].value;
+
+	var state = values[4].value.split(",")[0];
+	
+	Widget.GetObjectByName("normal").visible = (state=="Normal");
+	Widget.GetObjectByName("over").visible = (state=="Over");
+	Widget.GetObjectByName("press").visible = (state=="Press");
+	
+
+	if (state=="Disabled"){
+	Widget.GetObjectByName("disabled").visible = (state=="Disabled");
+	Widget.GetObjectByName("label").pathAttributes.fillColor = "#919095";}
+	else{
+	Widget.GetObjectByName("label").pathAttributes.fillColor = values[1].value;
+	}
+
+
+
+
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}

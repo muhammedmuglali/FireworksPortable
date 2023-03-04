@@ -1,0 +1,6 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["alertMessage"] = "No blank ALT Text were found.";
+__tooltips["promptMessage"] = "This command enters ALT text for hotspots and slices that do not have ALT text specified in the Property inspector or HTML Setup dialog. Enter ALT text:";

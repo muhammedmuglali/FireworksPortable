@@ -1,0 +1,481 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Cube.jsf");
+
+gTT[0] = __tooltips["perspective"] ;
+gTT[1] = __tooltips["offset"];
+gTT[2] = __tooltips["reset"] ;
+
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var c   = {x:cmp.x-100, y:cmp.y-100, w:160, h:160};
+	var contour, e;
+
+	var c0, c1, c2;
+
+	smartShape.elem.controlPoints.length = 3;
+
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x+200;
+	c0.y                 = c.y+200;
+	c0.name              = "1";
+	c0.toolTip           = gTT[0];
+	c0.toolTipTracksDrag = true;
+	c0.type              = "default";
+
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.x                 = c.x+c.w/2+40;
+	c1.y                 = c.y+c.h/2+40;
+	c1.toolTip           = gTT[1];
+	c1.toolTipTracksDrag = true;
+	c1.type              = "default";
+
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.x                 = c.x+c.w/2;
+	c2.y                 = c.y+c.h/2;
+	c2.toolTip           = gTT[2];
+	c2.toolTipTracksDrag = true;
+	c2.type              = "default";
+
+	for (e=0; e<6; e++)
+	{
+		smartShape.elem.elements[e] = new Path;
+		smartShape.elem.elements[e].opacity = 80;
+		smartShape.elem.elements[e].pathAttributes.brush = {	alphaRemap:"none",
+																angle:0, 
+																antiAliased:true, 
+																aspect:100, 
+																blackness:0, 
+																category:"bc_Basic", 
+																concentration:100, 
+																dashOffSize1:2, 
+																dashOffSize2:2, 
+																dashOffSize3:2, 
+																dashOnSize1:10, 
+																dashOnSize2:1, 
+																dashOnSize3:1, 
+																diameter:3, 
+																feedback:"brush", 
+																flowRate:0, 
+																maxCount:14, 
+																minSize:1, 
+																name:"bn_Soft Line", 
+																numDashes:0, 
+																shape:"square", 
+																softenMode:"bell curve", 
+																softness:50, 
+																spacing:6, 
+																textureBlend:0, 
+																textureEdge:0, 
+																tipColoringMode:"random", 
+																tipCount:1, 
+																tipSpacing:0, 
+																tipSpacingMode:"random", 
+																type:"simple" };
+		smartShape.elem.elements[e].pathAttributes.brushColor = "#000000";
+		smartShape.elem.elements[e].pathAttributes.fill = {		category:"fc_Solid", 
+																ditherColors:[ "#000000", "#000000" ], 
+																edgeType:"antialiased", 
+																feather:0, 
+																gradient:null, 
+																name:"fn_Normal", 
+																pattern:null, 
+																shape:"solid", 
+																stampingMode:"blend opaque", 
+																textureBlend:0, 
+																webDitherTransparent:false };
+		smartShape.elem.elements[e].pathAttributes.fillColor = "#FF9900";
+		smartShape.elem.elements[e].contours[0] = new Contour;
+	}
+
+	e = 0;
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x,     c.y    );
+	addPathPoint(contour, c.x+c.w, c.y    );
+	addPathPoint(contour, c.x+c.w, c.y+c.h);
+	addPathPoint(contour, c.x,     c.y+c.h);
+	contour.isClosed = true;
+
+	e++;
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x+c.w,    c.y       );
+	addPathPoint(contour, c.x+c.w,    c.y+c.h   );
+	addPathPoint(contour, c.x+40+c.w, c.y+40+c.h);
+	addPathPoint(contour, c.x+40+c.w, c.y+40    );
+	contour.isClosed = true;
+
+	e++
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x+c.w,    c.y+c.h   );
+	addPathPoint(contour, c.x,        c.y+c.h   );
+	addPathPoint(contour, c.x+40,     c.y+40+c.h);
+	addPathPoint(contour, c.x+40+c.w, c.y+40+c.h);
+	contour.isClosed = true;
+
+	e++
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x,     c.y       );
+	addPathPoint(contour, c.x,     c.y+c.h   );
+	addPathPoint(contour, c.x+40,  c.y+40+c.h);
+	addPathPoint(contour, c.x+40,  c.y+40    );
+	contour.isClosed = true;
+
+	e++
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x,        c.y   );
+	addPathPoint(contour, c.x+c.w,    c.y   );
+	addPathPoint(contour, c.x+40+c.w, c.y+40);
+	addPathPoint(contour, c.x+40,     c.y+40);
+	contour.isClosed = true;
+
+	e++
+	contour = smartShape.elem.elements[e].contours[0];
+	contour.nodes.length = 0;
+	addPathPoint(contour, c.x+40,     c.y+40    );
+	addPathPoint(contour, c.x+40+c.w, c.y+40    );
+	addPathPoint(contour, c.x+40+c.w, c.y+40+c.h);
+	addPathPoint(contour, c.x+40,     c.y+40+c.h);
+	contour.isClosed = true;
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var e0    = smartShape.elem.elements[0].contours[0];
+	var e1    = smartShape.elem.elements[1].contours[0];
+	var e2    = smartShape.elem.elements[2].contours[0];
+	var e3    = smartShape.elem.elements[3].contours[0];
+	var e4    = smartShape.elem.elements[4].contours[0];
+	var e5    = smartShape.elem.elements[5].contours[0];
+	var c     = {x:(e5.nodes[0].x+e5.nodes[1].x)/2, y:(e5.nodes[0].y+e5.nodes[3].y)/2};
+	var s     = evalSide();
+	var params;
+	var dx, dy;
+
+	c0.name = s;
+
+	switch (cpIdx)
+	{
+		case 0:
+			params           = smartShape.GetDefaultMoveParms();
+			params.rotate    = false;
+			params.minRadius = 0;
+
+			if (c0.x==c1.x)
+			{
+				c0.x++;
+				c0.y++;
+				s = evalSide();
+				moveNode(e1.nodes[2], c.x+(((s==0)||(s==1))?1:-1), c.y+(((s==1)||(s==2))?1:-1));
+				moveNode(e1.nodes[3], c.x+(((s==1)||(s==2))?1:-1), c.y+(((s==2)||(s==3))?1:-1));
+				s = (s+1)&3;
+				moveNode(e2.nodes[2], c.x+(((s==0)||(s==1))?1:-1), c.y+(((s==1)||(s==2))?1:-1));
+				moveNode(e2.nodes[3], c.x+(((s==1)||(s==2))?1:-1), c.y+(((s==2)||(s==3))?1:-1));
+				s = (s+1)&3;
+				moveNode(e3.nodes[2], c.x+(((s==0)||(s==1))?1:-1), c.y+(((s==1)||(s==2))?1:-1));
+				moveNode(e3.nodes[3], c.x+(((s==1)||(s==2))?1:-1), c.y+(((s==2)||(s==3))?1:-1));
+				s = (s+1)&3;
+				moveNode(e4.nodes[2], c.x+(((s==0)||(s==1))?1:-1), c.y+(((s==1)||(s==2))?1:-1));
+				moveNode(e4.nodes[3], c.x+(((s==1)||(s==2))?1:-1), c.y+(((s==2)||(s==3))?1:-1));
+
+				moveNode(e5.nodes[0], c.x-1, c.y-1);
+				moveNode(e5.nodes[1], c.x+1, c.y-1);
+				moveNode(e5.nodes[2], c.x+1, c.y+1);
+				moveNode(e5.nodes[3], c.x-1, c.y+1);
+			}
+
+			c0.RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e1.nodes[2].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e1.nodes[3].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e2.nodes[2].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e2.nodes[3].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e3.nodes[2].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e3.nodes[3].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e4.nodes[2].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e4.nodes[3].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e5.nodes[0].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e5.nodes[1].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e5.nodes[2].RegisterPolygonMove({x:c.x, y:c.y}, params);
+			e5.nodes[3].RegisterPolygonMove({x:c.x, y:c.y}, params);
+
+			break;
+
+		case 1:
+			params = smartShape.GetDefaultMoveParms();
+			c0.RegisterMove(params);
+			c1.RegisterMove(params);
+			e1.nodes[2].RegisterMove(params);
+			e1.nodes[3].RegisterMove(params);
+			e2.nodes[2].RegisterMove(params);
+			e2.nodes[3].RegisterMove(params);
+			e3.nodes[2].RegisterMove(params);
+			e3.nodes[3].RegisterMove(params);
+			e4.nodes[2].RegisterMove(params);
+			e4.nodes[3].RegisterMove(params);
+			e5.nodes[0].RegisterMove(params);
+			e5.nodes[1].RegisterMove(params);
+			e5.nodes[2].RegisterMove(params);
+			e5.nodes[3].RegisterMove(params);
+			break;
+
+		case 2:
+			params = smartShape.GetDefaultMoveParms();
+			c2.RegisterMove(params);
+			e0.nodes[0].RegisterMove(params);
+			e0.nodes[1].RegisterMove(params);
+			e0.nodes[2].RegisterMove(params);
+			e0.nodes[3].RegisterMove(params);
+			e1.nodes[0].RegisterMove(params);
+			e1.nodes[1].RegisterMove(params);
+			e2.nodes[0].RegisterMove(params);
+			e2.nodes[1].RegisterMove(params);
+			e3.nodes[0].RegisterMove(params);
+			e3.nodes[1].RegisterMove(params);
+			e4.nodes[0].RegisterMove(params);
+			e4.nodes[1].RegisterMove(params);
+			break;
+
+		default:
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var e0    = smartShape.elem.elements[0].contours[0];
+	var e1    = smartShape.elem.elements[1].contours[0];
+	var e2    = smartShape.elem.elements[2].contours[0];
+	var e3    = smartShape.elem.elements[3].contours[0];
+	var e4    = smartShape.elem.elements[4].contours[0];
+	var e5    = smartShape.elem.elements[5].contours[0];
+	var s     = evalSide();
+
+	var dm, cm, d, dx, dy;
+
+	switch (cpIdx)
+	{
+		case 1:
+			if (s!=parseInt(c0.name))
+				sortSides(s);
+			break;
+
+		case 2:
+			dm = smartShape.mouseDownPos;
+			cm = smartShape.currentMousePos;
+			d  = dist(dm.x, dm.y, cm.x, cm.y);
+
+			if (d<1)
+			{
+				dx    = c2.x - c1.x;
+				dy    = c2.y - c1.y;
+				c1.x  = c2.x;
+				c1.y  = c2.y;
+				c0.x += dx;
+				c0.y += dy;
+				moveNode(e1.nodes[2], e1.nodes[2].x+dx, e1.nodes[2].y+dy);
+				moveNode(e1.nodes[3], e1.nodes[3].x+dx, e1.nodes[3].y+dy);
+				moveNode(e2.nodes[2], e2.nodes[2].x+dx, e2.nodes[2].y+dy);
+				moveNode(e2.nodes[3], e2.nodes[3].x+dx, e2.nodes[3].y+dy);
+				moveNode(e3.nodes[2], e3.nodes[2].x+dx, e3.nodes[2].y+dy);
+				moveNode(e3.nodes[3], e3.nodes[3].x+dx, e3.nodes[3].y+dy);
+				moveNode(e4.nodes[2], e4.nodes[2].x+dx, e4.nodes[2].y+dy);
+				moveNode(e4.nodes[3], e4.nodes[3].x+dx, e4.nodes[3].y+dy);
+				moveNode(e5.nodes[0], e5.nodes[0].x+dx, e5.nodes[0].y+dy);
+				moveNode(e5.nodes[1], e5.nodes[1].x+dx, e5.nodes[1].y+dy);
+				moveNode(e5.nodes[2], e5.nodes[2].x+dx, e5.nodes[2].y+dy);
+				moveNode(e5.nodes[3], e5.nodes[3].x+dx, e5.nodes[3].y+dy);
+			}
+			else if (s!=parseInt(c0.name))
+				sortSides(s);
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function moveNode(node, x, y)
+{
+	node.x     = x;
+	node.y     = y;
+	node.predX = x;
+	node.predY = y;
+	node.succX = x;
+	node.succY = y;
+}
+
+function evalSide()
+{
+	var e0 = smartShape.elem.elements[0].contours[0];
+	var e5 = smartShape.elem.elements[5].contours[0];
+
+	if ((e5.nodes[0].x>e0.nodes[0].x) && (e5.nodes[0].y>e0.nodes[0].y) &&
+		(e5.nodes[1].x<e0.nodes[1].x) && (e5.nodes[1].y>e0.nodes[1].y) &&
+		(e5.nodes[2].x<e0.nodes[2].x) && (e5.nodes[2].y<e0.nodes[2].y) &&
+		(e5.nodes[3].x>e0.nodes[3].x) && (e5.nodes[3].y<e0.nodes[3].y))
+		return -1;
+	else if ((e5.nodes[0].x>e0.nodes[0].x) && (e5.nodes[0].y<e0.nodes[0].y))
+		return 0;
+	else if ((e5.nodes[1].x>e0.nodes[1].x) && (e5.nodes[1].y>e0.nodes[1].y))
+		return 1;
+	else if ((e5.nodes[2].x<e0.nodes[2].x) && (e5.nodes[2].y>e0.nodes[2].y))
+		return 2;
+	else
+		return 3;
+}
+
+function sortSides(s)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var e  = smartShape.elem;
+	var e0 = e.elements[0].contours[0];
+	var e1 = e.elements[1].contours[0];
+	var e2 = e.elements[2].contours[0];
+	var e3 = e.elements[3].contours[0];
+	var e4 = e.elements[4].contours[0];
+	var e5 = e.elements[5].contours[0];
+	var s_ = parseInt(c0.name);
+	var p_ = new Array(1, 2, 3, 4,
+	                   1, 2, 3, 4,
+	                   4, 1, 2, 3,
+	                   3, 4, 1, 2,
+	                   2, 3, 4, 1);
+	var p  = new Array(6, 7, 8, 9,
+	                   6, 7, 8, 9,
+	                   7, 8, 9, 6,
+	                   8, 9, 6, 7,
+	                   9, 6, 7, 8);
+	var i;
+
+	// create new paths for temporary storage of pathAttributes
+	for (i=0; i<4; i++)
+	{
+		e.elements[6+i] = new Path;
+		e.elements[6+i].blendMode      = e.elements[p_[(s_+1)*4+i]].blendMode;
+		e.elements[6+i].effectList     = e.elements[p_[(s_+1)*4+i]].effectList;
+		e.elements[6+i].opacity        = e.elements[p_[(s_+1)*4+i]].opacity;
+		e.elements[6+i].pathAttributes = e.elements[p_[(s_+1)*4+i]].pathAttributes;
+	}
+
+	// reposition sides accordingly
+	moveNode(e1.nodes[0], e0.nodes[(s<0)? 0 : ((s+0)&3)].x, e0.nodes[(s<0)? 0 : ((s+0)&3)].y);
+	moveNode(e1.nodes[1], e0.nodes[(s<0)? 1 : ((s+1)&3)].x, e0.nodes[(s<0)? 1 : ((s+1)&3)].y);
+	moveNode(e1.nodes[2], e5.nodes[(s<0)? 1 : ((s+1)&3)].x, e5.nodes[(s<0)? 1 : ((s+1)&3)].y);
+	moveNode(e1.nodes[3], e5.nodes[(s<0)? 0 : ((s+0)&3)].x, e5.nodes[(s<0)? 0 : ((s+0)&3)].y);
+
+	moveNode(e2.nodes[0], e0.nodes[(s<0)? 1 : ((s+1)&3)].x, e0.nodes[(s<0)? 1 : ((s+1)&3)].y);
+	moveNode(e2.nodes[1], e0.nodes[(s<0)? 2 : ((s+2)&3)].x, e0.nodes[(s<0)? 2 : ((s+2)&3)].y);
+	moveNode(e2.nodes[2], e5.nodes[(s<0)? 2 : ((s+2)&3)].x, e5.nodes[(s<0)? 2 : ((s+2)&3)].y);
+	moveNode(e2.nodes[3], e5.nodes[(s<0)? 1 : ((s+1)&3)].x, e5.nodes[(s<0)? 1 : ((s+1)&3)].y);
+
+	moveNode(e3.nodes[0], e0.nodes[(s<0)? 2 : ((s+2)&3)].x, e0.nodes[(s<0)? 2 : ((s+2)&3)].y);
+	moveNode(e3.nodes[1], e0.nodes[(s<0)? 3 : ((s+3)&3)].x, e0.nodes[(s<0)? 3 : ((s+3)&3)].y);
+	moveNode(e3.nodes[2], e5.nodes[(s<0)? 3 : ((s+3)&3)].x, e5.nodes[(s<0)? 3 : ((s+3)&3)].y);
+	moveNode(e3.nodes[3], e5.nodes[(s<0)? 2 : ((s+2)&3)].x, e5.nodes[(s<0)? 2 : ((s+2)&3)].y);
+
+	moveNode(e4.nodes[0], e0.nodes[(s<0)? 3 : ((s+3)&3)].x, e0.nodes[(s<0)? 3 : ((s+3)&3)].y);
+	moveNode(e4.nodes[1], e0.nodes[(s<0)? 0 : ((s+4)&3)].x, e0.nodes[(s<0)? 0 : ((s+4)&3)].y);
+	moveNode(e4.nodes[2], e5.nodes[(s<0)? 0 : ((s+4)&3)].x, e5.nodes[(s<0)? 0 : ((s+4)&3)].y);
+	moveNode(e4.nodes[3], e5.nodes[(s<0)? 3 : ((s+3)&3)].x, e5.nodes[(s<0)? 3 : ((s+3)&3)].y);
+
+	// apply correct pathAttributes
+	for (i=0; i<4; i++)
+	{
+		e.elements[1+i].blendMode      = e.elements[p[(s+1)*4+i]].blendMode;
+		e.elements[1+i].effectList     = e.elements[p[(s+1)*4+i]].effectList;
+		e.elements[1+i].opacity        = e.elements[p[(s+1)*4+i]].opacity;
+		e.elements[1+i].pathAttributes = e.elements[p[(s+1)*4+i]].pathAttributes;
+	}
+
+	// record current orientation
+	c0.name = s;
+
+	// remove temporary paths
+	smartShape.elem.elements.length -= 4;
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

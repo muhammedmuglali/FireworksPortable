@@ -1,0 +1,762 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCPD  = fw.ellipseBCPConst;
+var gPI   = Math.PI;		// 180 degrees
+
+var gFlowchartSymbols = new Array();
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Flowchart.jsf");
+gFlowchartSymbols[0] = __tooltips["alternateproces"]; 
+gFlowchartSymbols[1] = __tooltips["card"]; 
+gFlowchartSymbols[2] = __tooltips["collate"];
+gFlowchartSymbols[3] = __tooltips["connector"];        
+gFlowchartSymbols[4] = __tooltips["data"];             
+gFlowchartSymbols[5] = __tooltips["decision"];         
+gFlowchartSymbols[6] = __tooltips["delay"];            
+gFlowchartSymbols[7] = __tooltips["directaccess"];     
+gFlowchartSymbols[8] = __tooltips["display"];          
+gFlowchartSymbols[9] = __tooltips["document"];         
+gFlowchartSymbols[10] = __tooltips["extract"];          
+gFlowchartSymbols[11] = __tooltips["internalstorage"];  
+gFlowchartSymbols[12] = __tooltips["magneticdisk"];     
+gFlowchartSymbols[13] = __tooltips["manualinput"];      
+gFlowchartSymbols[14] = __tooltips["manualoperation"];  
+gFlowchartSymbols[15] = __tooltips["merge"];            
+gFlowchartSymbols[16] = __tooltips["multidocument"];    
+gFlowchartSymbols[17] = __tooltips["offpageconnector"]; 
+gFlowchartSymbols[18] = __tooltips["or"];               
+gFlowchartSymbols[19] = __tooltips["predefinedprocess"];
+gFlowchartSymbols[20] = __tooltips["preparation"];      
+gFlowchartSymbols[21] = __tooltips["process"];          
+gFlowchartSymbols[22] = __tooltips["punchedtape"];      
+gFlowchartSymbols[23] = __tooltips["seqaccess"];        
+gFlowchartSymbols[24] = __tooltips["sort"];             
+gFlowchartSymbols[25] = __tooltips["storeddata"];       
+gFlowchartSymbols[26] = __tooltips["summingjunction"];  
+gFlowchartSymbols[27] = __tooltips["terminator"];       
+
+
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+
+	createThumbnails({x:cmp.x, y:cmp.y});
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var cpLen = smartShape.elem.controlPoints.length;
+	var cp    = smartShape.elem.controlPoints[cpIdx];
+	var c     = {x:0, y:0};
+
+	if (cpLen==1)
+		createThumbnails({x:cp.x, y:cp.y});
+	else
+	{
+		c = getCentre();
+
+		createFlowchartSymbol({x:c.x,y:c.y}, cpIdx, false);
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function addElement(element, bc, fc)
+{
+	element.elements[element.elements.length] = new Path;
+
+	var e = element.elements[element.elements.length-1];
+
+	e.contours[0] = new Contour;
+	e.contours[0].nodes.length = 0;
+
+	e.opacity = 100;
+
+	if (bc!="")
+	{
+		e.pathAttributes.brush = {	alphaRemap:"none",
+									angle:0, 
+									antiAliased:true, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Basic", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:10, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"brush", 
+									flowRate:0, 
+									maxCount:14, 
+									minSize:1, 
+									name:"bn_Soft Line", 
+									numDashes:0, 
+									shape:"square", 
+									softenMode:"bell curve", 
+									softness:50, 
+									spacing:6, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = bc;
+	}
+	else
+		e.pathAttributes.brush = null;
+
+	if (fc!="")
+	{
+		e.pathAttributes.fill = {	category:"fc_Solid", 
+									ditherColors:[ "#000000", "#000000" ], 
+									edgeType:"antialiased", 
+									feather:0, 
+									gradient:null, 
+									name:"fn_Normal", 
+									pattern:null, 
+									shape:"solid", 
+									stampingMode:"blend opaque", 
+									textureBlend:0, 
+									webDitherTransparent:false };
+		e.pathAttributes.fillColor = fc;
+	}
+	else
+		e.pathAttributes.fill = null
+}
+
+function createThumbnails(c)
+{
+	var i, j, k=7, cp;
+	var N = gFlowchartSymbols.length;
+	var n;
+
+	var w = 60;
+	var h = 54;
+	var l = c.x-((k-1)*w/2);
+	var t = c.y-(((N/k)-1)*h/2);
+
+	smartShape.elem.elements.length = 0;
+	smartShape.elem.controlPoints.length = N;
+
+	for (i=0,n=0; i<N/k; i++)
+	{
+		for (j=0; (j<k)&&(n<N); j++,n++)
+		{
+			cp         = smartShape.elem.controlPoints[n];
+			cp.x       = l+j*w;
+			cp.y       = t+i*h;
+			cp.toolTip = gFlowchartSymbols[n];
+
+			createFlowchartSymbol({x:cp.x,y:cp.y}, n, true);
+		}
+	}
+}
+
+function createFlowchartSymbol(c, t, thumbnail)
+{
+	var e;
+	var bc    = "#000000";
+	var fc    = "#FFFFFF";
+	var wRect = (thumbnail)? 24 : 48;
+	var hRect = (thumbnail)? 16 : 32;
+	var cp;
+
+	if (!thumbnail)
+	{
+		smartShape.elem.elements.length = 0;
+		smartShape.elem.controlPoints.length = 1;
+
+		cp         = smartShape.elem.controlPoints[0];
+		cp.x       = c.x;
+		cp.y       = c.y;
+		cp.toolTip = gFlowchartSymbols[t];
+	}
+
+	switch (t)
+	{
+		// Alternate process
+		case 0:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 2 : 8;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x-w,   c.y-h+r, c.x-w,          c.y-h+r,        c.x-w,          c.y-h+r-r*gCPD);
+			addPathPointBez(e.contours[0], c.x-w+r, c.y-h,   c.x-w+r-r*gCPD, c.y-h,          c.x-w+r,        c.y-h         );
+			addPathPointBez(e.contours[0], c.x+w-r, c.y-h,   c.x+w-r,        c.y-h,          c.x+w-r+r*gCPD, c.y-h         );
+			addPathPointBez(e.contours[0], c.x+w,   c.y-h+r, c.x+w,          c.y-h+r-r*gCPD, c.x+w,          c.y-h+r       );
+			addPathPointBez(e.contours[0], c.x+w,   c.y+h-r, c.x+w,          c.y+h-r,        c.x+w,          c.y+h-r+r*gCPD);
+			addPathPointBez(e.contours[0], c.x+w-r, c.y+h,   c.x+w-r+r*gCPD, c.y+h,          c.x+w-r,        c.y+h         );
+			addPathPointBez(e.contours[0], c.x-w+r, c.y+h,   c.x-w+r,        c.y+h,          c.x-w+r-r*gCPD, c.y+h         );
+			addPathPointBez(e.contours[0], c.x-w,   c.y+h-r, c.x-w,          c.y+h-r+r*gCPD, c.x-w,          c.y+h-r       );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Card
+		case 1:
+			var w = wRect;
+			var h = (thumbnail)? 21 : 42;
+			var r = (thumbnail)?  9 : 18;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h  );
+			addPathPoint(e.contours[0], c.x+w,   c.y-h  );
+			addPathPoint(e.contours[0], c.x+w,   c.y+h  );
+			addPathPoint(e.contours[0], c.x-w,   c.y+h  );
+			addPathPoint(e.contours[0], c.x-w,   c.y-h+r);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Collate
+		case 2:
+			var w = wRect/2;
+			var h = wRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y-h);
+			addPathPoint(e.contours[0], c.x-w, c.y+h);
+			addPathPoint(e.contours[0], c.x+w, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Connector
+		case 3:
+			var r = wRect/2;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x,   c.y-r, c.x-r*gCPD, c.y-r,      c.x+r*gCPD, c.y-r     );
+			addPathPointBez(e.contours[0], c.x+r, c.y,   c.x+r,      c.y-r*gCPD, c.x+r,      c.y+r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y+r, c.x+r*gCPD, c.y+r,      c.x-r*gCPD, c.y+r     );
+			addPathPointBez(e.contours[0], c.x-r, c.y,   c.x-r,      c.y+r*gCPD, c.x-r,      c.y-r*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Data
+		case 4:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 10 : 20;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w,   c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Decision
+		case 5:
+			var w = wRect;
+			var h = hRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y  );
+			addPathPoint(e.contours[0], c.x,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y  );
+			addPathPoint(e.contours[0], c.x,   c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Delay
+		case 6:
+			var w = hRect;
+			var h = w;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint   (e.contours[0], c.x-w, c.y-h);
+			addPathPointBez(e.contours[0], c.x,   c.y-h, c.x+w,      c.y-h,      c.x+w*gCPD, c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w, c.y,   c.x+w,      c.y-h*gCPD, c.x+w,      c.y+h*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y+h, c.x+w*gCPD, c.y+h,      c.x,        c.y+h     );
+			addPathPoint   (e.contours[0], c.x-w, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Direct Access Storage
+		case 7:
+			var w = wRect;
+			var h = (thumbnail)? 18 : 36;
+			var r = (thumbnail)?  8 : 16;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x+w-r,   c.y-h, c.x+w-r-r*gCPD, c.y-h,      c.x+w-r+r*gCPD, c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w,     c.y,   c.x+w,          c.y-h*gCPD, c.x+w,          c.y+h*gCPD);
+			addPathPointBez(e.contours[0], c.x+w-r,   c.y+h, c.x+w-r+r*gCPD, c.y+h,      c.x+w-r-r*gCPD, c.y+h     );
+			addPathPointBez(e.contours[0], c.x+w-r*2, c.y,   c.x+w-r*2,      c.y+h*gCPD, c.x+w-r*2,      c.y-h*gCPD);
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint   (e.contours[0], c.x+w-r, c.y-h);
+			addPathPoint   (e.contours[0], c.x+w-r, c.y+h);
+			addPathPointBez(e.contours[0], c.x-w+r, c.y+h, c.x-w+r,        c.y+h,      c.x-w+r-r*gCPD, c.y+h     );
+			addPathPointBez(e.contours[0], c.x-w,   c.y,   c.x-w,          c.y+h*gCPD, c.x-w,          c.y-h*gCPD);
+			addPathPointBez(e.contours[0], c.x-w+r, c.y-h, c.x-w+r-r*gCPD, c.y-h,      c.x-w+r,        c.y-h     );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Display
+		case 8:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 8 : 16;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint   (e.contours[0], c.x-w+r, c.y-h);
+			addPathPointBez(e.contours[0], c.x+w-r, c.y-h, c.x+w-r,        c.y-h,      c.x+w-r+r*gCPD, c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w,   c.y,   c.x+w,          c.y-h*gCPD, c.x+w,          c.y+h*gCPD);
+			addPathPointBez(e.contours[0], c.x+w-r, c.y+h, c.x+w-r+r*gCPD, c.y+h,      c.x+w-r,        c.y+h     );
+			addPathPoint   (e.contours[0], c.x-w+r, c.y+h);
+			addPathPoint   (e.contours[0], c.x-w,   c.y  );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Document
+		case 9:
+			var w   = wRect;
+			var h   = hRect;
+			var r1  = (thumbnail)?  7 : 14;
+			var r1_ = w;
+			var r2  = (thumbnail)?  3 :  6;
+			var r2_ = (thumbnail)? 13 : 26;
+			var i;
+
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint   (e.contours[0], c.x-w,     c.y-h);
+			addPathPoint   (e.contours[0], c.x+w,     c.y-h);
+			addPathPointBez(e.contours[0], c.x+w,     c.y+h-r1, c.x+w,              c.y+h-r1, c.x+w-r1_*gCPD,     c.y+h-r1);
+			addPathPointBez(e.contours[0], c.x-w+r2_, c.y+h,    c.x-w+r2_+r2_*gCPD, c.y+h,    c.x-w+r2_-r2_*gCPD, c.y+h   );
+			addPathPoint   (e.contours[0], c.x-w,     c.y+h-r2);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Extract
+		case 10:
+			var w = (thumbnail)? 18 : 36;
+			var h = w;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y+h);
+			addPathPoint(e.contours[0], c.x-w, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Internal Storage
+		case 11:
+			var w = hRect;
+			var h = hRect;
+			var r = (thumbnail)? 6 : 12;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w,   c.y-h  );
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h  );
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h+r);
+			addPathPoint(e.contours[0], c.x-w,   c.y-h+r);
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h  );
+			addPathPoint(e.contours[0], c.x+w,   c.y-h  );
+			addPathPoint(e.contours[0], c.x+w,   c.y-h+r);
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h+r);
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w,   c.y-h+r);
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h+r);
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h  );
+			addPathPoint(e.contours[0], c.x-w,   c.y+h  );
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h+r);
+			addPathPoint(e.contours[0], c.x+w,   c.y-h+r);
+			addPathPoint(e.contours[0], c.x+w,   c.y+h  );
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h  );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Magnetic Disk
+		case 12:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 5 : 10;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x-w, c.y-h+r,   c.x-w,      c.y-h+r+r*gCPD, c.x-w,      c.y-h+r-r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y-h,     c.x-w*gCPD, c.y-h,          c.x+w*gCPD, c.y-h         );
+			addPathPointBez(e.contours[0], c.x+w, c.y-h+r,   c.x+w,      c.y-h+r-r*gCPD, c.x+w,      c.y-h+r+r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y-h+r*2, c.x+w*gCPD, c.y-h+r*2,      c.x-w*gCPD, c.y-h+r*2     );
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint   (e.contours[0], c.x-w, c.y-h+r);
+			addPathPoint   (e.contours[0], c.x+w, c.y-h+r);
+			addPathPointBez(e.contours[0], c.x+w, c.y+h-r,   c.x+w,      c.y+h-r,        c.x+w,      c.y+h-r+r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y+h,     c.x+w*gCPD, c.y+h,          c.x-w*gCPD, c.y+h         );
+			addPathPointBez(e.contours[0], c.x-w, c.y+h-r,   c.x-w,      c.y+h-r+r*gCPD, c.x-w,      c.y+h-r       );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Manual Input
+		case 13:
+			var w = wRect;
+			var h = (thumbnail)? 13 : 26;
+			var r = (thumbnail)?  5 : 10;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y-h+r);
+			addPathPoint(e.contours[0], c.x+w, c.y-h  );
+			addPathPoint(e.contours[0], c.x+w, c.y+h  );
+			addPathPoint(e.contours[0], c.x-w, c.y+h  );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Manual Operation
+		case 14:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 10 : 20;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Merge
+		case 15:
+			var w = (thumbnail)? 18 : 36;
+			var h = w;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y-h);
+			addPathPoint(e.contours[0], c.x,   c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Multidocument
+		case 16:
+			c.x -= ((thumbnail)? 4 : 8);
+			c.y += ((thumbnail)? 4 : 8);
+
+			var w   = wRect;
+			var h   = hRect;
+			var r1  = (thumbnail)?  7 : 14;
+			var r1_ = w;
+			var r2  = (thumbnail)?  3 :  6;
+			var r2_ = (thumbnail)? 13 : 26;
+			var i;
+
+			for (i=0; i<((t==6)?1:3); i++)
+			{
+				addElement(smartShape.elem, bc, fc);
+				e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+				addPathPoint   (e.contours[0], c.x-w,     c.y-h);
+				addPathPoint   (e.contours[0], c.x+w,     c.y-h);
+				addPathPointBez(e.contours[0], c.x+w,     c.y+h-r1, c.x+w,              c.y+h-r1, c.x+w-r1_*gCPD,     c.y+h-r1);
+				addPathPointBez(e.contours[0], c.x-w+r2_, c.y+h,    c.x-w+r2_+r2_*gCPD, c.y+h,    c.x-w+r2_-r2_*gCPD, c.y+h   );
+				addPathPoint   (e.contours[0], c.x-w,     c.y+h-r2);
+				e.contours[0].isClosed = true;
+
+				c.x += ((thumbnail)? 4 : 8);
+				c.y -= ((thumbnail)? 4 : 8);
+			}
+			break;
+
+		// Off-page Connector
+		case 17:
+			var w = hRect;
+			var h = w;
+			var r = h/2;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y-h  );
+			addPathPoint(e.contours[0], c.x+w, c.y-h  );
+			addPathPoint(e.contours[0], c.x+w, c.y+h-r);
+			addPathPoint(e.contours[0], c.x,   c.y+h  );
+			addPathPoint(e.contours[0], c.x-w, c.y+h-r);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Or
+		case 18:
+			var r = hRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x, c.y-r);
+			addPathPoint(e.contours[0], c.x, c.y+r);
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-r, c.y);
+			addPathPoint(e.contours[0], c.x+r, c.y);
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x,   c.y-r, c.x-r*gCPD, c.y-r,      c.x+r*gCPD, c.y-r     );
+			addPathPointBez(e.contours[0], c.x+r, c.y,   c.x+r,      c.y-r*gCPD, c.x+r,      c.y+r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y+r, c.x+r*gCPD, c.y+r,      c.x-r*gCPD, c.y+r     );
+			addPathPointBez(e.contours[0], c.x-r, c.y,   c.x-r,      c.y+r*gCPD, c.x-r,      c.y-r*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Predefined Process
+		case 19:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 6 : 12;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w,   c.y-h);
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h);
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w,   c.y+h);
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h);
+			e.contours[0].isClosed = true;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x+w-r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w,   c.y+h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Preparation
+		case 20:
+			var w = (thumbnail)? 28 : 56;
+			var h = hRect;
+			var r = (thumbnail)? 11 : 22;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w+r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w-r, c.y-h);
+			addPathPoint(e.contours[0], c.x+w,   c.y  );
+			addPathPoint(e.contours[0], c.x+w-r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w+r, c.y+h);
+			addPathPoint(e.contours[0], c.x-w,   c.y  );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Process
+		case 21:
+			var w = wRect;
+			var h = hRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x-w, c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y+h);
+			addPathPoint(e.contours[0], c.x-w, c.y+h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Punched Tape
+		case 22:
+			var w  = wRect;
+			var h  = (thumbnail)? 21 : 42;
+			var r  = (thumbnail)?  4 :  8;
+			var r_ = w/2;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x-w,    c.y-h+r,   c.x-w,            c.y-h+r,   c.x-w,            c.y-h+r  );
+			addPathPointBez(e.contours[0], c.x-w+r_, c.y-h+r*2, c.x-w+r_-r_*gCPD, c.y-h+r*2, c.x-w+r_+r_*gCPD, c.y-h+r*2);
+			addPathPointBez(e.contours[0], c.x,      c.y-h+r,   c.x,              c.y-h+r,   c.x,              c.y-h+r  );
+			addPathPointBez(e.contours[0], c.x+w-r_, c.y-h,     c.x+w-r_-r_*gCPD, c.y-h,     c.x+w-r_+r_*gCPD, c.y-h    );
+			addPathPointBez(e.contours[0], c.x+w,    c.y-h+r,   c.x+w,            c.y-h+r,   c.x+w,            c.y-h+r  );
+			addPathPointBez(e.contours[0], c.x+w,    c.y+h-r,   c.x+w,            c.y+h-r,   c.x+w,            c.y+h-r  );
+			addPathPointBez(e.contours[0], c.x+w-r_, c.y+h-r*2, c.x+w-r_+r_*gCPD, c.y+h-r*2, c.x+w-r_-r_*gCPD, c.y+h-r*2);
+			addPathPointBez(e.contours[0], c.x,      c.y+h-r,   c.x,              c.y+h-r,   c.x,              c.y+h-r  );
+			addPathPointBez(e.contours[0], c.x-w+r_, c.y+h,     c.x-w+r_+r_*gCPD, c.y+h,     c.x-w+r_-r_*gCPD, c.y+h    );
+			addPathPointBez(e.contours[0], c.x-w,    c.y+h-r,   c.x-w,            c.y+h-r,   c.x-w,            c.y+h-r  );
+			e.contours[0].isClosed = true;
+			break;
+
+		// Sequential Access Storage
+		case 23:
+			var r  = hRect;
+			var r_ = (thumbnail)? 5 : 10;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x,   c.y-r, c.x-r*gCPD, c.y-r,      c.x+r*gCPD, c.y-r     );
+			addPathPointBez(e.contours[0], c.x+r, c.y,   c.x+r,      c.y-r*gCPD, c.x+r,      c.y+r*gCPD);
+			addPathPoint   (e.contours[0], c.x+r*Math.cos(gPI/4), c.y+r*Math.sin(gPI/4));
+			addPathPoint   (e.contours[0], c.x+r, c.y+r*Math.sin(gPI/4));
+			addPathPoint   (e.contours[0], c.x+r, c.y+r);
+			addPathPointBez(e.contours[0], c.x,   c.y+r, c.x,   c.y+r,      c.x-r*gCPD, c.y+r     );
+			addPathPointBez(e.contours[0], c.x-r, c.y,   c.x-r, c.y+r*gCPD, c.x-r,      c.y-r*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Sort
+		case 24:
+			var w = wRect/2;
+			var h = wRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x,   c.y-h);
+			addPathPoint(e.contours[0], c.x+w, c.y  );
+			addPathPoint(e.contours[0], c.x-w, c.y  );
+			addPathPoint(e.contours[0], c.x,   c.y+h);
+			addPathPoint(e.contours[0], c.x+w, c.y  );
+			addPathPoint(e.contours[0], c.x-w, c.y  );
+			addPathPoint(e.contours[0], c.x,   c.y-h);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Stored Data
+		case 25:
+			var w = wRect;
+			var h = hRect;
+			var r = (thumbnail)? 8 : 16;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x-w+r, c.y-h, c.x-w+r-r*gCPD, c.y-h,      c.x-w+r,      c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w,   c.y-h, c.x+w,          c.y-h,      c.x+w-r*gCPD, c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w-r, c.y,   c.x+w-r,        c.y-h*gCPD, c.x+w-r,      c.y+h*gCPD);
+			addPathPointBez(e.contours[0], c.x+w,   c.y+h, c.x+w-r*gCPD,   c.y+h,      c.x+w,        c.y+h     );
+			addPathPointBez(e.contours[0], c.x-w+r, c.y+h, c.x-w+r, c.y+h,      c.x-w+r-r*gCPD, c.y+h     );
+			addPathPointBez(e.contours[0], c.x-w,   c.y,   c.x-w,   c.y+h*gCPD, c.x-w,          c.y-h*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Summing Junction
+		case 26:
+			var r = hRect;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x+r*Math.cos(-gPI*3/4), c.y+r*Math.sin(-gPI*3/4));
+			addPathPoint(e.contours[0], c.x+r*Math.cos( gPI*1/4), c.y+r*Math.sin( gPI*1/4));
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPoint(e.contours[0], c.x+r*Math.cos(-gPI*1/4), c.y+r*Math.sin(-gPI*1/4));
+			addPathPoint(e.contours[0], c.x+r*Math.cos( gPI*3/4), c.y+r*Math.sin( gPI*3/4));
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x,   c.y-r, c.x-r*gCPD, c.y-r,      c.x+r*gCPD, c.y-r     );
+			addPathPointBez(e.contours[0], c.x+r, c.y,   c.x+r,      c.y-r*gCPD, c.x+r,      c.y+r*gCPD);
+			addPathPointBez(e.contours[0], c.x,   c.y+r, c.x+r*gCPD, c.y+r,      c.x-r*gCPD, c.y+r     );
+			addPathPointBez(e.contours[0], c.x-r, c.y,   c.x-r,      c.y+r*gCPD, c.x-r,      c.y-r*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		// Terminator
+		case 27:
+			var w = wRect;
+			var h = hRect/2;
+			var r = h;
+			addElement(smartShape.elem, bc, fc);
+			e = smartShape.elem.elements[smartShape.elem.elements.length-1];
+			addPathPointBez(e.contours[0], c.x-w+r, c.y-h, c.x-w+r-r*gCPD, c.y-h,          c.x-w+r,        c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w-r, c.y-h, c.x+w-r,        c.y-h,          c.x+w-r+r*gCPD, c.y-h     );
+			addPathPointBez(e.contours[0], c.x+w,   c.y,   c.x+w,          c.y-r*gCPD,     c.x+w,          c.y+r*gCPD);
+			addPathPointBez(e.contours[0], c.x+w-r, c.y+h, c.x+w-r+r*gCPD, c.y+h,          c.x+w-r,        c.y+h     );
+			addPathPointBez(e.contours[0], c.x-w+r, c.y+h, c.x-w+r,        c.y+h,          c.x-w+r-r*gCPD, c.y+h     );
+			addPathPointBez(e.contours[0], c.x-w,   c.y,   c.x-w,          c.y+r*gCPD,     c.x-w,          c.y-r*gCPD);
+			e.contours[0].isClosed = true;
+			break;
+
+		default:
+			break;
+	}
+}
+
+function getCentre()
+{
+	var i;
+	var minX = 65000;
+	var maxX = 0;
+	var minY = 65000;
+	var maxY = 0;
+
+	for (i=0; i<smartShape.elem.controlPoints.length; i++)
+	{
+		cp = smartShape.elem.controlPoints[i];
+		minX = (cp.x<minX)? cp.x : minX;
+		maxX = (cp.x>maxX)? cp.x : maxX;
+		minY = (cp.y<minY)? cp.y : minY;
+		maxY = (cp.y>maxY)? cp.y : maxY;
+	}
+
+	return ({x:(minX+maxX)/2, y:(minY+maxY)/2});
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

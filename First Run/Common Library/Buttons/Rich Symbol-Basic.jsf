@@ -1,0 +1,38 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	var values = new Array();
+
+	values.push({ name:"Color",      type:"color", value:"#009900" });
+	values.push({ name:"Font",       type:"font",  value:"Arial"   });
+	values.push({ name:"Label",      type:"text",  value:"Button"  });
+	values.push({ name:"Fill Color", type:"color", value:"#009900" });
+
+	Widget.elem.customData["currentValues"] = values;
+}
+
+function applyCurrentValues()
+{
+	var values = Widget.elem.customData["currentValues"];
+
+	Widget.GetObjectByName("label").pathAttributes.fillColor  = values[0].value;
+	Widget.GetObjectByName("label").font                      = values[1].value;
+	Widget.GetObjectByName("label").textChars                 = values[2].value;
+	Widget.GetObjectByName("path0").pathAttributes.brushColor = values[3].value;
+	Widget.GetObjectByName("path1").pathAttributes.fillColor  = values[3].value;
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

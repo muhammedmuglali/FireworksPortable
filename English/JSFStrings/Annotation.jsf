@@ -1,0 +1,10 @@
+﻿
+// English
+
+var __tooltips = new Object();
+
+__tooltips["defaultText"] = "Edit this text using the Text or Subselection tools.";
+__tooltips["openAnnotation"] = "Open Annotation";
+__tooltips["move"] = "move";
+__tooltips["close"] = "close";
+__tooltips["resize"] = "resize";

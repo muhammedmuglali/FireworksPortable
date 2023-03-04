@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["width"] = "Frame width";
+__tooltips["overhang"] = "Overhang";
+__tooltips["drag"] = "Drag to reposition over another object";
+__tooltips["resize"] = "Resize";

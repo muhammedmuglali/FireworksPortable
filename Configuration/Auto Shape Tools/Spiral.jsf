@@ -1,0 +1,603 @@
+﻿/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+/*============================================================================*/
+/*                                Spiral tool                                 */
+/*============================================================================*/
+/*
+
+The Spiral tool allows the users to create an equiangular spiral defined by
+the following equation:-
+
+  r = a.exp(theta.cot(b))
+
+where:-
+
+  r     = distance from the origin
+  a     = constant; radius at theta=0
+  theta = angle
+  b     = constant; determines how tight the spiral is
+
+The default spiral has the following:-
+
+- One control point in the centre of the spiral.
+  (smartShape.elem.controlPoints[0])
+  This control point cannot be moved. Clicking this control point toggles
+  between open and closed spiral.
+  Open spiral is a simple spiral path, which cannot be filled completely.
+  Closed spiral is a closed path, and can be filled as such.
+
+- One control point on the end of the spiral (hidden).
+  (smartShape.elem.controlPoints[1])
+  This control point is a hidden point used to calculate the radius of the
+  spiral.
+
+- One control point to the left of the spiral.
+  (smartShape.elem.controlPoints[2])
+  This control point determines how tight the spiral should be.
+  The minimum and maximum are currently set to 45 and 88, respectively.
+
+- One element (smartShape.elem.elements[0]) for the spiral itself.
+*/
+
+
+/*============================================================================*/
+/*                             Default functions                              */
+/*============================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+		InsertSmartShapeAt(true);
+		break;
+
+	case "EndDragInsert":
+		EndDragInsert();
+		break;
+
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt(false);
+		break;
+
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	case "RedrawSmartShape":
+		RedrawSmartShape();
+		break;
+}
+
+function InsertSmartShapeAt(dragIns)
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Spiral.jsf");
+	var t    = __tooltips;
+
+	smartShape.elem.customData["tooltips"] = t;
+
+	var k = new Object();
+
+	k.ppc  = 4;		// points per cycle
+	k.maxB = 89.0;	// maximum b
+	k.minB = 50.0;	// minimum b
+
+	smartShape.elem.customData["constants"] = k;
+
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var c   = {x:cmp.x+R, y:cmp.y+R};
+	var t   = smartShape.elem.customData["tooltips"];
+	var k   = smartShape.elem.customData["constants"];
+
+	var c0, c1, c2;
+
+	// add 3 control points
+	smartShape.elem.controlPoints.length = 3;
+
+	// control point for the centre - remains fixed
+	c0         = smartShape.elem.controlPoints[0];
+	c0.x       = c.x;
+	c0.y       = c.y;
+	c0.name    = "open";
+	c0.toolTip = t.openclose;
+
+	// control point for on the end of the spiral (hidden)
+	c1         = smartShape.elem.controlPoints[1];
+	c1.x       = c.x;
+	c1.y       = c.y - R;
+	c1.visible = false;
+
+	// control point for 'b'
+	c2         = smartShape.elem.controlPoints[2];
+	c2.x       = c.x - R;
+	c2.y       = (c.y+R) - (2*R)*(80-k.minB)/(k.maxB-k.minB);
+	c2.toolTipTracksDrag = true;
+
+	smartShape.elem.elements[0] = new Path;
+	smartShape.elem.elements[0].contours[0] = new Contour;
+
+	smartShape.elem.customData["shapeName"] = "spiral";
+	smartShape.elem.customData["radius"]    = R;
+	smartShape.elem.customData["clockwise"] = "true";
+	smartShape.elem.customData["c2y"]       = (c2.y-c0.y)/R;
+
+	createEquiangularSpiral(true);
+
+	if (dragIns)
+	{
+		smartShape.constrainDragInsertAspect = true;
+
+		var c_ = {x:c.x-R ,y:c.y-R};
+		var i, n, dx, dy;
+
+		for (i=0; i<smartShape.elem.elements[0].contours[0].nodes.length; i++)
+		{
+			n  = smartShape.elem.elements[0].contours[0].nodes[i];
+			dx = (n.predX - c_.x)/(2*R);
+			dy = (n.predY - c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(setMoveParams(true,  false, false, dx, dy));
+			dx = (n.x - c_.x)/(2*R);
+			dy = (n.y - c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(setMoveParams(false, true,  false, dx, dy));
+			dx = (n.succX - c_.x)/(2*R);
+			dy = (n.succY - c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(setMoveParams(false, false, true,  dx, dy));
+		}
+
+		var	params = smartShape.GetDefaultMoveParms();
+
+		for (i=0; i<smartShape.elem.controlPoints.length; i++)
+		{
+			n = smartShape.elem.controlPoints[i];
+			params.deltaXtoX = (n.x-c_.x)/(2*R);
+			params.deltaYtoY = (n.y-c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(params);
+		}
+	}
+}
+
+function EndDragInsert()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var k  = smartShape.elem.customData["constants"];
+	var R  = Math.round(dist(c0.x, c0.y, c1.x, c1.y))
+
+	smartShape.elem.customData["radius"] = R;
+
+	c2.y = c0.y + R*smartShape.elem.customData["c2y"];
+}
+
+function DragControlPoint()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var R  = dist(c0.x, c0.y, c1.x, c1.y);
+	var cm = smartShape.currentMousePos;
+
+	if (smartShape.currentControlPointIndex==2)
+	{
+		// move vertically with the mouse
+		c2.y = cm.y;
+
+		// limit the movement to >=min and <=max
+		if      (c2.y < (c0.y-R)) c2.y = c0.y - R;
+		else if (c2.y > (c0.y+R)) c2.y = c0.y + R;
+
+		smartShape.elem.customData["c2y"] = (c2.y-c0.y)/R;
+
+		createEquiangularSpiral(false);
+	}
+}
+
+function EndDragControlPoint()
+{
+	if (smartShape.currentControlPointIndex==0)
+	{
+		var c0 = smartShape.elem.controlPoints[0];
+
+		// toggle Open and Closed spiral
+		c0.name = (c0.name=="open")? "closed" : "open";
+
+		// redraw spiral
+		createEquiangularSpiral(false);
+	}
+}
+
+function RedrawSmartShape()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c2 = smartShape.elem.controlPoints[2];
+	var R  = parseInt(smartShape.elem.customData["radius"]);
+	var d  = smartShape.elem.customData["c2y"];
+
+	c0.name = smartShape.elem.customData["isClosed"];
+
+	c2.x = c0.x - R;
+	c2.y = c0.y + R*d
+
+	createEquiangularSpiral(false);
+}
+
+/*============================================================================*/
+/*                             Utility functions                              */
+/*============================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/(2*Math.PI); }
+
+// converts Degrees to Radians
+function deg2rad(a) { return (a/360)*(2*Math.PI); }
+
+function cot(a) { return 1/Math.tan(a); }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+/*----------------------------------------------------------------------------*/
+/* setMoveParams                                                              */
+/*                                                                            */
+/*   Description: returns a new parameter object with values provided in      */
+/*                the argument                                                */
+/*                                                                            */
+/*     Arguments: mvPred - move predecessor (true/false)                      */
+/*                mvPt   - move point       (true/false)                      */
+/*                mvSucc - move successor   (true/false)                      */
+/*                xx     - change in x that applies to x (-1 <= xx <= 1)      */
+/*                yy     - change in y that applies to y (-1 <= yy <= 1)      */
+/*                xy     - change in x that applies to y (-1 <= xy <= 1)      */
+/*                yx     - change in y that applies to x (-1 <= yx <= 1)      */
+/*                minX   - mininum value in x-axis                            */
+/*                maxX   - maximum value in x-axis                            */
+/*                minY   - mininum value in y-axis                            */
+/*                maxY   - maximum value in y-axis                            */
+/*                                                                            */
+/*       Returns: new parameter object                                        */
+/*----------------------------------------------------------------------------*/
+function setMoveParams(mvPred, mvPt, mvSucc, xx, yy, xy, yx, minX, maxX, minY, maxY)
+{
+	var p = smartShape.GetDefaultMoveParms();
+
+	p.movePred  = mvPred;
+	p.movePt    = mvPt;
+	p.moveSucc  = mvSucc;
+	p.deltaXtoX = xx;
+	p.deltaYtoY = yy;
+
+	if (xy!=undefined)
+	{
+		p.deltaXtoY = xy;
+		p.deltaYtoX = yx;
+		p.minX      = minX;
+		p.maxX      = maxX;
+		p.minY      = minY;
+		p.maxY      = maxY;
+	}
+
+	return p;
+}
+
+/*----------------------------------------------------------------------------*/
+/* evalB                                                                      */
+/*                                                                            */
+/*   Description: calculates b based on the positin of the control point.     */
+/*                The slider is scaled logarithmically so the it slowly       */
+/*                reaches the max value.                                      */
+/*                                                                            */
+/*     Arguments: none                                                        */
+/*                                                                            */
+/*       Returns: b                                                           */
+/*----------------------------------------------------------------------------*/
+function evalB()
+{
+	var k  = smartShape.elem.customData["constants"];
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var R  = parseInt(smartShape.elem.customData["radius"]);
+	var b_, b;
+
+	// logarithmic scale
+	b_ = ((c0.y+R-c2.y)/(2*R)) * 9;
+	b  = (Math.log(b_+1)/Math.log(12))*(k.maxB-k.minB) + k.minB;
+
+	return b;
+}
+
+/*----------------------------------------------------------------------------*/
+/* createEquiangularSpiral                                                    */
+/*                                                                            */
+/*   Description: creates an equiangular spiral.                              */
+/*                                                                            */
+/*     Arguments: init      - whether or not this is the first time           */
+/*                clockwise - direction of spiral                             */
+/*                                                                            */
+/*       Returns: none                                                        */
+/*----------------------------------------------------------------------------*/
+function createEquiangularSpiral(init)
+{
+	var a = 0.5;
+	var b = deg2rad(evalB());
+
+	var bcpConst  = fw.ellipseBCPConst;
+	var k         = smartShape.elem.customData["constants"];
+	var c0        = smartShape.elem.controlPoints[0];
+	var c1        = smartShape.elem.controlPoints[1];
+	var c2        = smartShape.elem.controlPoints[2];
+	var R         = parseInt(smartShape.elem.customData["radius"]);
+	var clockwise = (smartShape.elem.customData["clockwise"]);
+	var theta     = 0;
+	var r         = 0;
+	var cotb      = cot(b);
+	var contour;
+	var cpdist;
+	var N, lastNode, i, n=0, an, aInc, ppc;
+
+	// if spirals less than 2PI radians, increase point per cycle to
+	// obtain smoother curve
+	ppc = ((a * Math.exp(Math.PI*4 * cotb)) < R)? k.ppc : (k.ppc*2);
+
+	aInc = (2*Math.PI)/ppc;
+
+	// remove existing nodes
+	contour = smartShape.elem.elements[0].contours[0];
+	contour.nodes.length = 0;
+
+	// until the required radius is reached...
+	while (r <= R)
+	{
+		// calculate the radius
+		// r = a * exp(theta.Cot[b])
+		r = a * Math.exp(theta * cotb);
+
+		// limit not reached
+		if (r <= R)
+		{
+			cpdist = r * bcpConst * aInc/(Math.PI/2);
+		}
+		// limit reached - need to clip last section
+		else
+		{
+			a0 = theta - aInc;			// angle of previous node
+			a1 = (Math.log(R/a))/cotb;	// what the angle should be with maximum radius
+
+			cpdist = R * bcpConst * (a1-a0)/(Math.PI/2);
+
+			theta = a1;
+
+			an = a0 - (Math.PI/2) + b;	// angle delta
+
+			dx = cpdist * Math.sin(an);
+			dy = cpdist * Math.cos(an);
+
+			lastNode = contour.nodes[contour.nodes.length-1];
+
+			// reposition last node's successors
+			lastNode.succX = lastNode.x - ((clockwise)?1:-1)*dx;
+			lastNode.succY = lastNode.y + dy;
+		}
+
+		addPointOnSpiral(contour, (r>R)?R:r, theta, b, cpdist, clockwise);
+
+		theta += aInc;
+	}
+
+	N = contour.nodes.length;
+
+	// 'clip' last node's successor
+	lastNode       = contour.nodes[N-1];
+	lastNode.succX = lastNode.x;
+	lastNode.succY = lastNode.y;
+
+	// position control point 1 (hidden)
+	c1.x = lastNode.x;
+	c1.y = lastNode.y;
+
+	c2.toolTip = smartShape.elem.customData["tooltips"].spirals
+	             + ": "
+				 + Math.round((theta-aInc)/(2*Math.PI));
+
+	//smartShape.elem.customData["spirals"] = parseFloat((theta-aInc)/(2*Math.PI));
+
+	// if the spiral is closed...
+	if (c0.name == "closed")
+	{
+		// turn back 2PI radians
+		theta -= (2*Math.PI + aInc);
+
+		// calculate the radius
+		r = a * Math.exp(theta * cotb);
+
+		cpdist = r * bcpConst * (a1-a0)/(Math.PI/2);
+
+		x = c0.x + r * Math.cos(theta);
+		y = c0.y + r * Math.sin(theta);
+
+		addPointOnSpiral(contour, r, theta, b, cpdist, clockwise);
+
+		// copy the rest of the nodes, since the closed spiral is simply
+		// following the previous path, but reverse pred & succ
+		for (i=N-2-ppc; i>-1; i--)
+		{
+			x  = contour.nodes[i].x;
+			y  = contour.nodes[i].y;
+			px = contour.nodes[i].succX;
+			py = contour.nodes[i].succY;
+			sx = contour.nodes[i].predX;
+			sy = contour.nodes[i].predY;
+
+			addPathPointBez(contour, x, y, px, py, sx, sy);
+		}
+
+		// adjust first node on return path
+		// reverse pred & succ, and 'clip' pred
+		lastNode       = contour.nodes[N];
+		lastNode.succX = lastNode.predX;
+		lastNode.succY = lastNode.predY;
+		lastNode.predX = lastNode.x;
+		lastNode.predY = lastNode.y;
+
+		if (N<(contour.nodes.length-1))
+		{
+			// adjust pred on the next node on return path
+			theta -= aInc;
+
+			r = a * Math.exp(theta * cotb);
+
+			cpdist = r * bcpConst * (a1-a0)/(Math.PI/2);
+
+			dx = cpdist * Math.sin(an);
+			dy = cpdist * Math.cos(an);
+
+			lastNode       = contour.nodes[N+1];
+			lastNode.predX = lastNode.x - ((clockwise)?1:-1)*dx;
+			lastNode.predY = lastNode.y + dy;
+		}
+
+		// close the spiral
+		contour.isClosed = true;
+	}
+	else
+	{
+		contour.isClosed = false;
+
+		if (init)
+		{
+			if (smartShape.elem.elements[0].pathAttributes.brush == null)
+			{
+				var e = smartShape.elem.elements[0];
+
+				e.pathAttributes.brush = {	alphaRemap:"none",
+											angle:0, 
+											antiAliased:true, 
+											aspect:100, 
+											blackness:0, 
+											category:"bc_Basic", 
+											concentration:100, 
+											dashOffSize1:2, 
+											dashOffSize2:2, 
+											dashOffSize3:2, 
+											dashOnSize1:10, 
+											dashOnSize2:1, 
+											dashOnSize3:1, 
+											diameter:1, 
+											feedback:"brush", 
+											flowRate:0, 
+											maxCount:14, 
+											minSize:1, 
+											name:"bn_Soft Line", 
+											numDashes:0, 
+											shape:"square", 
+											softenMode:"bell curve", 
+											softness:50, 
+											spacing:6, 
+											textureBlend:0, 
+											textureEdge:0, 
+											tipColoringMode:"random", 
+											tipCount:1, 
+											tipSpacing:0, 
+											tipSpacingMode:"random", 
+											type:"simple" };
+				e.pathAttributes.brushColor = "#000000";
+			}
+			// if not closed spiral, remove fill
+			smartShape.elem.elements[0].pathAttributes.fill = null;
+		}
+	}
+}
+
+/*----------------------------------------------------------------------------*/
+/* addPointOnSpiral                                                           */
+/*                                                                            */
+/*   Description: adds a point on the spiral                                  */
+/*                                                                            */
+/*     Arguments: contour   - contour to add the point to                     */
+/*                r         - distance from the origin                        */
+/*                theta     - angle                                           */
+/*                b         - constant                                        */
+/*                cpdist    - distance of pred/succ from the point            */
+/*                clockwise - true for clockwise spiral, false otherwise      */
+/*                                                                            */
+/*       Returns: none                                                        */
+/*----------------------------------------------------------------------------*/
+function addPointOnSpiral(contour, r, theta, b, cpdist, clockwise)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var x, y, px, py, sx, sy, dx, dy, a;
+
+	if (clockwise)
+	{
+		x = c0.x + r * Math.cos(theta);
+		y = c0.y + r * Math.sin(theta);
+		a = theta - (Math.PI/2) + b;
+	}
+	else
+	{
+		x = c0.x - r * Math.cos(-theta);
+		y = c0.y - r * Math.sin(-theta);
+		a = -theta + (Math.PI/2) - b;
+	}
+
+	dx = cpdist * Math.sin(a);
+	dy = cpdist * Math.cos(a);
+
+	if (theta==0)
+	{
+		px = x;
+		py = y;
+	}
+	else
+	{
+		px = x + dx;
+		py = y - dy;
+	}
+
+	sx = x - dx;
+	sy = y + dy;
+
+	addPathPointBez(contour, x, y, px, py, sx, sy);
+}
+
+/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/

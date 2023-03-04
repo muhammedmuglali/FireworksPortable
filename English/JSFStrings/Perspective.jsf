@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["verticalplane"] = "Vertical Plane";
+__tooltips["vanishingpoints"] = "Vanishing Point";
+__tooltips["hide"] = "Hide or adjust grid";
+__tooltips["drag"] = "Drag to adjust grid";

@@ -1,0 +1,702 @@
+﻿/* Arrow Tool allows to draw about 4 kinds of arrow styles which are of great help while designing flow diagrams and related UI designs 
+
+- Two Control Points in each corner
+(smartShape.elem.controlPoints[0], smartShape.elem.controlPoints[1])
+These control points allow you to move the corresponding end of the arrow 
+Shift - dragging allows snapping to the nearest 45 degree intervals 
+
+Also, clicking on these controlpoints allows you to change the arrow head styles 
+
+*/
+
+/*============================================================================*/
+/*                          Global variables                                  */
+/*============================================================================*/
+
+
+var cps = smartShape.elem.controlPoints;
+var rad30 = Math.PI/6;
+var rad45 = Math.PI/4;
+var mode0, mode1, fromdrag, firsttime;
+var modes = 5;
+
+
+
+/*============================================================================*/
+/*                         Default functions                                  */
+/*============================================================================*/
+
+
+switch(smartShape.operation)
+{
+	
+    case "BeginDragInsert":
+            InsertSmartShapeAt();
+	    	//RegisterDragInsert(); This over rides the functionality of DragControlPoint() which should ideally be called when CP are dragged.
+            break;
+    case "DragInsert":
+            DragInsert();
+            break;
+	case "EndDragInsert":
+            EndDragControlPoint();
+            break;
+    case "InsertSmartShapeAt":
+            InsertSmartShapeAt();
+            break;
+    case "BeginDragControlPoint":
+            firsttime = 0;
+            BeginDragControlPoint();
+            break;
+    case "DragControlPoint":
+            DragControlPoint(0);
+            break;
+    case "EndDragControlPoint":
+            EndDragControlPoint();            
+            break;
+    case "RedrawSmartShape":
+        RedrawSmartShape();
+		break;
+	default:
+		break;
+}
+
+
+function DragInsert()
+{
+	var params = smartShape.GetDefaultMoveParms();
+    var c = smartShape.currentMousePos;
+ 
+    cps[1].x = c.x;
+    cps[1].y = c.y;    
+       
+    DragControlPoint(1);
+}
+
+function RegisterDragInsert()
+{
+    var params = smartShape.GetDefaultMoveParms();
+        
+    smartShape.elem.elements[0].contours[0].nodes[1].RegisterInsertBBoxMove(params);
+	smartShape.elem.controlPoints[1].RegisterInsertBBoxMove(params);
+	
+}
+
+function InsertSmartShapeAt()
+{
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Arrow Line.jsf");
+var t =  __tooltips;
+var custdata = __customdata;
+
+var elem = smartShape.elem;
+var newPath = new Array();
+
+smartShape.elem.customData["toolTips"] = t;
+smartShape.elem.customData["custData"] = custdata;
+
+smartShape.getsDragEvents = true;
+
+mode0 = 0;
+mode1 = 1;
+
+newPath[0] = new Path;
+newPath[1] = new Path;
+newPath[2] = new Path;
+
+elem.elements[0] = newPath[0];
+elem.elements[1] = newPath[1];
+elem.elements[2] = newPath[2];
+
+newPath[0].contours[0] = new Contour;
+newPath[1].contours[0] = new Contour;
+newPath[2].contours[0] = new Contour;
+
+initattri();
+
+var line = newPath[0].contours[0];
+var arrow = newPath[1].contours[0];
+var arrow1 = newPath[2].contours[0];
+
+var i = 0;
+var mouse = smartShape.currentMousePos;
+var x = mouse.x;
+var y = mouse.y;
+
+SetControlPoint(0,"default",x,y);
+SetControlPoint(1,"default",x+100,y);
+
+i = 0;
+addPathPoint(line,i++,cps[0].x,cps[0].y);
+addPathPoint(line,i++,cps[1].x,cps[1].y);
+line.isClosed = false;
+
+i = 0;
+addPathPoint(arrow,i++,x,y);
+addPathPoint(arrow,i++,x,y);
+addPathPoint(arrow,i++,x,y);
+arrow.isClosed = false;
+
+i = 0;
+addPathPoint(arrow1,i++,cps[1].x - 10*Math.cos(rad30),cps[1].y - 10*Math.sin(rad30));
+addPathPoint(arrow1,i++,x+100,y);
+addPathPoint(arrow1,i++,cps[1].x - 10*Math.cos(rad30),cps[1].y + 10*Math.sin(rad30));
+arrow1.isClosed = false;
+
+cps[0].toolTip = t.head+": 1 "+t.of+" "+modes;
+cps[1].toolTip = t.head+": 2 "+t.of+" "+modes;
+
+smartShape.elem.customData["shapeName"] = "arrowtool";
+smartShape.elem.customData["x1"]   = x;
+smartShape.elem.customData["y1"]   = y;
+smartShape.elem.customData["x2"]   = x+100;
+smartShape.elem.customData["y2"]   = y;
+smartShape.elem.customData["t1"] = custdata.none+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+smartShape.elem.customData["t2"] = custdata.head1+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+}
+
+function BeginDragControlPoint()
+{
+smartShape.getsDragEvents = true;
+var params = smartShape.GetDefaultMoveParms();
+cps[smartShape.currentControlPointIndex].RegisterMove(params);
+}
+
+function DragControlPoint(num)
+{
+var n = smartShape.elem.elements;
+var index = 0;
+var t = smartShape.elem.customData["toolTips"];
+var x, y;
+var w, h;
+
+w = cps[1].x - cps[0].x;
+h = cps[1].y - cps[0].y;
+
+var slope = Slopeof(cps[0],cps[1]);
+
+if(num == 0)
+index = smartShape.currentControlPointIndex;
+else
+index = num;
+
+if(smartShape.shiftKeyDown)
+{
+switch(index)
+{
+case 0 : if(((slope <= 2) && (slope >= 0.5)) || ((slope <= -0.5) && (slope >= -2)))
+         {
+         if(slope < 0)
+         {
+           x = cps[1].x - w;
+           y = cps[1].y + w;
+         }
+         else
+         {
+           x = cps[1].x - w;
+           y = cps[1].y - w;         
+         }
+         }
+         else if((slope > -0.5) && (slope < 0.5))
+         {         
+           x = cps[0].x;
+           y = cps[1].y;
+         }
+         else
+         {
+           x = cps[1].x;
+           y = cps[0].y;
+         }
+         SetNodePosition(n[0].contours[0].nodes[0],x,y);
+         cps[0].x = x;
+         cps[0].y = y;
+         break;
+case 1 : if(((slope <= 2) && (slope >= 0.5)) || ((slope <= -0.5) && (slope >= -2)))
+         {
+          if(slope < 0)
+         {
+           x = cps[0].x + w;
+           y = cps[0].y - w;
+         }
+         else
+         {
+           x = cps[0].x + w;
+           y = cps[0].y + w;         
+         }
+         }
+         else if((slope > -0.5) && (slope < 0.5))
+         {         
+           x = cps[1].x;
+           y = cps[0].y;
+         }
+         else
+         {
+           x = cps[0].x;
+           y = cps[1].y;
+         }
+         SetNodePosition(n[0].contours[0].nodes[1],x,y);
+         cps[1].x = x;
+         cps[1].y = y;         
+         break;
+default : break;
+}
+}
+else
+{
+switch(index)
+{
+case 0 : SetNodePosition(n[0].contours[0].nodes[0],cps[0].x,cps[0].y);
+         break;
+case 1 : SetNodePosition(n[0].contours[0].nodes[1],cps[1].x,cps[1].y);
+         break;
+default : break;
+}
+}
+if(firsttime == 0)
+{
+var mode0instring = smartShape.elem.customData["t1"].split(",")[0];
+var mode1instring = smartShape.elem.customData["t2"].split(",")[0];
+mode0 = getCustomData(mode0instring)-1;
+mode1 = getCustomData(mode1instring)-1;
+
+}
+firsttime ++;
+setArrows(10);
+fromdrag = 1;
+cps[0].toolTip = t.resize;
+cps[1].toolTip = t.resize;
+}
+
+function EndDragControlPoint()
+{
+if(fromdrag == 1)
+setArrows(10);
+else
+{
+var pointclicked = smartShape.currentControlPointIndex;
+setArrows(pointclicked);
+}
+fromdrag = 0;
+
+smartShape.elem.customData["x1"]   = cps[0].x;
+smartShape.elem.customData["y1"]   = cps[0].y;
+smartShape.elem.customData["x2"]   = cps[1].x;
+smartShape.elem.customData["y2"]   = cps[1].y;
+setCustomData(mode0, 1);
+setCustomData(mode1, 2);
+}
+
+function RedrawSmartShape()
+{
+var n = smartShape.elem.elements[0].contours;   
+    
+var x1 = parseInt(smartShape.elem.customData["x1"]);
+var y1 = parseInt(smartShape.elem.customData["y1"]);
+var x2 = parseInt(smartShape.elem.customData["x2"]);
+var y2 = parseInt(smartShape.elem.customData["y2"]);
+var t1  = smartShape.elem.customData["t1"].split(",")[0];
+var t2  = smartShape.elem.customData["t2"].split(",")[0];
+    
+    cps[0].x = x1;
+    cps[0].y = y1;
+    cps[1].x = x2;
+    cps[1].y = y2;
+    
+    SetNodePosition(n[0].nodes[0],cps[0].x,cps[0].y);
+    SetNodePosition(n[0].nodes[1],cps[1].x,cps[1].y);
+   
+    t1 = getCustomData(t1);
+    t2 = getCustomData(t2);
+    
+    mode0 = t1 - 1;
+    mode1 = t2 - 1;    
+    
+    setArrows(10);
+}
+
+/*============================================================================*/
+/*                           User defined functions                           */
+/*============================================================================*/
+
+function initattri()
+{
+var i;
+for(i=0;i<3;i++)
+{
+smartShape.elem.elements[i].pathAttributes.brush = { alphaRemap:"none", angle:0, antiAliased:false, aspect:100, blackness:0, category:"bc_Basic", concentration:100, dashOffSize1:2, dashOffSize2:2, dashOffSize3:2, dashOnSize1:10, dashOnSize2:1, dashOnSize3:1, diameter:1, feedback:"none", flowRate:0, maxCount:14, minSize:1, name:"bn_Hard Line", numDashes:0, shape:"square", softenMode:"bell curve", softness:0, spacing:15, textureBlend:0, textureEdge:0, tipColoringMode:"random", tipCount:1, tipSpacing:0, tipSpacingMode:"random", type:"simple" }
+smartShape.elem.elements[i].pathAttributes.brushColor = "#000000";
+smartShape.elem.elements[i].pathAttributes.fill = null;
+}
+fw.getDocumentDOM().setBrushNColor({ alphaRemap:"none", angle:0, antiAliased:false, aspect:100, blackness:0, category:"bc_Basic", concentration:100, dashOffSize1:2, dashOffSize2:2, dashOffSize3:2, dashOnSize1:10, dashOnSize2:1, dashOnSize3:1, diameter:1, feedback:"none", flowRate:0, maxCount:14, minSize:1, name:"bn_Hard Line", numDashes:0, shape:"square", softenMode:"bell curve", softness:0, spacing:15, textureBlend:0, textureEdge:0, tipColoringMode:"random", tipCount:1, tipSpacing:0, tipSpacingMode:"random", type:"simple" }, "#000000");
+fw.getDocumentDOM().setFill(null);
+
+}
+
+function addPathPoint(contour, i, x, y)
+{
+var theNodes =contour.nodes;
+if(i>0)
+theNodes.length++;
+var node = theNodes[theNodes.length-1];
+node.x = node.predX = node.succX = x;
+node.y = node.predY = node.succY = y;
+}
+
+function SetControlPoint(index, type, xcoord, ycoord)
+{
+var t = smartShape.elem.customData["toolTips"];
+ 
+cps.length = index + 1;
+cps[index].type = type;
+cps[index].x = xcoord;
+cps[index].y = ycoord;
+cps[index].toolTipTracksDrag = true;
+cps[index].toolTip = t.head+": "+(index+1)+" "+t.of+" "+modes;
+}
+
+
+function setCustomData(mode, index)
+{
+var custdata = smartShape.elem.customData["custData"];
+switch(mode)
+{
+case 0: smartShape.elem.customData["t"+index] = custdata.none+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+        break;
+case 1: smartShape.elem.customData["t"+index] = custdata.head1+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+        break;
+case 2: smartShape.elem.customData["t"+index] = custdata.head2+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+        break;
+case 3: smartShape.elem.customData["t"+index] = custdata.tail+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+        break;
+case 4: smartShape.elem.customData["t"+index] = custdata.box+","+custdata.none+","+custdata.head1+","+custdata.head2+","+custdata.tail+","+custdata.box;
+        break;
+}
+}
+
+function getCustomData(index)
+{
+var custdata = smartShape.elem.customData["custData"];
+
+switch(index)
+{
+case custdata.none: return 1;
+case custdata.head1: return 2;
+case custdata.head2: return 3;
+case custdata.tail: return 4;
+case custdata.box: return 5;
+default : break;
+}
+}
+
+      
+function setArrows(pointclicked)
+{
+var t = smartShape.elem.customData["toolTips"];
+var n = smartShape.elem.elements;
+if(pointclicked == 10)
+{
+DrawbyModecp0();
+DrawbyModecp1();
+cps[0].toolTip = t.head+": "+(mode0+1)+" "+t.of+" "+modes;
+cps[1].toolTip = t.head+": "+(mode1+1)+" "+t.of+" "+modes;
+}
+else if(pointclicked == 0)
+{
+mode0 = (mode0+1)%5;
+DrawbyModecp0();
+cps[0].toolTip = t.head+": "+(mode0+1)+" "+t.of+" "+modes;
+}
+else if(pointclicked == 1)
+{
+mode1 = (mode1+1)%5;
+DrawbyModecp1();
+cps[1].toolTip = t.head+": "+(mode1+1)+" "+t.of+" "+modes;
+}
+}
+
+function DrawbyModecp0()
+{
+var X1, Y1, X2, Y2, X3, Y3, X4, Y4, X5, Y5;
+var n = smartShape.elem.elements;
+var brushColor = smartShape.elem.elements[1].pathAttributes.brushColor;
+var fillColor = smartShape.elem.elements[1].pathAttributes.fillColor;
+var angle = AngleBetween(cps[0],cps[1]);
+n[1].contours[0].nodes.length = 3;
+n[1].contours[0].closed = false;
+var alias = n[0].pathAttributes.brush.antiAliased;
+
+if (mode0 == 0)
+{
+	smartShape.elem.elements[1].pathAttributes.brush = null;
+	smartShape.elem.elements[1].pathAttributes.fill = null;
+}
+else
+{
+	smartShape.elem.elements[1].pathAttributes.brush = { alphaRemap:"none", angle:0, antiAliased:false, aspect:100, blackness:0, category:"bc_Basic", concentration:100, dashOffSize1:2, dashOffSize2:2, dashOffSize3:2, dashOnSize1:10, dashOnSize2:1, dashOnSize3:1, diameter:1, feedback:"none", flowRate:0, maxCount:14, minSize:1, name:"bn_Hard Line", numDashes:0, shape:"square", softenMode:"bell curve", softness:0, spacing:15, textureBlend:0, textureEdge:0, tipColoringMode:"random", tipCount:1, tipSpacing:0, tipSpacingMode:"random", type:"simple" }
+	smartShape.elem.elements[1].pathAttributes.brushColor = brushColor;
+	smartShape.elem.elements[1].pathAttributes.brush.antiAliased = alias;
+
+	if (mode0==1)
+	{
+		smartShape.elem.elements[1].pathAttributes.fill = null;
+	}
+	else
+	{
+		smartShape.elem.elements[1].pathAttributes.fill = {	category:"fc_Solid", 
+															ditherColors:[ "#000000", "#000000" ], 
+															edgeType:"antialiased", 
+															feather:0, 
+															gradient:null, 
+															name:"fn_Normal", 
+															pattern:null, 
+															shape:"solid", 
+															stampingMode:"blend opaque", 
+															textureBlend:0, 
+															webDitherTransparent:false };
+	}
+	smartShape.elem.elements[1].pathAttributes.fillColor = fillColor;
+}
+
+switch(mode0)
+{
+case 0 :  SetNodePosition(n[1].contours[0].nodes[0],cps[0].x,cps[0].y);
+          SetNodePosition(n[1].contours[0].nodes[1],cps[0].x,cps[0].y);
+          SetNodePosition(n[1].contours[0].nodes[2],cps[0].x,cps[0].y);
+		  cps[0].tooTip = mode0;
+          break;
+
+case 1 :  X1 = cps[0].x + 10 * Math.cos(rad30 + angle);
+          Y1 = cps[0].y + 10 * Math.sin(rad30 + angle);
+
+          X2 = cps[0].x + 10 * Math.cos(angle - rad30);
+          Y2 = cps[0].y + 10 * Math.sin(angle - rad30);
+
+          SetNodePosition(n[1].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[1].contours[0].nodes[1],cps[0].x,cps[0].y);
+          SetNodePosition(n[1].contours[0].nodes[2],X2,Y2);
+		  n[1].contours[0].isClosed = false;
+		  cps[0].tooTip = mode0;
+          break;
+          
+case 2 :  X1 = cps[0].x + 10 * Math.cos(rad30 + angle);
+          Y1 = cps[0].y + 10 * Math.sin(rad30 + angle);
+
+          X2 = cps[0].x + 10 * Math.cos(angle - rad30);
+          Y2 = cps[0].y + 10 * Math.sin(angle - rad30);
+
+          SetNodePosition(n[1].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[1].contours[0].nodes[1],cps[0].x,cps[0].y);
+          SetNodePosition(n[1].contours[0].nodes[2],X2,Y2);
+          n[1].contours[0].isClosed = true;
+		  cps[0].tooTip = mode0;
+          break;
+
+case 3 :  X1 = cps[0].x - 10 * Math.cos(rad45 + angle);
+          Y1 = cps[0].y - 10 * Math.sin(rad45 + angle);
+
+          X2 = cps[0].x - 10 * Math.cos(angle - rad45);
+          Y2 = cps[0].y - 10 * Math.sin(angle - rad45);
+          
+          X3 = X2 + 15 * Math.cos(angle);
+          Y3 = Y2 + 15 * Math.sin(angle);
+
+          X4 = cps[0].x + 20 * Math.cos(angle);
+          Y4 = cps[0].y + 20 * Math.sin(angle);
+
+          X5 = X1 + 15 * Math.cos(angle);
+          Y5 = Y1 + 15 * Math.sin(angle);
+
+          SetNodePosition(n[1].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[1].contours[0].nodes[1],cps[0].x,cps[0].y);
+          SetNodePosition(n[1].contours[0].nodes[2],X2,Y2);
+          addPathPoint(n[1].contours[0],3,X3,Y3);
+          addPathPoint(n[1].contours[0],4,X4,Y4);
+          addPathPoint(n[1].contours[0],5,X5,Y5);
+          n[1].contours[0].isClosed = true;
+          cps[0].tooTip = mode0;
+          break;
+
+case 4 :  X1 = cps[0].x - 5 * Math.cos(rad45 + angle);
+          Y1 = cps[0].y - 5 * Math.sin(rad45 + angle);
+
+          X2 = cps[0].x - 5 * Math.cos(angle - rad45);
+          Y2 = cps[0].y - 5 * Math.sin(angle - rad45);
+
+          
+          X3 = cps[0].x + 5 * Math.cos(rad45 + angle);
+          Y3 = cps[0].y + 5 * Math.sin(rad45 + angle);
+
+          X4 = cps[0].x + 5 * Math.cos(angle - rad45);
+          Y4 = cps[0].y + 5 * Math.sin(angle - rad45);
+          
+          
+          SetNodePosition(n[1].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[1].contours[0].nodes[1],X2,Y2);
+          SetNodePosition(n[1].contours[0].nodes[2],X3,Y3);
+          addPathPoint(n[1].contours[0],3,X4,Y4);
+		  n[1].contours[0].isClosed = true;
+		  cps[0].tooTip = mode0;
+          break;
+
+default : break;
+}
+}
+
+function DrawbyModecp1()
+{
+var X1, Y1, X2, Y2, X3, Y3, X4, Y4, X5, Y5;
+var n = smartShape.elem.elements;
+var angle = AngleBetween(cps[0],cps[1]);
+n[2].contours[0].nodes.length = 3;
+n[2].contours[0].closed = false;
+var brushColor = smartShape.elem.elements[2].pathAttributes.brushColor;
+var fillColor = smartShape.elem.elements[2].pathAttributes.fillColor;
+var alias = n[0].pathAttributes.brush.antiAliased;
+
+if (mode1 == 0)
+{
+	smartShape.elem.elements[2].pathAttributes.brush = null;
+	smartShape.elem.elements[2].pathAttributes.fill = null;
+}
+else
+{
+	smartShape.elem.elements[2].pathAttributes.brush = { alphaRemap:"none", angle:0, antiAliased:false, aspect:100, blackness:0, category:"bc_Basic", concentration:100, dashOffSize1:2, dashOffSize2:2, dashOffSize3:2, dashOnSize1:10, dashOnSize2:1, dashOnSize3:1, diameter:1, feedback:"none", flowRate:0, maxCount:14, minSize:1, name:"bn_Hard Line", numDashes:0, shape:"square", softenMode:"bell curve", softness:0, spacing:15, textureBlend:0, textureEdge:0, tipColoringMode:"random", tipCount:1, tipSpacing:0, tipSpacingMode:"random", type:"simple" }
+	smartShape.elem.elements[2].pathAttributes.brushColor = brushColor;
+	smartShape.elem.elements[2].pathAttributes.brush.antiAliased = alias;
+
+	if (mode1==1)
+	{
+		smartShape.elem.elements[2].pathAttributes.fill = null;
+	}
+	else
+	{
+		smartShape.elem.elements[2].pathAttributes.fill = {	category:"fc_Solid", 
+															ditherColors:[ "#000000", "#000000" ], 
+															edgeType:"antialiased", 
+															feather:0, 
+															gradient:null, 
+															name:"fn_Normal", 
+															pattern:null, 
+															shape:"solid", 
+															stampingMode:"blend opaque", 
+															textureBlend:0, 
+															webDitherTransparent:false };
+	}
+	smartShape.elem.elements[2].pathAttributes.fillColor = fillColor;
+}
+
+switch(mode1)
+{
+case 0 :  smartShape.elem.elements[2].pathAttributes.brush = null;
+          smartShape.elem.elements[2].pathAttributes.fill = null;
+          SetNodePosition(n[2].contours[0].nodes[0],cps[1].x,cps[1].y);
+          SetNodePosition(n[2].contours[0].nodes[1],cps[1].x,cps[1].y);
+          SetNodePosition(n[2].contours[0].nodes[2],cps[1].x,cps[1].y);
+          break;
+           
+case 1 :  X1 = cps[1].x - 10 * Math.cos(rad30 + angle);
+          Y1 = cps[1].y - 10 * Math.sin(rad30 + angle);
+
+          X2 = cps[1].x - 10 * Math.cos(angle - rad30);
+          Y2 = cps[1].y - 10 * Math.sin(angle - rad30);
+
+          SetNodePosition(n[2].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[2].contours[0].nodes[1],cps[1].x,cps[1].y);
+          SetNodePosition(n[2].contours[0].nodes[2],X2,Y2);
+		  n[2].contours[0].isClosed = false;
+          break;
+case 2 :  X1 = cps[1].x - 10 * Math.cos(rad30 + angle);
+          Y1 = cps[1].y - 10 * Math.sin(rad30 + angle);
+
+          X2 = cps[1].x - 10 * Math.cos(angle - rad30);
+          Y2 = cps[1].y - 10 * Math.sin(angle - rad30);
+
+          SetNodePosition(n[2].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[2].contours[0].nodes[1],cps[1].x,cps[1].y);
+          SetNodePosition(n[2].contours[0].nodes[2],X2,Y2);
+          n[2].contours[0].isClosed = true;
+          break;
+case 3 :  X1 = cps[1].x + 10 * Math.cos(rad45 + angle);
+          Y1 = cps[1].y + 10 * Math.sin(rad45 + angle);
+
+          X2 = cps[1].x + 10 * Math.cos(angle - rad45);
+          Y2 = cps[1].y + 10 * Math.sin(angle - rad45);
+     
+          X3 = X2 - 15 * Math.cos(angle);
+          Y3 = Y2 - 15 * Math.sin(angle);
+
+          X4 = cps[1].x - 20 * Math.cos(angle);
+          Y4 = cps[1].y - 20 * Math.sin(angle);
+
+          X5 = X1 - 15 * Math.cos(angle);
+          Y5 = Y1 - 15 * Math.sin(angle);
+
+
+          SetNodePosition(n[2].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[2].contours[0].nodes[1],cps[1].x,cps[1].y);
+          SetNodePosition(n[2].contours[0].nodes[2],X2,Y2);
+          addPathPoint(n[2].contours[0],3,X3,Y3);
+          addPathPoint(n[2].contours[0],4,X4,Y4);
+          addPathPoint(n[2].contours[0],5,X5,Y5);
+          n[2].contours[0].isClosed = true;
+          break;
+          
+case 4 :  X1 = cps[1].x - 5 * Math.cos(rad45 + angle);
+          Y1 = cps[1].y - 5 * Math.sin(rad45 + angle);
+
+          X2 = cps[1].x - 5 * Math.cos(angle - rad45);
+          Y2 = cps[1].y - 5 * Math.sin(angle - rad45);
+
+          
+          X3 = cps[1].x + 5 * Math.cos(rad45 + angle);
+          Y3 = cps[1].y + 5 * Math.sin(rad45 + angle);
+
+          X4 = cps[1].x + 5 * Math.cos(angle - rad45);
+          Y4 = cps[1].y + 5 * Math.sin(angle - rad45);
+          
+          
+          SetNodePosition(n[2].contours[0].nodes[0],X1,Y1);
+          SetNodePosition(n[2].contours[0].nodes[1],X2,Y2);
+          SetNodePosition(n[2].contours[0].nodes[2],X3,Y3);
+          addPathPoint(n[2].contours[0],3,X4,Y4);
+		  n[2].contours[0].isClosed = true;                    
+          break;
+default : break;
+}
+
+}
+
+
+function SetNodePosition(n, x, y)
+{
+SetBezierNodePosition(n, x, y);
+}
+
+function SetBezierNodePosition(n, x, y)
+{
+n.predX = x;
+n.predY = y;
+n.x = x;
+n.y = y;
+n.succX = x;
+n.succY = y;
+}
+
+function AngleBetween(p1,p2){
+	return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+}
+
+function Slopeof(pt1, pt2)
+{
+	if (pt2.x==pt1.x)
+	{
+		return 9999.00;
+	}
+	else if (pt2.y==pt1.y)
+	{
+		return 0.00;
+	}
+	else
+	{
+		return ((pt2.y-pt1.y)/(pt2.x-pt1.x));
+	}
+}

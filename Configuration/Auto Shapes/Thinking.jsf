@@ -1,0 +1,349 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+
+/*==========================================================================*/
+/*                           Thinking Auto Shape                            */
+/*==========================================================================*/
+
+
+
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Thinking.jsf");
+
+gTT[0] = __tooltips["direction"];
+gTT[1] = __tooltips["curvature"];
+gTT[2] = __tooltips["distance"];
+
+/*==========================================================================*/
+/* Constants                                                                */
+/*==========================================================================*/
+var kBigCurcleIndex = 0;
+var kSmallestCircleIndex = 3;
+
+var kDirectionCPIndex = 0;
+var kCurvatureCPIndex = 1;
+var kDistanceCPIndex = 2;
+var kBigBubbleRadius = 100;
+var kSmallBubbleRadius = 15;
+var kBubble1Radius = 0;
+var kPI = Math.PI;
+
+/*==========================================================================*/
+/* main switch                                                              */
+/*==========================================================================*/
+switch(smartShape.operation) {
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+		
+	case "SmartShapeEdited":
+		PlaceControlPoints();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+/*==========================================================================*/
+/* functions                                                                */
+/*==========================================================================*/
+function addCircle(elem, x, y, rad)
+{
+	var kCircleBCPAmount = fw.ellipseBCPConst;
+	
+	var position = elem.elements.length;
+	elem.elements[position] = new Path;
+
+	elem.elements[position].contours[0] = new Contour;
+	elem.elements[position].contours[0].isClosed = true;
+	//elem.elements[position].contours[0].nodes.length ++;
+	elem.elements[position].contours[0].nodes[0].x = x - rad;
+	elem.elements[position].contours[0].nodes[0].y = y;
+	elem.elements[position].contours[0].nodes[0].predX = x - rad;
+	elem.elements[position].contours[0].nodes[0].predY = y + rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[0].succX = x - rad;
+	elem.elements[position].contours[0].nodes[0].succY = y - rad * kCircleBCPAmount;
+
+	elem.elements[position].contours[0].nodes.length ++;
+	elem.elements[position].contours[0].nodes[1].x = x;
+	elem.elements[position].contours[0].nodes[1].y = y - rad;
+	elem.elements[position].contours[0].nodes[1].predX = x - rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[1].predY = y - rad;
+	elem.elements[position].contours[0].nodes[1].succX = x + rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[1].succY = y - rad;
+
+	elem.elements[position].contours[0].nodes.length ++;
+	elem.elements[position].contours[0].nodes[2].x = x + rad;
+	elem.elements[position].contours[0].nodes[2].y = y;
+	elem.elements[position].contours[0].nodes[2].predX = x + rad;
+	elem.elements[position].contours[0].nodes[2].predY = y - rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[2].succX = x + rad;
+	elem.elements[position].contours[0].nodes[2].succY = y + rad * kCircleBCPAmount;
+
+	elem.elements[position].contours[0].nodes.length ++;
+	elem.elements[position].contours[0].nodes[3].x = x;
+	elem.elements[position].contours[0].nodes[3].y = y + rad;
+	elem.elements[position].contours[0].nodes[3].predX = x + rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[3].predY = y + rad;
+	elem.elements[position].contours[0].nodes[3].succX = x - rad * kCircleBCPAmount;
+	elem.elements[position].contours[0].nodes[3].succY = y + rad;
+
+	return(elem.elements[position]);
+}
+
+function SetAttrs(elem)
+{
+	// Solid yellow fill with black stroke
+	elem.pathAttributes.brush = { alphaRemap:"none", angle:0, antiAliased:true, aspect:100, blackness:0, category:"bc_Pencil", concentration:100, dashOffSize1:2, dashOffSize2:2, dashOffSize3:2, dashOnSize1:8, dashOnSize2:1, dashOnSize3:1, diameter:1, feedback:"brush", flowRate:0, maxCount:15, minSize:1, name:"bn_1-Pixel Anti-Aliased", numDashes:0, shape:"circle", softenMode:"bell curve", softness:0, spacing:15, textureBlend:0, textureEdge:0, tipColoringMode:"random", tipCount:1, tipSpacing:0, tipSpacingMode:"random", type:"simple" };
+	elem.pathAttributes.brushColor = "#000000";
+	elem.pathAttributes.fill = { category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"antialiased", feather:0, gradient:null, name:"fn_Normal", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false };
+	elem.pathAttributes.fillColor = "#ffffff";
+}
+
+function InsertSmartShapeAt()
+{
+	var elem = smartShape.elem;
+
+	var p = smartShape.currentMousePos;
+
+	var c = addCircle(elem, p.x, p.y, kBigBubbleRadius);
+	SetAttrs(c);
+
+	c.contours[0].nodes[0].predY -= (15*fw.ellipseBCPConst);
+	c.contours[0].nodes[0].succY += (15*fw.ellipseBCPConst);
+
+	c.contours[0].nodes[1].y     += 15;
+	c.contours[0].nodes[1].predY += 15;
+	c.contours[0].nodes[1].succY += 15;
+
+	c.contours[0].nodes[2].predY += (15*fw.ellipseBCPConst);
+	c.contours[0].nodes[2].succY -= (15*fw.ellipseBCPConst);
+
+	c.contours[0].nodes[3].y     -= 15;
+	c.contours[0].nodes[3].predY -= 15;
+	c.contours[0].nodes[3].succY -= 15;
+
+	PlaceControlPoints();
+
+	var r;
+
+	r = kSmallBubbleRadius;
+	c = addCircle(elem, p.x, p.y, r);
+	SetAttrs(c);
+
+	r = kSmallBubbleRadius - 3;
+	c = addCircle(elem, p.x, p.y, r);
+	SetAttrs(c);
+
+	r = kSmallBubbleRadius - 5;
+	c = addCircle(elem, p.x, p.y, r);
+	SetAttrs(c);
+
+	PositionBubbles();
+
+	smartShape.elem.effectList = {	category:"UNUSED", 
+												effects:[ {	EffectIsVisible:true, 
+															EffectMoaID:"{a7944db8-6ce2-11d1-8c76000502701850}", 
+															ShadowAngle:315, 
+															ShadowBlur:4, 
+															ShadowColor:"#000000a5", 
+															ShadowDistance:7, 
+															ShadowType:0, 
+															category:"Shadow and Glow", 
+															name:"Drop Shadow" } ], 
+												name:"UNUSED" };
+}
+
+function GetCenter(contour)
+{
+	var center = new Object();
+	center.x = 0;
+	center.y = 0;
+	
+	var n = contour.nodes.length;
+	for (var i = 0; i < n; i++) {
+		center.x += contour.nodes[i].x;
+		center.y += contour.nodes[i].y;
+	}
+	
+	if (n > 0) {
+		center.x = center.x / n;
+		center.y = center.y / n;
+	}
+	
+	return(center);	
+}
+
+function PlaceControlPoints()
+{
+	var c, c0, c1, c2;
+
+	// delete any previous control point(s) and add one new one
+	smartShape.elem.controlPoints.length = 3;
+
+	c = GetCenter(smartShape.elem.elements[0].contours[0]);
+
+	// place it in the center of smallest circle
+	c0         = smartShape.elem.controlPoints[kDirectionCPIndex];
+	c0.x       = c.x + kBigBubbleRadius * Math.cos(kPI*3/4);
+	c0.y       = c.y + kBigBubbleRadius * Math.sin(kPI*3/4);
+	c0.toolTip = gTT[0];
+
+	c2         = smartShape.elem.controlPoints[kDistanceCPIndex];
+	c2.x       = c0.x + 80*Math.cos(kPI*3/4);
+	c2.y       = c0.y + 80*Math.sin(kPI*3/4);
+	c2.toolTip = gTT[2];
+
+	c1         = smartShape.elem.controlPoints[kCurvatureCPIndex];
+	c1.x       = c0.x + 40*Math.cos((kPI*3/4)*0.7);
+	c1.y       = c0.y + 40*Math.sin((kPI*3/4)*0.7);
+	c1.toolTip = gTT[1];
+}
+
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+function PositionBubbles()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var e1 = smartShape.elem.elements[1].contours[0];
+	var e2 = smartShape.elem.elements[2].contours[0];
+	var e3 = smartShape.elem.elements[3].contours[0];
+
+	var x, y;
+
+	x  = c1.x + (c0.x-c1.x)*0.45;
+	y  = c1.y - (c1.y-c0.y)*0.45;
+	MoveCircle(1, x, y, dist(e1.nodes[0].x, e1.nodes[0].y, e1.nodes[2].x, e1.nodes[2].y)/2);
+
+	x  = c1.x - (c1.x-c2.x)*0.45;
+	y  = c1.y + (c2.y-c1.y)*0.45;
+	MoveCircle(2, x, y, dist(e2.nodes[0].x, e2.nodes[0].y, e2.nodes[2].x, e2.nodes[2].y)/2);
+
+	x  = c2.x;
+	y  = c2.y;
+	MoveCircle(3, x, y, dist(e3.nodes[0].x, e3.nodes[0].y, e3.nodes[2].x, e3.nodes[2].y)/2);
+}
+
+function MoveCircle(e, x, y, r)
+{
+	var contour = smartShape.elem.elements[e].contours[0];
+	var cpd     = fw.ellipseBCPConst;
+
+	contour.nodes[0].x     = x-r;
+	contour.nodes[0].y     = y;
+	contour.nodes[0].predX = x-r;
+	contour.nodes[0].predY = y+r*cpd;
+	contour.nodes[0].succX = x-r;
+	contour.nodes[0].succY = y-r*cpd;
+
+	contour.nodes[1].x     = x;
+	contour.nodes[1].y     = y-r;
+	contour.nodes[1].predX = x-r*cpd;
+	contour.nodes[1].predY = y-r;
+	contour.nodes[1].succX = x+r*cpd;
+	contour.nodes[1].succY = y-r;
+
+	contour.nodes[2].x     = x+r;
+	contour.nodes[2].y     = y;
+	contour.nodes[2].predX = x+r;
+	contour.nodes[2].predY = y-r*cpd;
+	contour.nodes[2].succX = x+r;
+	contour.nodes[2].succY = y+r*cpd;
+
+	contour.nodes[3].x     = x;
+	contour.nodes[3].y     = y+r;
+	contour.nodes[3].predX = x+r*cpd;
+	contour.nodes[3].predY = y+r;
+	contour.nodes[3].succX = x-r*cpd;
+	contour.nodes[3].succY = y+r;
+}
+
+function BeginDragControlPoint()
+{
+	var parms = smartShape.GetDefaultMoveParms();
+
+	switch (smartShape.currentControlPointIndex) {
+		case kDirectionCPIndex:
+			// move the control point
+
+			var center = GetCenter(smartShape.elem.elements[kBigCurcleIndex].contours[0]);
+
+			smartShape.elem.controlPoints[kDirectionCPIndex].RegisterCircularMove(center, parms);
+			smartShape.elem.controlPoints[kCurvatureCPIndex].RegisterCircularMove(center, parms);
+			smartShape.elem.controlPoints[kDistanceCPIndex ].RegisterCircularMove(center, parms);
+
+			smartShape.elem.elements[1].contours[0].nodes[0].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[1].contours[0].nodes[1].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[1].contours[0].nodes[2].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[1].contours[0].nodes[3].RegisterCircularMove(center, parms);
+
+			smartShape.elem.elements[2].contours[0].nodes[0].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[2].contours[0].nodes[1].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[2].contours[0].nodes[2].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[2].contours[0].nodes[3].RegisterCircularMove(center, parms);
+
+			smartShape.elem.elements[3].contours[0].nodes[0].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[3].contours[0].nodes[1].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[3].contours[0].nodes[2].RegisterCircularMove(center, parms);
+			smartShape.elem.elements[3].contours[0].nodes[3].RegisterCircularMove(center, parms);
+		break;
+
+		case kCurvatureCPIndex:
+
+			var c = GetCenter(smartShape.elem.elements[0].contours[0]);
+
+			smartShape.elem.controlPoints[kCurvatureCPIndex].RegisterCircularMove({x:c.x,y:c.y},parms);
+
+			break;
+
+		case kDistanceCPIndex:
+
+			var c0 = smartShape.elem.controlPoints[0];
+			var c1 = smartShape.elem.controlPoints[1];
+			var c2 = smartShape.elem.controlPoints[2];
+
+			smartShape.elem.controlPoints[kDistanceCPIndex ].RegisterPolygonMove({x:c0.x,y:c0.y},parms);
+
+			parms.deltaRtoR = dist(c0.x, c0.y, c1.x, c1.y)/dist(c0.x, c0.y, c2.x, c2.y);
+
+			smartShape.elem.controlPoints[kCurvatureCPIndex].RegisterPolygonMove({x:c0.x,y:c0.y},parms);
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	switch (smartShape.currentControlPointIndex)
+	{
+		case kCurvatureCPIndex:
+		case kDistanceCPIndex:
+			PositionBubbles();
+			break;
+
+		default:
+			break;
+	}
+}
+

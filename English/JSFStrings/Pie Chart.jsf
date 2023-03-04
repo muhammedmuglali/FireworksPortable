@@ -1,0 +1,6 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["reset"] = "Click to reset inner radius";
+__tooltips["innerradius"] = "Inner radius";

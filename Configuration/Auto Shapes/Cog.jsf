@@ -1,0 +1,632 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Cog.jsf");
+
+gTT[0] =   __tooltips["reset"] ;
+gTT[1] =   __tooltips["height"] ;
+gTT[2] =   __tooltips["depth"] ;
+gTT[3] =   __tooltips["cogs"] ;
+gTT[4] =   __tooltips["outershape"] ;
+gTT[5] =   __tooltips["innershape"] ;
+gTT[6] =   __tooltips["innerradius"];
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCPD      = 0.552;
+var gPI2      = Math.PI/2;	//  90 degrees
+var gPI       = Math.PI;	// 180 degrees
+var g2PI      = 2*Math.PI;	// 360 degrees
+var gMaxNodes = 50;			// max number of points/corners
+var gMinNodes = 3;			// min number of points/corners
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	// initialisation
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	// on mouse down
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	// on mouse drag
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	// on mouse up
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var R   = 120;
+	var R_  = 100;
+	var c   = {x:cmp.x, y:cmp.y};
+	var r   = 70;
+	var r_  = 80;
+	var N   = 12;
+	var iR  = 30;
+
+	var c0, c1, c2, c3, c4, c5, c6;
+
+	smartShape.elem.controlPoints.length = 7;
+
+	// control point for the centre - remains fixed & hidden
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x;
+	c0.y                 = c.y;
+	c0.name              = "";
+	c0.toolTip           = gTT[0];
+	c0.toolTipTracksDrag = true;
+	c0.type              = "default";
+
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.x                 = c.x;
+	c1.y                 = c.y - R;
+	c1.name              = "";
+	c1.toolTip           = gTT[1];
+	c1.toolTipTracksDrag = true;
+	c1.type              = "default";
+
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.name              = "";
+	c2.toolTip           = gTT[2];
+	c2.toolTipTracksDrag = true;
+	c2.type              = "default";
+
+	c3                   = smartShape.elem.controlPoints[3];
+	c3.x                 = c.x - R;
+	c3.y                 = (c.y+R) - (2*R*(N-3)/gMaxNodes);
+	c3.name              = N;
+	c3.toolTip           = gTT[3] + ": " + N;
+	c3.toolTipTracksDrag = true;
+	c3.type              = "default";
+
+	c4                   = smartShape.elem.controlPoints[4];
+	c4.name              = "";
+	c4.toolTip           = gTT[4];
+	c4.toolTipTracksDrag = true;
+	c4.type              = "default";
+
+	c5                   = smartShape.elem.controlPoints[5];
+	c5.name              = "";
+	c5.toolTip           = gTT[5];
+	c5.toolTipTracksDrag = true;
+	c5.type              = "default";
+
+	c6                   = smartShape.elem.controlPoints[6];
+	c6.name              = "";
+	c6.x                 = c.x + iR;
+	c6.y                 = c.y;
+	c6.toolTip           = gTT[6];
+	c6.toolTipTracksDrag = true;
+	c6.type              = "default";
+
+	// allocate space for the shape
+	smartShape.elem.elements[0] = new Path;
+	smartShape.elem.elements[0].opacity = 100;
+	smartShape.elem.elements[0].pathAttributes.brush = {	alphaRemap:"none",
+															angle:0, 
+															antiAliased:true, 
+															aspect:100, 
+															blackness:0, 
+															category:"bc_Basic", 
+															concentration:100, 
+															dashOffSize1:2, 
+															dashOffSize2:2, 
+															dashOffSize3:2, 
+															dashOnSize1:10, 
+															dashOnSize2:1, 
+															dashOnSize3:1, 
+															diameter:3, 
+															feedback:"brush", 
+															flowRate:0, 
+															maxCount:14, 
+															minSize:1, 
+															name:"bn_Soft Line", 
+															numDashes:0, 
+															shape:"square", 
+															softenMode:"bell curve", 
+															softness:50, 
+															spacing:6, 
+															textureBlend:0, 
+															textureEdge:0, 
+															tipColoringMode:"random", 
+															tipCount:1, 
+															tipSpacing:0, 
+															tipSpacingMode:"random", 
+															type:"simple" };
+	smartShape.elem.elements[0].pathAttributes.brushColor = "#000000";
+	smartShape.elem.elements[0].pathAttributes.fill = {		category:"fc_Solid", 
+															ditherColors:[ "#000000", "#000000" ], 
+															edgeType:"antialiased", 
+															feather:0, 
+															gradient:null, 
+															name:"fn_Normal", 
+															pattern:null, 
+															shape:"solid", 
+															stampingMode:"blend opaque", 
+															textureBlend:0, 
+															webDitherTransparent:false };
+	smartShape.elem.elements[0].pathAttributes.fillColor = "#9966CC";
+	smartShape.elem.elements[0].contours[0] = new Contour;
+	smartShape.elem.elements[0].contours[0].nodes.length = 0;
+	smartShape.elem.elements[0].contours[1] = new Contour;
+	smartShape.elem.elements[0].contours[1].nodes.length = 0;
+
+	createCogwheel(R, R_, r, r_, N, iR);
+}
+
+// On mouse down
+function BeginDragControlPoint()
+{
+	var cpIdx  = smartShape.currentControlPointIndex;
+	var c0     = smartShape.elem.controlPoints[0];
+	var c1     = smartShape.elem.controlPoints[1];
+	var c2     = smartShape.elem.controlPoints[2];
+	var c3     = smartShape.elem.controlPoints[3];
+	var c4     = smartShape.elem.controlPoints[4];
+	var c5     = smartShape.elem.controlPoints[5];
+	var c6     = smartShape.elem.controlPoints[6];
+	var R      = parseInt(dist(c0.x, c0.y, c1.x, c1.y));
+	var r      = parseInt(dist(c0.x, c0.y, c2.x, c2.y));
+	var R_     = parseInt(dist(c0.x, c0.y, c4.x, c4.y));
+	var r_     = parseInt(dist(c0.x, c0.y, c5.x, c5.y));
+	var N      = parseInt(c3.name);
+	var params = smartShape.GetDefaultMoveParms();
+	var inc    = 4;
+	var i;
+
+	switch (cpIdx)
+	{
+		case 0:
+			c6.x = c0.x;
+
+			smartShape.elem.elements[0].contours[1] = new Contour;
+			smartShape.elem.elements[0].contours[1].nodes.length = 0;
+
+			addCircle(smartShape.elem.elements[0].contours[1], {x:c0.x, y:c0.y}, 1);
+
+		case 6:
+			params.deltaYtoY = 0;
+			params.minX      = c0.x;
+			params.maxX      = c0.x + r;
+			c6.RegisterMove(params);
+
+			registerCircleResize(smartShape.elem.elements[0].contours[1], {x:c0.x, y:c0.y}, r_);
+
+			break;
+
+		case 1:
+		case 2:
+			params.rotate    = false;
+			params.minRadius = (cpIdx==1)? (r_+(R-R_)) : (c6.x-c0.x);
+			params.maxRadius = (cpIdx==1)? params.maxRadius : (R_-(r_-r));
+
+			if (cpIdx==1)
+			{
+				c1.RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+				params.minRadius = r_;
+				c4.RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+			}
+			else
+			{
+				c2.RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+				params.minRadius += r_-r;
+				params.maxRadius  = R_;
+				c5.RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+			}
+
+			if (R==R_) inc--;
+			if (r==r_) inc--;
+
+			if (cpIdx==1)
+			{
+				for (i=0; i<smartShape.elem.elements[0].contours[0].nodes.length; i+=inc)
+				{
+					smartShape.elem.elements[0].contours[0].nodes[i+0].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+
+					if (R!=R_)
+						smartShape.elem.elements[0].contours[0].nodes[i+1].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+				}
+			}
+
+			break;
+
+		case 4:
+		case 5:
+			params.rotate    = false;
+			params.minRadius = (cpIdx==4)? r_ : r;
+			params.maxRadius = (cpIdx==4)? R  : R_;
+			smartShape.elem.controlPoints[cpIdx].RegisterPolygonMove({x:c0.x, y:c0.y}, params);
+			break;
+
+		default:
+			break;
+	}
+}
+
+// On mouse drag
+function DragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var c5    = smartShape.elem.controlPoints[5];
+	var c6    = smartShape.elem.controlPoints[6];
+	var R     = dist(c0.x, c0.y, c1.x, c1.y);
+	var r     = dist(c0.x, c0.y, c2.x, c2.y);
+	var R_    = dist(c0.x, c0.y, c4.x, c4.y);
+	var r_    = dist(c0.x, c0.y, c5.x, c5.y);
+	var iR    = c6.x - c0.x;
+	var cm    = smartShape.currentMousePos;
+	var N;
+
+	switch (cpIdx)
+	{
+		case 3:
+			cp = smartShape.elem.controlPoints[cpIdx];
+
+			// follow mouse movement
+			cp.y = cm.y;
+
+			// moves between min & max
+			if (cp.y < c0.y-R)
+			{
+				cp.y = c0.y - R;
+				N    = gMaxNodes;
+			}
+			else if (cp.y > c0.y+R)
+			{
+				cp.y = c0.y + R;
+				N    = gMinNodes;
+			}
+			else
+			{
+				N = parseInt((gMaxNodes-gMinNodes)*(c0.y+R-c3.y)/(2*R)) + gMinNodes;
+			}
+
+			c3.name    = N;
+			c3.toolTip = gTT[3] + ": " + N;
+
+			createCogwheel(R, R_, r, r_, N, iR);
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+// On mouse up
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var c5    = smartShape.elem.controlPoints[5];
+	var c6    = smartShape.elem.controlPoints[6];
+
+	if (dist(c1.x, c1.y, c4.x, c4.y) < fw.getPref("SnapDistance"))
+	{
+		c4.x = c1.x;
+		c4.y = c1.y;
+	}
+	if (dist(c2.x, c2.y, c5.x, c5.y) < fw.getPref("SnapDistance"))
+	{
+		c5.x = c2.x;
+		c5.y = c2.y;
+	}
+
+	var R     = dist(c0.x, c0.y, c1.x, c1.y);
+	var r     = dist(c0.x, c0.y, c2.x, c2.y);
+	var R_    = dist(c0.x, c0.y, c4.x, c4.y);
+	var r_    = dist(c0.x, c0.y, c5.x, c5.y);
+	var N     = parseInt(c3.name);
+	var iR    = c6.x - c0.x;
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 6:
+			if ( (c6.x-c0.x) <= fw.getPref("SnapDistance") )
+			{
+				c6.x = c0.x;
+
+				smartShape.elem.elements[0].contours.length = 1;
+
+				c0.toolTip = gTT[6];
+			}
+			else
+				c0.toolTip = gTT[0];
+
+			break;
+
+		case 1:
+		case 2:
+			// if control point 1 is close enough to be the centre...
+			if ( (dist(c0.x, c0.y, c2.x, c2.y) <= fw.getPref("SnapDistance")) &&
+				 (dist(c0.x, c0.y, c5.x, c5.y) <= fw.getPref("SnapDistance")) )
+			{
+				createCogwheel(R, R_, 0, 0, N, iR);
+			}
+			else
+				createCogwheel(R, R_, r, r_, N, iR);
+
+		case 3:
+			c3.x = c0.x - ((R>r)?R:r);
+			c3.y = (c0.y+((R>r)?R:r)) - (2*((R>r)?R:r))*(N-gMinNodes)/(gMaxNodes-gMinNodes);
+			break;
+
+		case 4:
+		case 5:
+			createCogwheel(R, R_, r, r_, N, iR);
+			break;
+
+		default:
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/g2PI; }
+
+// converts Degrees to Radians
+function deg2rad(a) { return (a/360)*g2PI; }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function addCircle(contour, c, r)
+{
+	var cpd = r*gCPD;
+
+	addPathPointBez(contour, c.x,   c.y-r, c.x-cpd, c.y-r,   c.x+cpd, c.y-r  );//0
+	addPathPointBez(contour, c.x+r, c.y,   c.x+r,   c.y-cpd, c.x+r,   c.y+cpd);//1
+	addPathPointBez(contour, c.x,   c.y+r, c.x+cpd, c.y+r,   c.x-cpd, c.y+r  );//2
+	addPathPointBez(contour, c.x-r, c.y,   c.x-r,   c.y+cpd, c.x-r,   c.y-cpd);//3
+
+	contour.isClosed = true;
+}
+
+function setMoveParams(mvPred, mvPt, mvSucc, xx, yy, xy, yx, minX, maxX, minY, maxY)
+{
+	var p = smartShape.GetDefaultMoveParms();
+
+	p.movePred  = mvPred;
+	p.movePt    = mvPt;
+	p.moveSucc  = mvSucc;
+	p.deltaXtoX = xx;
+	p.deltaYtoY = yy;
+	p.deltaXtoY = xy;
+	p.deltaYtoX = yx;
+	p.minX      = minX;
+	p.maxX      = maxX;
+	p.minY      = minY;
+	p.maxY      = maxY;
+
+	return p;
+}
+
+function registerCircleResize(contour, c, R)
+{
+	var cpd = R*gCPD;
+
+	params = setMoveParams(true, false, false, -gCPD, 0, -1, 0, c.x-cpd, c.x,     c.y-R, c.y);
+	contour.nodes[0].RegisterMove(params);
+	params = setMoveParams(false, true, false,  0,    0, -1, 0, c.x,     c.x,     c.y-R, c.y);
+	contour.nodes[0].RegisterMove(params);
+	params = setMoveParams(false, false, true,  gCPD, 0, -1, 0, c.x,     c.x+cpd, c.y-R, c.y);
+	contour.nodes[0].RegisterMove(params);
+
+	params = setMoveParams(true, false, false, 1, 0, -gCPD, 0, c.x, c.x+R, c.y-cpd, c.y    );
+	contour.nodes[1].RegisterMove(params);
+	params = setMoveParams(false, true, false, 1, 0,  0,    0, c.x, c.x+R, c.y,     c.y    );
+	contour.nodes[1].RegisterMove(params);
+	params = setMoveParams(false, false, true, 1, 0,  gCPD, 0, c.x, c.x+R, c.y,     c.y+cpd);
+	contour.nodes[1].RegisterMove(params);
+
+	params = setMoveParams(true, false, false,  gCPD, 0, 1, 0, c.x,     c.x+cpd, c.y, c.y+R);
+	contour.nodes[2].RegisterMove(params);
+	params = setMoveParams(false, true, false,  0,    0, 1, 0, c.x,     c.x,     c.y, c.y+R);
+	contour.nodes[2].RegisterMove(params);
+	params = setMoveParams(false, false, true, -gCPD, 0, 1, 0, c.x-cpd, c.x,     c.y, c.y+R);
+	contour.nodes[2].RegisterMove(params);
+
+	params = setMoveParams(true, false, false, -1, 0,  gCPD, 0, c.x-R, c.x, c.y,     c.y+cpd);
+	contour.nodes[3].RegisterMove(params);
+	params = setMoveParams(false, true, false, -1, 0,  0,    0, c.x-R, c.x, c.y,     c.y    );
+	contour.nodes[3].RegisterMove(params);
+	params = setMoveParams(false, false, true, -1, 0, -gCPD, 0, c.x-R, c.x, c.y-cpd, c.y    );
+	contour.nodes[3].RegisterMove(params);
+}
+
+function getPoints(c, r, n0, n1)
+{
+	var pts = {x:0, y:0, px:0, py:0, sx:0, sy:0};
+	var a0  = evalAngle(n0.x-c.x, n0.y-c.y);
+	var a1  = evalAngle(n1.x-c.x, n1.y-c.y);
+	var da, cpd;
+
+	if ((a0>=0) && (a1<0))
+		da = (a1+g2PI) - a0;
+	else
+		da = a1 - a0;
+
+	cpd = r*gCPD * Math.abs(da/gPI2);
+
+	pts.px = n1.x + cpd * Math.sin(a1);
+	pts.py = n1.y - cpd * Math.cos(a1);
+
+	pts.sx = n0.x - cpd * Math.sin(a0);
+	pts.sy = n0.y + cpd * Math.cos(a0);
+
+	return pts;
+}
+
+function createCogwheel(R, R_, r, r_, N, iR)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var c4 = smartShape.elem.controlPoints[4];
+	var c5 = smartShape.elem.controlPoints[5];
+
+	var a_ = evalAngle(c1.x-c0.x, c1.y-c0.y);
+	var da = g2PI/(2*N);
+	var a, i, x, y, x_, y_, px, py, sx, sy, rr;
+	var ap, as;
+	var pts = {x:0, y:0, px:0, py:0, sx:0, sy:0};
+	var contour, n0, n1;
+
+	// remove existing nodes
+	contour = smartShape.elem.elements[0].contours[0];
+	contour.nodes.length = 0;
+
+	for (i=0; i<(2*N); i++,a_+=da)
+	{
+		a  = (a_>gPI)? a_-g2PI : a_;
+
+		if (Math.floor(((i&1)?r:R)) == Math.floor(((i&1)?r_:R_)))
+		{
+			x = c0.x + ((i&1)?r:R) * Math.cos(a);
+			y = c0.y + ((i&1)?r:R) * Math.sin(a);
+
+			addPathPoint(contour, x, y);
+		}
+		else
+		{
+			x_ = c0.x + ((i&1)?r_:R_) * Math.cos(a);
+			y_ = c0.y + ((i&1)?r_:R_) * Math.sin(a);
+
+			if (i&1)
+				rr = (r_-r) * R * Math.sin(da)/(R * Math.cos(da) - r);
+			else
+				rr = r * Math.sin(da) * (R-R_)/(R - r * Math.cos(da));
+
+			px = x_ + rr * Math.sin(a);
+			py = y_ - rr * Math.cos(a);
+			sx = x_ - rr * Math.sin(a);
+			sy = y_ + rr * Math.cos(a);
+
+			addPathPoint(contour, px, py);
+			addPathPoint(contour, sx, sy);
+
+			n0 = contour.nodes[contour.nodes.length-2];
+			n1 = contour.nodes[contour.nodes.length-1];
+
+			a0 = evalAngle(n0.x-c0.x, n0.y-c0.y);
+			a1 = evalAngle(n1.x-c0.x, n1.y-c0.y);
+
+			pts = getPoints({x:c0.x,y:c0.y}, (i&1)?r_:R_, n0, n1, da);
+
+			n0.succX = pts.sx;
+			n0.succY = pts.sy;
+
+			n1.predX = pts.px;
+			n1.predY = pts.py;
+		}
+
+		if (i==1)
+		{
+			c2.x = c0.x + r * Math.cos(a);
+			c2.y = c0.y + r * Math.sin(a);
+		}
+		if (i==2)
+		{
+			c4.x = c0.x + R_ * Math.cos(a);
+			c4.y = c0.y + R_ * Math.sin(a);
+		}
+		if (i==3)
+		{
+			c5.x = c0.x + r_ * Math.cos(a);
+			c5.y = c0.y + r_ * Math.sin(a);
+		}
+	}
+	contour.isClosed = true;
+
+	if (iR > 0)
+	{
+		contour = smartShape.elem.elements[0].contours[1];
+		contour.nodes.length = 0;
+
+		addCircle(contour, {x:c0.x, y:c0.y}, iR);
+	}
+	else
+	{
+		smartShape.elem.elements[0].contours.length = 1;
+	}
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

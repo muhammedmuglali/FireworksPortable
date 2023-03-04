@@ -1,0 +1,678 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Tube.jsf");
+
+gTT[0] = __tooltips["perspective"];
+gTT[1] = __tooltips["innerradiusrear"];
+gTT[2] = __tooltips["innerradiusfront"];
+gTT[3] = __tooltips["offset"];
+gTT[4] = __tooltips["reset"];
+
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCPD  = 0.552;
+var gPI2  = Math.PI/2;		//  90 degrees
+var gPI   = Math.PI;		// 180 degrees
+var g6PI4 = (6*Math.PI)/4;	// 270 degrees
+var g2PI  = 2*Math.PI;		// 360 degrees
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var r   = 80;
+	var c   = {x:cmp.x+r-100, y:cmp.y+r-100};
+	var cpd = r * gCPD;
+	var dx  = 40;
+	var dy  = 40;
+
+	var contour;
+
+	var c0, c3, c4, c3, c4;
+
+	smartShape.elem.controlPoints.length = 5;
+
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x+dx+r;
+	c0.y                 = c.y+dy;
+	c0.name              = "0";
+	c0.toolTip           = gTT[0];
+	c0.toolTipTracksDrag = true;
+	c0.type              = "default";
+
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.x                 = c.x+dx+r/2;
+	c1.y                 = c.y+dy;
+	c1.name              = "1";
+	c1.toolTip           = gTT[1];
+	c1.toolTipTracksDrag = true;
+	c1.type              = "default";
+
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.x                 = c.x+r/2;
+	c2.y                 = c.y;
+	c2.toolTip           = gTT[2];
+	c2.toolTipTracksDrag = true;
+	c2.type              = "default";
+
+	c3                   = smartShape.elem.controlPoints[3];
+	c3.x                 = c.x+dx;
+	c3.y                 = c.y+dy;
+	c3.toolTip           = gTT[3];
+	c3.toolTipTracksDrag = true;
+	c3.type              = "default";
+
+	c4                   = smartShape.elem.controlPoints[4];
+	c4.x                 = c.x;
+	c4.y                 = c.y;
+	c4.toolTip           = gTT[4];
+	c4.toolTipTracksDrag = true;
+	c4.type              = "default";
+
+	for (e=0; e<6; e++)
+	{
+		smartShape.elem.elements[e] = new Path;
+		smartShape.elem.elements[e].opacity = 80;
+		smartShape.elem.elements[e].pathAttributes.brush = {	alphaRemap:"none",
+																angle:0, 
+																antiAliased:true, 
+																aspect:100, 
+																blackness:0, 
+																category:"bc_Basic", 
+																concentration:100, 
+																dashOffSize1:2, 
+																dashOffSize2:2, 
+																dashOffSize3:2, 
+																dashOnSize1:10, 
+																dashOnSize2:1, 
+																dashOnSize3:1, 
+																diameter:3, 
+																feedback:"brush", 
+																flowRate:0, 
+																maxCount:14, 
+																minSize:1, 
+																name:"bn_Soft Line", 
+																numDashes:0, 
+																shape:"square", 
+																softenMode:"bell curve", 
+																softness:50, 
+																spacing:6, 
+																textureBlend:0, 
+																textureEdge:0, 
+																tipColoringMode:"random", 
+																tipCount:1, 
+																tipSpacing:0, 
+																tipSpacingMode:"random", 
+																type:"simple" };
+		smartShape.elem.elements[e].pathAttributes.brushColor = "#000000";
+		smartShape.elem.elements[e].pathAttributes.fill = {		category:"fc_Solid", 
+																ditherColors:[ "#000000", "#000000" ], 
+																edgeType:"antialiased", 
+																feather:0, 
+																gradient:null, 
+																name:"fn_Normal", 
+																pattern:null, 
+																shape:"solid", 
+																stampingMode:"blend opaque", 
+																textureBlend:0, 
+																webDitherTransparent:false };
+		smartShape.elem.elements[e].pathAttributes.fillColor = "#3399FF";
+		smartShape.elem.elements[e].contours[0] = new Contour;
+
+		if ((e==0)||(e==5))
+			smartShape.elem.elements[e].contours[1] = new Contour;
+	}
+
+	createTube(c, r, r/2, r, r/2, dx, dy);
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx  = smartShape.currentControlPointIndex;
+	var c0     = smartShape.elem.controlPoints[0];
+	var c1     = smartShape.elem.controlPoints[1];
+	var c2     = smartShape.elem.controlPoints[2];
+	var c3     = smartShape.elem.controlPoints[3];
+	var c4     = smartShape.elem.controlPoints[4];
+	var e00    = smartShape.elem.elements[0].contours[0];
+	var e01    = smartShape.elem.elements[0].contours[1];
+	var e1     = smartShape.elem.elements[1].contours[0];
+	var e2     = smartShape.elem.elements[2].contours[0];
+	var e3     = smartShape.elem.elements[3].contours[0];
+	var e4     = smartShape.elem.elements[4].contours[0];
+	var e50    = smartShape.elem.elements[5].contours[0];
+	var e51    = smartShape.elem.elements[5].contours[1];
+	var c      = {x:(e50.nodes[0].x+e50.nodes[2].x)/2, y:(e50.nodes[0].y+e50.nodes[2].y)/2};
+	var R      = dist(c4.x, c4.y, e00.nodes[0].x, e00.nodes[0].y);
+	var R_     = dist(c4.x, c4.y, e01.nodes[0].x, e01.nodes[0].y);
+	var r      = dist(c3.x, c3.y, e50.nodes[0].x, e50.nodes[0].y);
+	var r_     = dist(c3.x, c3.y, e51.nodes[0].x, e51.nodes[0].y);
+	var cpdist = r * gCPD;
+	var params, dParams;
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 1:
+			if ((c0.x>c1.x)&&(cpIdx==0))
+			{
+				params           = smartShape.GetDefaultMoveParms();
+				params.deltaYtoY = 0;
+				params.minX      = c.x+1;
+				c0.RegisterMove(params);
+
+				params.deltaXtoX = r_/r;
+				c1.RegisterMove(params);
+
+				registerCircleResize(e50, c, 1   , 0, false);
+				registerCircleResize(e51, c, r_/r, 0, false);
+			}
+			else
+			{
+				params           = smartShape.GetDefaultMoveParms();
+				params.deltaYtoY = 0;
+				params.minX      = c3.x+1;
+				params.maxX      = c3.x+r;
+				c1.RegisterMove(params);
+
+				registerCircleResize(e51, c3, 1, r, true);
+			}
+
+			break;
+
+		case 2:
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaYtoY = 0;
+			params.minX      = c4.x+1;
+			params.maxX      = c4.x+R;
+			c2.RegisterMove(params);
+
+			registerCircleResize(e01, c4, 1, R, true);
+
+			break;
+
+		case 3:
+			params = smartShape.GetDefaultMoveParms();
+			c0.RegisterMove(params);
+			c1.RegisterMove(params);
+			c3.RegisterMove(params);
+
+			e50.nodes[0].RegisterMove(params);
+			e50.nodes[1].RegisterMove(params);
+			e50.nodes[2].RegisterMove(params);
+			e50.nodes[3].RegisterMove(params);
+
+			e51.nodes[0].RegisterMove(params);
+			e51.nodes[1].RegisterMove(params);
+			e51.nodes[2].RegisterMove(params);
+			e51.nodes[3].RegisterMove(params);
+
+			break;
+
+		case 4:
+			params = smartShape.GetDefaultMoveParms();
+			c4.RegisterMove(params);
+			c2.RegisterMove(params);
+
+			e00.nodes[0].RegisterMove(params);
+			e00.nodes[1].RegisterMove(params);
+			e00.nodes[2].RegisterMove(params);
+			e00.nodes[3].RegisterMove(params);
+
+			e01.nodes[0].RegisterMove(params);
+			e01.nodes[1].RegisterMove(params);
+			e01.nodes[2].RegisterMove(params);
+			e01.nodes[3].RegisterMove(params);
+			break;
+
+		default:
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var e00   = smartShape.elem.elements[0].contours[0];
+	var e01   = smartShape.elem.elements[0].contours[1];
+	var e50   = smartShape.elem.elements[5].contours[0];
+	var e51   = smartShape.elem.elements[5].contours[1];
+	var c     = {x:c4.x, y:c4.y};
+	var R     = (e00.nodes[1].x - e00.nodes[3].x)/2;
+	var R_    = (e01.nodes[1].x - e01.nodes[3].x)/2;
+	var r     = (e50.nodes[1].x - e50.nodes[3].x)/2;
+	var r_    = (e51.nodes[1].x - e51.nodes[3].x)/2;
+	var dm    = smartShape.mouseDownPos;
+	var cm    = smartShape.currentMousePos;
+	var d     = dist(dm.x, dm.y, cm.x, cm.y);
+	var i, n;
+
+	if ((cpIdx==4) && (d<1))
+	{
+		dx    = c4.x - c3.x;
+		dy    = c4.y - c3.y;
+		c3.x  = c4.x;
+		c3.y  = c4.y;
+		c0.x += dx;
+		c0.y += dy;
+		c1.x += dx;
+		c1.y += dy;
+
+		for (i=0; i<4; i++)
+		{
+			n        = e50.nodes[i];
+			n.x     += dx;
+			n.y     += dy;
+			n.predX += dx;
+			n.predY += dy;
+			n.succX += dx;
+			n.succY += dy;
+
+			n        = e51.nodes[i];
+			n.x     += dx;
+			n.y     += dy;
+			n.predX += dx;
+			n.predY += dy;
+			n.succX += dx;
+			n.succY += dy;
+		}
+	}
+
+	var dx = c3.x - c4.x;
+	var dy = c3.y - c4.y;
+	var s  = evalSide();
+
+	if (s.s0 != c0.name)
+	{
+		c0.name = s.s0;
+
+		createSides(0, s.s0);
+	}
+	positionSides(c, R, r, dx, dy, 0, s.s0);
+
+	if (s.s1 != c1.name)
+	{
+		c1.name = s.s1;
+
+		createSides(1, s.s1);
+	}
+	positionSides(c, R_, r_, dx, dy, 1, s.s1);
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/g2PI; }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+/*--------------------------------------------------------------------------*/
+/* setMoveParams                                                            */
+/*                                                                          */
+/*   Description: returns a new parameter object with values provided in    */
+/*                the argument                                              */
+/*                                                                          */
+/*     Arguments: mvPred - move predecessor (true/false)                    */
+/*                mvPt   - move point       (true/false)                    */
+/*                mvSucc - move successor   (true/false)                    */
+/*                xx     - change in x that applies to x (-1 <= xx <= 1)    */
+/*                yy     - change in y that applies to y (-1 <= yy <= 1)    */
+/*                xy     - change in x that applies to y (-1 <= xy <= 1)    */
+/*                yx     - change in y that applies to x (-1 <= yx <= 1)    */
+/*                minX   - mininum value in x-axis                          */
+/*                maxX   - maxinum value in x-axis                          */
+/*                minY   - mininum value in y-axis                          */
+/*                maxY   - maxinum value in y-axis                          */
+/*                                                                          */
+/*       Returns: new parameter object                                      */
+/*--------------------------------------------------------------------------*/
+function setMoveParams(mvPred, mvPt, mvSucc, xx, xy, minX, maxX, minY, maxY)
+{
+	var p = smartShape.GetDefaultMoveParms();
+
+	p.movePred  = mvPred;
+	p.movePt    = mvPt;
+	p.moveSucc  = mvSucc;
+	p.deltaXtoX = xx;
+	p.deltaYtoY = 0;
+	p.deltaXtoY = xy;
+	p.minX      = minX;
+	p.maxX      = maxX;
+	p.minY      = minY;
+	p.maxY      = maxY;
+
+	return p;
+}
+
+function registerCircleResize(contour, c, d, r, i)
+{
+	var dParams = smartShape.GetDefaultMoveParms();
+	var lim     = d;
+	var lim_    = lim * gCPD;
+
+	params = setMoveParams(true, false, false, -d*gCPD,   -d,      (i)?(c.x-r*gCPD):dParams.minX, c.x-lim_,                      (i)?(c.y-r):dParams.minY, c.y-lim);
+	contour.nodes[0].RegisterMove(params);
+	params = setMoveParams(false, true, false,  0,        -d,      c.x,                           c.x,                           (i)?(c.y-r):dParams.minY, c.y-lim);
+	contour.nodes[0].RegisterMove(params);
+	params = setMoveParams(false, false, true,  d*gCPD,   -d,      c.x+lim_,                      (i)?(c.x+r*gCPD):dParams.maxX, (i)?(c.y-r):dParams.minY, c.y-lim);
+	contour.nodes[0].RegisterMove(params);
+
+	params = setMoveParams(true, false, false,  d,        -d*gCPD, c.x+lim, (i)?(c.x+r):dParams.maxX, (i)?(c.y-r*gCPD):dParams.minY, c.y-lim_                     );
+	contour.nodes[1].RegisterMove(params);
+	params = setMoveParams(false, true, false,  d,         0,      c.x+lim, (i)?(c.x+r):dParams.maxX, c.y,                           c.y                          );
+	contour.nodes[1].RegisterMove(params);
+	params = setMoveParams(false, false, true,  d,         d*gCPD, c.x+lim, (i)?(c.x+r):dParams.maxX, c.y+lim_,                      (i)?(c.y+r*gCPD):dParams.maxY);
+	contour.nodes[1].RegisterMove(params);
+
+	params = setMoveParams(true, false, false,  d*gCPD,    d,      c.x+lim_,                      (i)?(c.x+r*gCPD):dParams.maxX, c.y+lim, (i)?(c.y+r):dParams.maxY);
+	contour.nodes[2].RegisterMove(params);
+	params = setMoveParams(false, true, false,  0,         d,      c.x,                           c.x,                           c.y+lim, (i)?(c.y+r):dParams.maxY);
+	contour.nodes[2].RegisterMove(params);
+	params = setMoveParams(false, false, true, -d*gCPD,    d,      (i)?(c.x-r*gCPD):dParams.minX, c.x-lim_,                      c.y+lim, (i)?(c.y+r):dParams.maxY);
+	contour.nodes[2].RegisterMove(params);
+
+	params = setMoveParams(true, false, false, -d,         d*gCPD, (i)?(c.x-r):dParams.minX, c.x-lim, c.y+lim_,                      (i)?(c.y+r*gCPD):dParams.maxY);
+	contour.nodes[3].RegisterMove(params);
+	params = setMoveParams(false, true, false, -d,         0,      (i)?(c.x-r):dParams.minX, c.x-lim, c.y,                           c.y                          );
+	contour.nodes[3].RegisterMove(params);
+	params = setMoveParams(false, false, true, -d,        -d*gCPD, (i)?(c.x-r):dParams.minX, c.x-lim, (i)?(c.y-r*gCPD):dParams.minY, c.y-lim_                     );
+	contour.nodes[3].RegisterMove(params);
+}
+
+function moveNode(n, x, y, px, py, sx, sy)
+{
+	n.x     = x;
+	n.y     = y;
+	n.predX = px;
+	n.predY = py;
+	n.succX = sx;
+	n.succY = sy;
+}
+
+function copyNodePos(ns, nd)
+{
+	nd.x     = ns.x;
+	nd.y     = ns.y;
+	nd.predX = ns.predX;
+	nd.predY = ns.predY;
+	nd.succX = ns.succX;
+	nd.succY = ns.succY;
+}
+
+function evalSide()
+{
+	var c3  = smartShape.elem.controlPoints[3];
+	var c4  = smartShape.elem.controlPoints[4];
+	var e00 = smartShape.elem.elements[0].contours[0];
+	var e01 = smartShape.elem.elements[0].contours[1];
+	var e50 = smartShape.elem.elements[5].contours[0];
+	var e51 = smartShape.elem.elements[5].contours[1];
+	var R   = (e00.nodes[1].x - e00.nodes[3].x)/2;
+	var R_  = (e01.nodes[1].x - e01.nodes[3].x)/2;
+	var r   = (e50.nodes[1].x - e50.nodes[3].x)/2;
+	var r_  = (e51.nodes[1].x - e51.nodes[3].x)/2;
+	var s   = {s0:0, s1:0};
+
+	// outer
+	// front larger - show interior
+	if      ( (R>=r) && (dist(c3.x, c3.y, c4.x, c4.y) <= (R-r)) )
+		s.s0 = 4;
+	// front smaller - show exterior
+	else if ( (R<=r) && (dist(c3.x, c3.y, c4.x, c4.y) <= (r-R)) )
+		s.s0 = 1;
+	// 'normal' perpective look
+	else
+		s.s0 = 0;
+
+	// inner
+	// front larger - show interior
+	if      ( (R_>=r_) && (dist(c3.x, c3.y, c4.x, c4.y) <= (R_-r_)) )
+		s.s1 = 3;
+	// front smaller - show exterior
+	else if ( (R_<=r_) && (dist(c3.x, c3.y, c4.x, c4.y) <= (r_-R_)) )
+		s.s1 = 2;
+	// 'normal' perpective look
+	else
+		s.s1 = 0;
+
+	return s;
+}
+
+function createTube(c, R, R_, r, r_, dx, dy)
+{
+	var CPD  = R  * gCPD;
+	var CPD_ = R_ * gCPD;
+	var cpd  = r  * gCPD;
+	var cpd_ = r_ * gCPD;
+	var contour;
+
+	contour = smartShape.elem.elements[0].contours[0];
+	contour.nodes.length = 0;
+	addPathPointBez(contour, c.x,   c.y-R, c.x-CPD, c.y-R,   c.x+CPD, c.y-R  );//0
+	addPathPointBez(contour, c.x+R, c.y,   c.x+R,   c.y-CPD, c.x+R,   c.y+CPD);//1
+	addPathPointBez(contour, c.x,   c.y+R, c.x+CPD, c.y+R,   c.x-CPD, c.y+R  );//2
+	addPathPointBez(contour, c.x-R, c.y,   c.x-R,   c.y+CPD, c.x-R,   c.y-CPD);//3
+	contour.isClosed = true;
+
+	contour = smartShape.elem.elements[0].contours[1];
+	contour.nodes.length = 0;
+	addPathPointBez(contour, c.x,    c.y-R_, c.x-CPD_, c.y-R_,   c.x+CPD_, c.y-R_  );//0
+	addPathPointBez(contour, c.x+R_, c.y,    c.x+R_,   c.y-CPD_, c.x+R_,   c.y+CPD_);//1
+	addPathPointBez(contour, c.x,    c.y+R_, c.x+CPD_, c.y+R_,   c.x-CPD_, c.y+R_  );//2
+	addPathPointBez(contour, c.x-R_, c.y,    c.x-R_,   c.y+CPD_, c.x-R_,   c.y-CPD_);//3
+	contour.isClosed = true;
+
+	createSides(0, 0);
+	createSides(1, 0);
+
+	c.x += dx;
+	c.y += dy;
+
+	contour = smartShape.elem.elements[5].contours[0];
+	contour.nodes.length = 0;
+	addPathPointBez(contour, c.x,   c.y-r, c.x-cpd, c.y-r,   c.x+cpd, c.y-r  );//0
+	addPathPointBez(contour, c.x+r, c.y,   c.x+r,   c.y-cpd, c.x+r,   c.y+cpd);//1
+	addPathPointBez(contour, c.x,   c.y+r, c.x+cpd, c.y+r,   c.x-cpd, c.y+r  );//2
+	addPathPointBez(contour, c.x-r, c.y,   c.x-r,   c.y+cpd, c.x-r,   c.y-cpd);//3
+	contour.isClosed = true;
+
+	contour = smartShape.elem.elements[5].contours[1];
+	contour.nodes.length = 0;
+	addPathPointBez(contour, c.x,    c.y-r_, c.x-cpd_, c.y-r_,   c.x+cpd_, c.y-r_  );//0
+	addPathPointBez(contour, c.x+r_, c.y,    c.x+r_,   c.y-cpd_, c.x+r_,   c.y+cpd_);//1
+	addPathPointBez(contour, c.x,    c.y+r_, c.x+cpd_, c.y+r_,   c.x-cpd_, c.y+r_  );//2
+	addPathPointBez(contour, c.x-r_, c.y,    c.x-r_,   c.y+cpd_, c.x-r_,   c.y-cpd_);//3
+	contour.isClosed = true;
+
+	c.x -= dx;
+	c.y -= dy;
+
+	positionSides(c, R,  r,  dx, dy, 0, 0);
+	positionSides(c, R_, r_, dx, dy, 1, 0);
+}
+
+function createSides(d, s)
+{
+	var i, j, k, contour;
+
+	smartShape.elem.elements[(d==0)?1:2].contours[0].nodes.length = 0;
+	smartShape.elem.elements[(d==0)?4:3].contours[0].nodes.length = 0;
+
+	if (s==0)
+	{
+		smartShape.elem.elements[(d==0)?1:2].contours.length = 1;
+		smartShape.elem.elements[(d==0)?4:3].contours.length = 1;
+	}
+	else
+	{
+		smartShape.elem.elements[s].contours[1] = new Contour;
+		smartShape.elem.elements[s].contours[1].nodes.length = 0;
+	}
+
+	for (k=0,i=((d==0)?1:2); k<2; k++,i+=((d==0)?3:1))
+	{
+		contour = smartShape.elem.elements[(s==0)?i:s].contours[(s==0)?0:k];
+
+		for (j=0; j<((s==0)?10:4); j++)
+		{
+			addPathPoint(contour, j, j);
+		}
+
+		contour.isClosed = true;
+	}
+}
+
+function positionSides(c, R, r, dx, dy, d, s)
+{
+	var CPD = R * gCPD;
+	var cpd = r * gCPD;
+	var L   = Math.sqrt((dx*dx) + (dy*dy));
+	var a_  = Math.asin((R-r)/L);
+	var da;
+	var contour, e0, e1, e2, e3;
+	var a, i, j, k, l, a, x, y, px, py, sx, sy, x_, y_;
+
+	if (s==0)
+	{
+		a  = -gPI2 + a_ + evalAngle(dx, dy);
+		da = (gPI-a_*2)/4;
+
+		for (k=1,l=((d==0)?1:2); k<3; k++,l+=((d==0)?3:1))
+		{
+			contour = smartShape.elem.elements[l].contours[0];
+
+			for (i=0,j=9; i<5; i++,j--)
+			{
+				x_ = CPD * Math.sin(a) * (da/gPI2);
+				y_ = CPD * Math.cos(a) * (da/gPI2);
+
+				x  = c.x + (R * Math.cos(a));
+				y  = c.y + (R * Math.sin(a));
+				px = x   + ((k==1)?  x_ : -x_);
+				py = y   + ((k==1)? -y_ :  y_);
+				sx = x   + ((k==1)? -x_ :  x_);
+				sy = y   + ((k==1)?  y_ : -y_);
+
+				if (i==0) {	px = x;
+							py = y; }
+				if (i==4) {	sx = x;
+							sy = y; }
+
+				moveNode(contour.nodes[i], x, y, px, py, sx, sy);
+
+				x_ = cpd * Math.sin(a) * (da/gPI2);
+				y_ = cpd * Math.cos(a) * (da/gPI2);
+
+				x  = c.x + (r * Math.cos(a)) + dx;
+				y  = c.y + (r * Math.sin(a)) + dy;
+				px = x   + ((k==1)?  x_ : -x_);
+				py = y   + ((k==1)? -y_ :  y_);
+				sx = x   + ((k==1)? -x_ :  x_);
+				sy = y   + ((k==1)?  y_ : -y_);
+
+				if (i==0) {	px = x;
+							py = y; }
+				if (i==4) {	sx = x;
+							sy = y; }
+
+				moveNode(contour.nodes[j], x, y, sx, sy, px, py);
+
+				a += ((k==1)? da : -da);
+			}
+
+			a  = -gPI2 + a_ + evalAngle(dx, dy);
+			da = (gPI+a_*2)/4;
+		}
+	}
+	else
+	{
+		e0 = smartShape.elem.elements[0].contours[d];
+		e1 = smartShape.elem.elements[s].contours[0];
+		e2 = smartShape.elem.elements[s].contours[1];
+		e3 = smartShape.elem.elements[5].contours[d];
+
+		for (i=0; i<4; i++)
+		{
+			copyNodePos(e0.nodes[i], e1.nodes[i]);
+			copyNodePos(e3.nodes[i], e2.nodes[i]);
+		}
+	}
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

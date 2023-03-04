@@ -1,0 +1,15 @@
+﻿//--not for batch--
+// Copyright (c) 2000 Macromedia. All rights reserved.
+
+var message;
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Reset Warning Dialogs.jsf");
+
+message = confirm(__tooltips["message"]);
+
+if (message == true)
+{
+	App.resetWarnings();
+}
+
+
+

@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["breadth"] = "Breadth";
+__tooltips["cleft"] = "Cleft";
+__tooltips["vertex"] = "Vertex";
+__tooltips["vertexarc"] = "Vertex Arc";

@@ -1,0 +1,50 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	Widget.elem.customData["flexClassName"] = "ScrollBar";
+
+	var currValues = new Array();
+
+	currValues.push({ name:"State",   type:"ComboBox", value:"Up,Up,Over,Down" });
+	currValues.push({ name:"enabled", type:"Boolean",  value:"true"            });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var vals    = Widget.elem.customData["currentValues"];
+	var state   = vals[0].value.split(",")[0];
+	var enabled = vals[1].value;
+
+	Widget.GetObjectByName("up_fill_up").visible       = ((state=="Up") || (state=="Over") || (!enabled));
+	Widget.GetObjectByName("up_border_up").visible     = ((state=="Up") || (!enabled));
+	Widget.GetObjectByName("over_border_up").visible   = (((state=="Over") || (state=="Down")) && enabled);
+	Widget.GetObjectByName("down_fill_up").visible     = ((state=="Down") && enabled);
+
+	Widget.GetObjectByName("up_fill").visible          = ((state=="Up") || (state=="Over") || (!enabled));
+	Widget.GetObjectByName("up_border").visible        = ((state=="Up") || (!enabled));
+	Widget.GetObjectByName("over_border").visible      = (((state=="Over") || (state=="Down")) && enabled);
+	Widget.GetObjectByName("down_fill").visible        = ((state=="Down") && enabled);
+
+	Widget.GetObjectByName("up_fill_down").visible     = ((state=="Up") || (state=="Over") || (!enabled));
+	Widget.GetObjectByName("up_border_down").visible   = ((state=="Up") || (!enabled));
+	Widget.GetObjectByName("over_border_down").visible = (((state=="Over") || (state=="Down")) && enabled);
+	Widget.GetObjectByName("down_fill_down").visible   = ((state=="Down") && enabled);
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+	default: break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

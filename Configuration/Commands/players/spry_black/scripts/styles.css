@@ -1,0 +1,180 @@
+@charset "UTF-8";
+
+body {
+	margin: 0;
+	padding: 0;
+	color: #999;
+	background: #000;
+	font-family: "Lucida Grande", "Trebuchet MS", sans-serif;
+	font-size: x-small; /*for IE5/Win */
+	voice-family: "\"}\"";
+	voice-family: inherit;
+	font-size: small; /*for compliant browsers */	
+	}
+html>body { font-size: small; } /* be nice to Opera */
+
+/* Layout Rules
+----------------------------------------------- */
+#wrap {
+	width: 1000px;
+	padding-top: 20px;
+	margin: 0 20px;
+}
+
+.albumDesc	{
+	margin-top: -15px;
+	color: #666666;
+
+}
+.albumBookDesc {
+	font-size: small;
+	color: #666666;
+	margin-top: -13px;
+}
+.descTitle {
+	font-size: small;
+	color: #999999;
+}
+
+.albumName {
+	font-size: large;
+}
+
+
+/* Form Elements
+----------------------------------------------- */
+label, select { 
+	font-size: 90%;
+	font-family: "Lucida Grande", "Trebuchet MS", sans-serif;
+}
+select {
+	color: #B1B1BC;
+	background-color:  #131313;
+	border: 1px solid #b1b1bc;
+}
+
+/* Gallery and Playback Controls
+----------------------------------------------- */
+#gallerySelect {
+	width: 248px;
+	margin-top: -8px;
+}
+#controls {	margin:0 auto 10px auto; }
+#galleries {	margin:0 auto 20px auto; }
+#galleries label { padding-bottom: 2px; }
+
+#transport {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+#transport li {
+	float: left;
+	margin: 0;
+	padding: 0;
+	text-align: center;
+}
+#transport a {
+	text-decoration: none;
+	text-transform: uppercase;
+	font-size: 85%;
+	font-weight: bold;
+	letter-spacing: 0.1em;
+	margin: 0 1px 0 0;
+	padding: 4px 8px;
+	width: 64px;
+	float: left;
+	display: block;
+	-moz-user-select: none;
+	-khtml-user-select: none;
+}
+#transport a:link {
+	background: #666 url('../images/bg_grad_gray1.gif') repeat-x;
+	color: #fff;
+	border-top: solid 1px #999;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #3a3a3a;
+	border-left: solid 1px #404040;
+}
+#transport a:visited {
+	background: #666 url('../images/bg_grad_gray1.gif') repeat-x;
+	color: #fff;
+	border-top: solid 1px #999;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #3a3a3a;
+	border-left: solid 1px #404040;
+}
+#transport a:hover {
+	background: #666 url('../images/bg_grad_gray2.gif') repeat-x;
+	color: #000;
+	border-top: solid 1px #999;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #3a3a3a;
+	border-left: solid 1px #404040;
+}
+#transport a:focus {
+	-moz-user-select: none;
+	-khtml-user-select: none;
+}
+
+#previews {
+	border-top: solid 1px #404040;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #3a3a3a;
+	border-left: solid 1px #404040;
+	padding: 10px 10px 20px 10px;
+	margin-bottom: 5px;
+	width: 250px;
+	float: left;
+	margin-right: 10px;
+	background-color: #171717;
+}
+#thumbnails {
+	clear: both;
+	margin: 10px auto;
+}
+#thumbnails div {
+	position: relative;
+	width: 24px;
+	height: 24px;
+	float: left;
+	margin: 8px;
+	padding: 0;
+	float: left;
+	display:inline;
+}
+#thumbnails img {
+	width: 24px;
+	height: 24px;
+	position: absolute;
+	border-top: solid 1px #999;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #333;
+	border-left: solid 1px #404040;
+}
+#picture {
+	padding: 0px;
+	width: 500px;
+	float: left;
+}
+#mainImageOutline {
+	margin: 0 auto;
+	padding: 0;
+	background-color: #eee;
+	border-top: solid 1px #999;
+	border-right: solid 1px #404040;
+	border-bottom: solid 1px #333;
+	border-left: solid 1px #404040;
+	padding: 1em; 
+	overflow: hidden; 
+}
+#mainImage {
+	width: 100%;
+	height: 100%;
+}
+
+#picture img {	border: 1px solid #999; }
+.selectedThumbnail {  border: solid 2px #fc0 !important; }
+.inFocus {  border: solid 1px #fc0 !important; }.header {
+	margin-top: 0px;
+}

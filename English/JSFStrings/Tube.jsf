@@ -1,0 +1,9 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["perspective"] = "Perspective";
+__tooltips["innerradiusrear"] = "Inner Radius - Rear";
+__tooltips["innerradiusfront"] = "Inner Radius - Front";
+__tooltips["offset"] = "Offset";
+__tooltips["reset"] = "Click to reset offset";

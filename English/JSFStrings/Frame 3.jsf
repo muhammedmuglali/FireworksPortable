@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["offset"] = "Frame offset";
+__tooltips["size"] = "Corner Size";
+__tooltips["drag"] = "Drag to reposition over another object";
+__tooltips["resize"] = "Resize";

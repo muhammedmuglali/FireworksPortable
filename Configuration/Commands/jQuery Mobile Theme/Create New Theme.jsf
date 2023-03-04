@@ -1,0 +1,30 @@
+﻿function __CreateTheme()
+{
+	var templateDir = fw.appHtmlCodeDir + "/jQuery/jQuery_template.png";
+	var fileExists = Files.exists(templateDir);
+	if(true == fileExists)
+	{
+		fw.openDocument(templateDir ,true,false );
+		fw.logPipEvent("jQuery Mobile Theme", null, "Create Theme");
+	}
+	else
+	{
+		fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+		localizedString = __jQuerytooltips;
+		alert(localizedString.missingTemplate); 
+	}
+}	
+
+try
+{
+	__CreateTheme();
+} 
+catch(FwErr)
+{
+		
+	if(FwErr == "Exit")
+		Files.deleteFileIfExisting(folder + "/" + imageFolder);
+	else
+		alert([FwErr, FwErr.lineNumber, FwErr.fileName].join("\n"));
+		
+}

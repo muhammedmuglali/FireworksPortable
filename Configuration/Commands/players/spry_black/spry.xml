@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FWACPlayer>
+	<Player name="Player - Black (Flash Plugin not required)" preview="spry.jpg" launch="index.html">
+		<File src="index.html"             dst="index.html"            />
+		<File src="scripts/gallery.js"     dst="scripts/gallery.js"    />
+		<File src="scripts/SpryData.js"    dst="scripts/SpryData.js"   />
+		<File src="scripts/SpryEffects.js" dst="scripts/SpryEffects.js"/>
+		<File src="scripts/styles.css"     dst="scripts/styles.css"    />
+		<File src="scripts/xpath.js"       dst="scripts/xpath.js"      />
+	</Player>
+</FWACPlayer>

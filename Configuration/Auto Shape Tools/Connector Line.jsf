@@ -1,0 +1,1235 @@
+﻿/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+/*============================================================================*/
+/*                            Connector Line tool                             */
+/*============================================================================*/
+/*
+
+The default connector line has the following:-
+
+  control point 1
+  o----------o control point 3
+             |
+             |
+             o control point 0
+             |
+             |
+             o----------o control point 2
+  control point 4
+
+- Control point 0 (smartShape.elem.controlPoints[0])
+  This control point determines the position of the centre vertical or
+  horizontal line.
+  The movement of control point 0 is limited such that it stops when
+  control points 3 and 4 meet control points 1 and 2.
+  If control points 0, 3, and 4 are aligned (i.e. corners are NOT curved -
+  see below), then the user is able to (after mouseup) continue dragging it
+  beyond the limit.
+  Shift-clicking will rotate the line about this control point by 90 degrees
+  clockwise.
+
+- Control point 1 (smartShape.elem.controlPoints[1])
+  This control point determines the position of the Start point.
+
+- Control point 2 (smartShape.elem.controlPoints[2])
+  This control point determines the position of the End point.
+
+- Control points 3 and 4
+  (smartShape.elem.controlPoints[3] & smartShape.elem.controlPoints[4])
+  These control points determine the curvature of the appropriate corner.
+  Moving one of these control points will result in the other to move in the
+  opposite direction. If the control points 1 and 2 are in the same direction
+  away from the centre, then control points 3 and 4 will move in the same
+  direction.
+  Shift-dragging one of these control points will force that control point
+  to be adjusted independently.
+
+
+  node 0
+  o----------o nodes 1 & 2
+             |
+             |
+             |
+             |
+             |
+             o----------o node 5
+     nodes 3 & 4
+
+*/
+
+
+/*============================================================================*/
+/*                             Default functions                              */
+/*============================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+		InsertSmartShapeAt();
+		RegisterDragInsert();
+		break;
+
+	case "EndDragInsert":
+		EndDragInsert();
+		break;
+
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	case "RedrawSmartShape":
+		RedrawSmartShape();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Connector Line.jsf");
+	var t    = __tooltips;
+
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var c   = {x:cmp.x+R, y:cmp.y+R};
+
+	var c0, c1, c2, c3, c4;
+
+	smartShape.elem.controlPoints.length = 5;
+
+	// centre control point
+	c0                      = smartShape.elem.controlPoints[0];
+	c0.x                    = c.x;
+	c0.y                    = c.y;
+	c0.name                 = "0";
+	c0.toolTip              = t.rotate;
+
+	// top-left
+	c1                      = smartShape.elem.controlPoints[1];
+	c1.x                    = c.x - R;
+	c1.y                    = c.y - R;
+	c1.hiliteDragOverObject = true;
+	c1.toolTip              = "1";
+
+	// bottom-right
+	c2                      = smartShape.elem.controlPoints[2];
+	c2.x                    = c.x + R;
+	c2.y                    = c.y + R;
+	c2.hiliteDragOverObject = true;
+	c2.toolTip              = "2";
+
+	// top corner
+	c3                      = smartShape.elem.controlPoints[3];
+	c3.x                    = c.x;
+	c3.y                    = c.y - R;
+	c3.toolTip              = t.altopt;
+
+	// bottom corner
+	c4                      = smartShape.elem.controlPoints[4];
+	c4.x                    = c.x;
+	c4.y                    = c.y + R;
+	c4.toolTip              = t.altopt;
+
+	// allocate space for the shape
+	smartShape.elem.elements[0] = new Path;
+
+	if (smartShape.elem.elements[0].pathAttributes.brush == null)
+	{
+		var e = smartShape.elem.elements[0];
+
+		e.pathAttributes.brush = {	alphaRemap:"none", 
+									angle:0, 
+									antiAliased:false, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Pencil", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:8, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"none", 
+									flowRate:0, 
+									maxCount:15, 
+									minSize:1, 
+									name:"bn_1-Pixel", 
+									numDashes:0, 
+									shape:"circle", 
+									softenMode:"bell curve", 
+									softness:0, 
+									spacing:15, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = "#000000";
+	}
+
+	smartShape.elem.elements[0].pathAttributes.fill = null;
+	smartShape.elem.elements[0].contours[0] = new Contour;
+	smartShape.elem.elements[0].contours[0].nodes.length = 0;
+
+	// draw the connector line
+	addPathPoint(smartShape.elem.elements[0].contours[0], c1.x, c1.y);
+	addPathPoint(smartShape.elem.elements[0].contours[0], c3.x, c3.y);
+	addPathPoint(smartShape.elem.elements[0].contours[0], c3.x, c3.y);
+	addPathPoint(smartShape.elem.elements[0].contours[0], c4.x, c4.y);
+	addPathPoint(smartShape.elem.elements[0].contours[0], c4.x, c4.y);
+	addPathPoint(smartShape.elem.elements[0].contours[0], c2.x, c2.y);
+
+	smartShape.elem.customData["shapeName"] = "connector";
+	smartShape.elem.customData["mode"]      = c0.name;
+	smartShape.elem.customData["offset1"]   = -100;
+	smartShape.elem.customData["corner1"]   = 0;
+	smartShape.elem.customData["offset2"]   = 100;
+	smartShape.elem.customData["corner2"]   = 0;
+	smartShape.elem.customData["width"]     = -1;
+	smartShape.elem.customData["height"]    = 200;
+}
+
+function RegisterDragInsert()
+{
+	var params = smartShape.GetDefaultMoveParms();
+
+	params.deltaXtoX = 0.0;
+	params.deltaYtoY = 0.0;
+	smartShape.elem.elements[0].contours[0].nodes[0].RegisterInsertBBoxMove(params);
+
+	smartShape.elem.controlPoints[1].RegisterInsertBBoxMove(params);
+
+	params.deltaXtoX = 0.5;
+	smartShape.elem.elements[0].contours[0].nodes[1].RegisterInsertBBoxMove(params);
+	smartShape.elem.elements[0].contours[0].nodes[2].RegisterInsertBBoxMove(params);
+
+	smartShape.elem.controlPoints[3].RegisterInsertBBoxMove(params);
+
+	params.deltaYtoY = 0.5;
+
+	smartShape.elem.controlPoints[0].RegisterInsertBBoxMove(params);
+
+	params.deltaYtoY = 1.0;
+	smartShape.elem.elements[0].contours[0].nodes[3].RegisterInsertBBoxMove(params);
+	smartShape.elem.elements[0].contours[0].nodes[4].RegisterInsertBBoxMove(params);
+
+	smartShape.elem.controlPoints[4].RegisterInsertBBoxMove(params);
+
+	params.deltaXtoX = 1.0
+	smartShape.elem.elements[0].contours[0].nodes[5].RegisterInsertBBoxMove(params);
+
+	smartShape.elem.controlPoints[2].RegisterInsertBBoxMove(params);
+}
+
+function EndDragInsert()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+
+	smartShape.elem.customData["offset1"] = c1.x - c0.x;
+	smartShape.elem.customData["offset2"] = c2.x - c0.x;
+	smartShape.elem.customData["height"]  = c2.y - c1.y;;
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var cpLen = smartShape.elem.controlPoints.length;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var contour, node;
+	var dx1, dy1, dx2, dy2, lim1, lim2, lim1_, lim2_, lim, lim_;
+	var dxx, dyy, dxy, dyx;
+	var minX, minY, maxX, maxY;
+	var cpdist, cpdist1, cpdist2;
+	var sameDirXp, sameDirYp, sameDirXn, sameDirYn, sameDirX, sameDirY;
+	var cpPt, cpPt_, cpCv, cpCv_;
+	var n0, n1, n2;
+	var dp, p0, p1, p2;
+
+	// determine which way the line is 'facing'
+	var q0  = (c0.name == 0);	// default - horizontal
+	var q1  = (c0.name == 1);	//  90 degrees clockwise - vertical
+	var q2  = (c0.name == 2);	// 180 degrees clockwise - horizontal
+	var q3  = (c0.name == 3);	// 270 degrees clockwise - vertical
+	var q02 = (q0||q2);			// 0 or 180 degrees  - horizontal
+	var q13 = (q1||q3);			// 90 or 270 degrees - vertical
+
+	// calculate the appropriate distance from the point for pred/succ handles
+	cpdist1 = ((q02)? Math.abs(c0.x-c3.x) : Math.abs(c0.y-c3.y)) * fw.ellipseBCPConst;
+	cpdist2 = ((q02)? Math.abs(c0.x-c4.x) : Math.abs(c0.y-c4.y)) * fw.ellipseBCPConst;
+
+	// calculate how far the points can be moved to create curves
+	dx1 = Math.abs(c1.x - c0.x);
+	dy1 = Math.abs(c1.y - c0.y);
+	dx2 = Math.abs(c2.x - c0.x);
+	dy2 = Math.abs(c2.y - c0.y);
+
+	lim1 = (dx1<dy1)? dx1 : dy1;
+	lim2 = (dx2<dy2)? dx2 : dy2;
+
+	// if constrained, make the two limits identical
+	if (!smartShape.altOptKeyDown)
+	{
+		lim1 = (Math.abs(lim1)<Math.abs(lim2))? lim1 : lim2;
+		lim2 = lim1;
+	}
+
+	// limit for pred/succ handles
+	lim1_ = lim1 - (lim1 * fw.ellipseBCPConst);
+	lim2_ = lim2 - (lim2 * fw.ellipseBCPConst);
+
+	// determine if Start & End points are on the same 'side'
+	sameDirXn = (q02) && (c1.x<c0.x) && (c2.x<c0.x);	// -ve direction in X
+	sameDirXp = (q02) && (c1.x>c0.x) && (c2.x>c0.x);	// +ve direction in X
+	sameDirYn = (q13) && (c1.y<c0.y) && (c2.y<c0.y);	// -ve direction in Y
+	sameDirYp = (q13) && (c1.y>c0.y) && (c2.y>c0.y);	// +ve direction in Y
+
+	sameDirX  = sameDirXn || sameDirXp;	// -/+ve direction in X
+	sameDirY  = sameDirYn || sameDirYp;	// -/+ve direction in Y
+
+	switch (cpIdx)
+	{
+		case 0:
+			dp           = smartShape.GetDefaultMoveParms();
+			p0           = smartShape.GetDefaultMoveParms();
+			p1           = smartShape.GetDefaultMoveParms();
+			p2           = smartShape.GetDefaultMoveParms();
+			p0.deltaXtoX = (q02)? 1 : 0;
+			p0.deltaYtoY = (q13)? 1 : 0;
+			p1.deltaXtoX = p0.deltaXtoX;
+			p1.deltaYtoY = p0.deltaYtoY;
+			p2.deltaXtoX = p0.deltaXtoX;
+			p2.deltaYtoY = p0.deltaYtoY;
+
+			// if 'horizontal' orientation, and c1 & c2 are not aligned with c0 vertically
+			if ( (q02) && (c1.x!=c0.x) && (c2.x!=c0.x) )
+			{
+				if      (sameDirXn)
+				{
+					p0.minX = (c1.x<c2.x)? c2.x+(c0.x-c4.x)  : c1.x+(c0.x-c3.x);	
+					p0.maxX = dp.maxX;
+					p1.minX = c3.x - (((c3.x-c1.x)<(c4.x-c2.x))? (c3.x-c1.x) : (c4.x-c2.x));
+					p1.maxX = dp.maxX;
+					p2.minX = c4.x - (((c4.x-c2.x)<(c3.x-c1.x))? (c4.x-c2.x) : (c3.x-c1.x));
+					p2.maxX = dp.maxX;
+				}
+				else if (sameDirXp)
+				{
+					p0.minX = dp.minX;
+					p0.maxX = (c1.x>c2.x)? c2.x-(c4.x-c0.x)  : c1.x-(c3.x-c0.x);
+					p1.minX = dp.minX;
+					p1.maxX = c3.x + (((c1.x-c3.x)<(c2.x-c4.x))? (c1.x-c3.x) : (c2.x-c4.x));
+					p2.minX = dp.minX;
+					p2.maxX = c4.x + (((c2.x-c4.x)<(c1.x-c3.x))? (c2.x-c4.x) : (c1.x-c3.x));
+				}
+				else
+				{
+					p0.minX = (c1.x<=c0.x)? c0.x-(c3.x-c1.x) : c0.x-(c4.x-c2.x);
+					p0.maxX = (c1.x<=c0.x)? c0.x+(c2.x-c4.x) : c0.x+(c1.x-c3.x);
+					p1.minX = (c1.x<=c0.x)? c1.x : c2.x-(c4.x-c3.x);
+					p1.maxX = (c1.x> c0.x)? c1.x : c2.x-(c4.x-c3.x);
+					p2.minX = (c2.x<=c0.x)? c2.x : c1.x-(c3.x-c4.x);
+					p2.maxX = (c2.x> c0.x)? c2.x : c1.x-(c3.x-c4.x);
+				}
+			}
+			// if 'vertical' orientation, and c1 & c2 are not aligned with c0 horizontally
+			else if ( (q13) && (c1.x!=c0.x) && (c2.x!=c0.x) )
+			{
+				if      (sameDirYn)
+				{
+					p0.minY = (c1.y<c2.y)? c2.y+(c0.y-c4.y)  : c1.y+(c0.y-c3.y);	
+					p0.maxY = dp.maxY;
+					p1.minY = c3.y - (((c3.y-c1.y)<(c4.y-c2.y))? (c3.y-c1.y) : (c4.y-c2.y));
+					p1.maxY = dp.maxY;
+					p2.minY = c4.y - (((c4.y-c2.y)<(c3.y-c1.y))? (c4.y-c2.y) : (c3.y-c1.y));
+					p2.maxY = dp.maxY;
+				}
+				else if (sameDirYp)
+				{
+					p0.minY = dp.minY;
+					p0.maxY = (c1.y>c2.y)? c2.y-(c4.y-c0.y)  : c1.y-(c3.y-c0.y);
+					p1.minY = dp.minY;
+					p1.maxY = c3.y + (((c1.y-c3.y)<(c2.y-c4.y))? (c1.y-c3.y) : (c2.y-c4.y));
+					p2.minY = dp.minY;
+					p2.maxY = c4.y + (((c2.y-c4.y)<(c1.y-c3.y))? (c2.y-c4.y) : (c1.y-c3.y));
+				}
+				else
+				{
+					p0.minY = (c1.y<=c0.y)? c0.y-(c3.y-c1.y) : c0.y-(c4.y-c2.y);
+					p0.maxY = (c1.y<=c0.y)? c0.y+(c2.y-c4.y) : c0.y+(c1.y-c3.y);
+					p1.minY = (c1.y<=c0.y)? c1.y : c2.y-(c4.y-c3.y);
+					p1.maxY = (c1.y> c0.y)? c1.y : c2.y-(c4.y-c3.y);
+					p2.minY = (c2.y<=c0.y)? c2.y : c1.y-(c3.y-c4.y);
+					p2.maxY = (c2.y> c0.y)? c2.y : c1.y-(c3.y-c4.y);
+				}
+			}
+
+			c0.RegisterMove(p0);
+			smartShape.elem.elements[0].contours[0].nodes[2].RegisterMove(p0);
+			smartShape.elem.elements[0].contours[0].nodes[3].RegisterMove(p0);
+
+			p1.movePred  = true;
+			p1.movePt    = true;
+			p1.moveSucc  = false;
+
+			c3.RegisterMove(p1);
+			smartShape.elem.elements[0].contours[0].nodes[1].RegisterMove(p1);
+
+			p1.movePred  = false;
+			p1.movePt    = false;
+			p1.moveSucc  = true;
+			p1.minX     += (q02)? ((c1.x<c0.x)? cpdist1 : -cpdist1) : 0;
+			p1.maxX     += (q02)? ((c1.x<c0.x)? cpdist1 : -cpdist1) : 0;
+			p1.minY     += (q13)? ((c1.y<c0.y)? cpdist1 : -cpdist1) : 0;
+			p1.maxY     += (q13)? ((c1.y<c0.y)? cpdist1 : -cpdist1) : 0;
+
+			smartShape.elem.elements[0].contours[0].nodes[1].RegisterMove(p1);
+
+			p2.movePred  = false;
+			p2.movePt    = true;
+			p2.moveSucc  = true;
+
+			c4.RegisterMove(p2);
+			smartShape.elem.elements[0].contours[0].nodes[4].RegisterMove(p2);
+
+			p2.movePred  = true;
+			p2.movePt    = false;
+			p2.moveSucc  = false;
+			p2.minX     += (q02)? ((c2.x<c0.x)? cpdist2 : -cpdist2) : 0;
+			p2.maxX     += (q02)? ((c2.x<c0.x)? cpdist2 : -cpdist2) : 0;
+			p2.minY     += (q13)? ((c2.y<c0.y)? cpdist2 : -cpdist2) : 0;
+			p2.maxY     += (q13)? ((c2.y<c0.y)? cpdist2 : -cpdist2) : 0;
+
+			smartShape.elem.elements[0].contours[0].nodes[4].RegisterMove(p2);
+		break;
+
+		case 1:
+		case 2:
+			cpdist  = (cpIdx==1)? cpdist1 : cpdist2;
+			cpdist_ = (cpIdx==2)? cpdist1 : cpdist2;
+			cpPt    = (cpIdx==1)? c1 : c2;
+			cpCv    = (cpIdx==1)? c3 : c4;
+			cpPt_   = (cpIdx==2)? c1 : c2;
+			cpCv_   = (cpIdx==2)? c3 : c4;
+			n0      = (cpIdx==1)? 0  : 5;
+			n1      = (cpIdx==1)? 1  : 4;
+			n2      = (cpIdx==1)? 2  : 3;
+			lim     = (cpIdx==1)? lim1 : lim2;
+			lim_    = (cpIdx==2)? lim1 : lim2;
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaXtoX = (q02)? 0 : 0.5;
+			params.deltaYtoY = (q13)? 0 : 0.5;
+
+			if ( (cpCv.x!=c0.x) && (cpCv.y!=c0.y) )
+			{
+				params.minX  = (q02)? c0.x : (cpPt.x<cpPt_.x)? params.minX : cpCv_.x+Math.abs(cpCv_.y-c0.y);
+				params.maxX  = (q02)? c0.x : (cpPt.x>cpPt_.x)? params.maxX : cpCv_.x-Math.abs(cpCv_.y-c0.y);
+				params.minY  = (q13)? c0.y : (cpPt.y<cpPt_.y)? params.minY : cpCv_.y+Math.abs(cpCv_.x-c0.x);
+				params.maxY  = (q13)? c0.y : (cpPt.y>cpPt_.y)? params.maxY : cpCv_.y-Math.abs(cpCv_.x-c0.x);
+			}
+			else if ( (q0) && (cpPt.y==cpPt_.y) )
+			{
+				params.minX  = c0.x;
+				params.maxX  = c0.x;
+				params.minY  = (cpIdx==1)? params.minY : cpPt_.y;
+				params.maxY  = (cpIdx==2)? params.maxY : cpPt_.y;
+			}
+			else if ( (q1) && (cpPt.x==cpPt_.x) )
+			{
+				params.minX  = (cpIdx==2)? params.minX : cpPt_.x;
+				params.maxX  = (cpIdx==1)? params.maxX : cpPt_.x;
+				params.minY  = c0.y;
+				params.maxY  = c0.y;
+			}
+			else if ( (q2) && (cpPt.y==cpPt_.y) )
+			{
+				params.minX  = c0.x;
+				params.maxX  = c0.x;
+				params.minY  = (cpIdx==2)? params.minY : cpPt_.y;
+				params.maxY  = (cpIdx==1)? params.maxY : cpPt_.y;
+			}
+			else if ( (q3) && (cpPt.x==cpPt_.x) )
+			{
+				params.minX  = (cpIdx==1)? params.minX : cpPt_.x;
+				params.maxX  = (cpIdx==2)? params.maxX : cpPt_.x;
+				params.minY  = c0.y;
+				params.maxY  = c0.y;
+			}
+			else
+			{
+				params.minX  = (q02)? c0.x : (cpPt.x<c0.x)? params.minX : cpPt_.x;
+				params.maxX  = (q02)? c0.x : (cpPt.x>c0.x)? params.maxX : cpPt_.x;
+				params.minY  = (q13)? c0.y : (cpPt.y<c0.y)? params.minY : cpPt_.y;
+				params.maxY  = (q13)? c0.y : (cpPt.y>c0.y)? params.maxY : cpPt_.y;
+			}
+
+			c0.RegisterMove(params);
+
+			params.deltaXtoX = 1;
+			params.deltaYtoY = 1;
+			params.movePred  = (cpIdx==2);
+			params.movePt    = true;
+			params.moveSucc  = (cpIdx==1);
+
+			smartShape.elem.elements[0].contours[0].nodes[n2].RegisterMove(params);
+
+			params.movePred  = (cpIdx==1);
+			params.movePt    = false;
+			params.moveSucc  = (cpIdx==2);
+
+			if ( (cpCv.x!=c0.x) && (cpCv.y!=c0.y) )
+			{
+				params.minX  = ((q13)&&(cpPt.x>c0.x))? params.minX+cpdist : params.minX;
+				params.maxX  = ((q13)&&(cpPt.x<c0.x))? params.maxX-cpdist : params.maxX;
+				params.minY  = ((q02)&&(cpPt.y>c0.y))? params.minY+cpdist : params.minY;
+				params.maxY  = ((q02)&&(cpPt.y<c0.y))? params.maxY-cpdist : params.maxY;
+			}
+
+			smartShape.elem.elements[0].contours[0].nodes[n2].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaXtoX = 1;
+			params.deltaYtoY = 1;
+
+			if ( (cpCv.x!=c0.x) && (cpCv.y!=c0.y) )
+			{
+				params.minX  = (cpPt.x<c0.x)? params.minX : ((q02)? cpCv.x : cpCv_.x+(Math.abs(cpCv.y-c0.y)+Math.abs(cpCv_.y-c0.y)));
+				params.maxX  = (cpPt.x>c0.x)? params.maxX : ((q02)? cpCv.x : cpCv_.x-(Math.abs(cpCv.y-c0.y)+Math.abs(cpCv_.y-c0.y)));
+				params.minY  = (cpPt.y<c0.y)? params.minY : ((q13)? cpCv.y : cpCv_.y+(Math.abs(cpCv.x-c0.x)+Math.abs(cpCv_.x-c0.x)));
+				params.maxY  = (cpPt.y>c0.y)? params.maxY : ((q13)? cpCv.y : cpCv_.y-(Math.abs(cpCv.x-c0.x)+Math.abs(cpCv_.x-c0.x)));
+			}
+			else if ( (q0) && (cpPt.y==cpPt_.y) )
+			{
+				params.minY  = (cpIdx==1)? params.minY : cpPt_.y;
+				params.maxY  = (cpIdx==2)? params.maxY : cpPt_.y;
+			}
+			else if ( (q1) && (cpPt.x==cpPt_.x) )
+			{
+				params.minX  = (cpIdx==2)? params.minX : cpPt_.x;
+				params.maxX  = (cpIdx==1)? params.maxX : cpPt_.x;
+			}
+			else if ( (q2) && (cpPt.y==cpPt_.y) )
+			{
+				params.minY  = (cpIdx==2)? params.minY : cpPt_.y;
+				params.maxY  = (cpIdx==1)? params.maxY : cpPt_.y;
+			}
+			else if ( (q3) && (cpPt.x==cpPt_.x) )
+			{
+				params.minX  = (cpIdx==1)? params.minX : cpPt_.x;
+				params.maxX  = (cpIdx==2)? params.maxX : cpPt_.x;
+			}
+			else
+			{
+				params.minX  = ((q13)&&(cpPt.x>cpPt_.x))? cpPt_.x : params.minX;
+				params.maxX  = ((q13)&&(cpPt.x<cpPt_.x))? cpPt_.x : params.maxX;
+				params.minY  = ((q02)&&(cpPt.y>cpPt_.y))? cpPt_.y : params.minY;
+				params.maxY  = ((q02)&&(cpPt.y<cpPt_.y))? cpPt_.y : params.maxY;
+			}
+
+			cpPt.RegisterMove(params);
+
+			smartShape.elem.elements[0].contours[0].nodes[n0].RegisterMove(params);
+
+			params.minX      = (q02)? cpCv.x : params.minX;
+			params.maxX      = (q02)? cpCv.x : params.maxX;
+			params.minY      = (q13)? cpCv.y : params.minY;
+			params.maxY      = (q13)? cpCv.y : params.maxY;
+
+			cpCv.RegisterMove(params);
+
+			params.movePred  = (cpIdx==1);
+			params.movePt    = true;
+			params.moveSucc  = (cpIdx==2);
+
+			smartShape.elem.elements[0].contours[0].nodes[n1].RegisterMove(params);
+
+			params.movePred  = (cpIdx==2);
+			params.movePt    = false;
+			params.moveSucc  = (cpIdx==1);
+
+			if ( (cpCv.x!=c0.x) && (cpCv.y!=c0.y) )
+			{
+				params.minX  = (q02)? (cpCv.x + ((cpPt.x<c0.x)? cpdist : -cpdist)) : params.minX;
+				params.maxX  = (q02)? (cpCv.x + ((cpPt.x<c0.x)? cpdist : -cpdist)) : params.maxX;
+				params.minY  = (q13)? (cpCv.y + ((cpPt.y<c0.y)? cpdist : -cpdist)) : params.minY;
+				params.maxY  = (q13)? (cpCv.y + ((cpPt.y<c0.y)? cpdist : -cpdist)) : params.maxY;
+			}
+
+			smartShape.elem.elements[0].contours[0].nodes[n1].RegisterMove(params);
+
+			break;
+
+		case 3:
+		case 4:
+			if (!(smartShape.altOptKeyDown) || (cpIdx==3))
+			{
+				dxx = (q02)? (((cpIdx==3)||sameDirX)? 1 : -1) : 0;
+				dyy = (q13)? (((cpIdx==3)||sameDirY)? 1 : -1) : 0;
+
+				params           = smartShape.GetDefaultMoveParms();
+				params.deltaXtoX = dxx;
+				params.deltaYtoY = dyy;
+				params.minX      = (q02)? ((c1.x<c0.x)? c0.x-lim1 : c0.x) : c1.x;
+				params.maxX      = (q02)? ((c1.x>c0.x)? c0.x+lim1 : c0.x) : c1.x;
+				params.minY      = (q13)? ((c1.y<c0.y)? c0.y-lim1 : c0.y) : c1.y;
+				params.maxY      = (q13)? ((c1.y>c0.y)? c0.y+lim1 : c0.y) : c1.y;
+
+				c3.RegisterMove(params);
+
+				params.movePred  = true;
+				params.movePt    = true;
+				params.moveSucc  = false;
+				smartShape.elem.elements[0].contours[0].nodes[1].RegisterMove(params);
+
+				params.movePred  = false;
+				params.movePt    = false;
+				params.moveSucc  = true;
+				params.deltaXtoX = dxx * (lim1_/lim1);
+				params.deltaYtoY = dyy * (lim1_/lim1);
+				params.minX      = (q02)? ((c1.x<c0.x)? c0.x-lim1_ : c0.x) : c1.x;
+				params.maxX      = (q02)? ((c1.x>c0.x)? c0.x+lim1_ : c0.x) : c1.x;
+				params.minY      = (q13)? ((c1.y<c0.y)? c0.y-lim1_ : c0.y) : c1.y;
+				params.maxY      = (q13)? ((c1.y>c0.y)? c0.y+lim1_ : c0.y) : c1.y;
+
+				smartShape.elem.elements[0].contours[0].nodes[1].RegisterMove(params);
+
+				dxy = (q02)? (((cpIdx==3)||sameDirX)? -1 :  1) : 0;
+				dyx = (q13)? (((cpIdx==3)||sameDirY)?  1 : -1) : 0;
+
+				dxy = (((c1.x<c0.x)&&(c1.y<c0.y))||((c1.x>c0.x)&&(c1.y>c0.y)))? dxy : -dxy;
+				dyx = (((c1.x>c0.x)&&(c1.y<c0.y))||((c1.x<c0.x)&&(c1.y>c0.y)))? dyx : -dyx;
+
+				params.movePred  = false;
+				params.movePt    = true;
+				params.moveSucc  = true;
+				params.deltaXtoX = 0;
+				params.deltaYtoY = 0;
+				params.deltaXtoY = dxy;
+				params.deltaYtoX = dyx;
+				params.minX      = (q13)? ((c1.x>c0.x)? c1.x-lim1 : c1.x) : c0.x;
+				params.maxX      = (q13)? ((c1.x<c0.x)? c1.x+lim1 : c1.x) : c0.x;
+				params.minY      = (q02)? ((c1.y>c0.y)? c1.y-lim1 : c1.y) : c0.y;
+				params.maxY      = (q02)? ((c1.y<c0.y)? c1.y+lim1 : c1.y) : c0.y;
+
+				smartShape.elem.elements[0].contours[0].nodes[2].RegisterMove(params);
+
+				params.movePred  = true;
+				params.movePt    = false;
+				params.moveSucc  = false;
+				params.deltaXtoY = dxy * (lim1_/lim1);
+				params.deltaYtoX = dyx * (lim1_/lim1);
+				params.minX      = (q13)? ((c1.x>c0.x)? c1.x-lim1_ : c1.x) : c0.x;
+				params.maxX      = (q13)? ((c1.x<c0.x)? c1.x+lim1_ : c1.x) : c0.x;
+				params.minY      = (q02)? ((c1.y>c0.y)? c1.y-lim1_ : c1.y) : c0.y;
+				params.maxY      = (q02)? ((c1.y<c0.y)? c1.y+lim1_ : c1.y) : c0.y;
+				smartShape.elem.elements[0].contours[0].nodes[2].RegisterMove(params);
+			}
+
+			if (!(smartShape.altOptKeyDown) || (cpIdx==4))
+			{
+				dxx = (q02)? (((cpIdx==4)||sameDirX)? 1 : -1) : 0;
+				dyy = (q13)? (((cpIdx==4)||sameDirY)? 1 : -1) : 0;
+
+				params           = smartShape.GetDefaultMoveParms();
+				params.deltaXtoX = dxx;
+				params.deltaYtoY = dyy;
+				params.minX      = (q02)? ((c2.x<c0.x)? c0.x-lim2 : c0.x) : c2.x;
+				params.maxX      = (q02)? ((c2.x>c0.x)? c0.x+lim2 : c0.x) : c2.x;
+				params.minY      = (q13)? ((c2.y<c0.y)? c0.y-lim2 : c0.y) : c2.y;
+				params.maxY      = (q13)? ((c2.y>c0.y)? c0.y+lim2 : c0.y) : c2.y;
+
+				c4.RegisterMove(params);
+
+				params.movePred  = false;
+				params.movePt    = true;
+				params.moveSucc  = true;
+				smartShape.elem.elements[0].contours[0].nodes[4].RegisterMove(params);
+
+				params.movePred  = true;
+				params.movePt    = false;
+				params.moveSucc  = false;
+				params.deltaXtoX = dxx * (lim2_/lim2);
+				params.deltaYtoY = dyy * (lim2_/lim2);
+				params.minX      = (q02)? ((c2.x<c0.x)? c0.x-lim2_ : c0.x) : c2.x;
+				params.maxX      = (q02)? ((c2.x>c0.x)? c0.x+lim2_ : c0.x) : c2.x;
+				params.minY      = (q13)? ((c2.y<c0.y)? c0.y-lim2_ : c0.y) : c2.y;
+				params.maxY      = (q13)? ((c2.y>c0.y)? c0.y+lim2_ : c0.y) : c2.y;
+				smartShape.elem.elements[0].contours[0].nodes[4].RegisterMove(params);
+
+				dxy = (q02)? (((cpIdx==4)||sameDirX)? -1 :  1) : 0;
+				dyx = (q13)? (((cpIdx==4)||sameDirY)?  1 : -1) : 0;
+
+				dxy = (((c2.x<c0.x)&&(c2.y<c0.y))||((c2.x>c0.x)&&(c2.y>c0.y)))? dxy : -dxy;
+				dyx = (((c2.x>c0.x)&&(c2.y<c0.y))||((c2.x<c0.x)&&(c2.y>c0.y)))? dyx : -dyx;
+
+				params.movePred  = true;
+				params.movePt    = true;
+				params.moveSucc  = false;
+				params.deltaXtoX = 0;
+				params.deltaYtoY = 0;
+				params.deltaXtoY = dxy;
+				params.deltaYtoX = dyx;
+				params.minX      = (q13)? ((c2.x>c0.x)? c2.x-lim2 : c2.x) : c0.x;
+				params.maxX      = (q13)? ((c2.x<c0.x)? c2.x+lim2 : c2.x) : c0.x;
+				params.minY      = (q02)? ((c2.y>c0.y)? c2.y-lim2 : c2.y) : c0.y;
+				params.maxY      = (q02)? ((c2.y<c0.y)? c2.y+lim2 : c2.y) : c0.y;
+
+				smartShape.elem.elements[0].contours[0].nodes[3].RegisterMove(params);
+
+				params.movePred  = false;
+				params.movePt    = false;
+				params.moveSucc  = true;
+				params.deltaXtoY = dxy * (lim2_/lim2);
+				params.deltaYtoX = dyx * (lim2_/lim2);
+				params.minX      = (q13)? ((c2.x>c0.x)? c2.x-lim2_ : c2.x) : c0.x;
+				params.maxX      = (q13)? ((c2.x<c0.x)? c2.x+lim2_ : c2.x) : c0.x;
+				params.minY      = (q02)? ((c2.y>c0.y)? c2.y-lim2_ : c2.y) : c0.y;
+				params.maxY      = (q02)? ((c2.y<c0.y)? c2.y+lim2_ : c2.y) : c0.y;
+				smartShape.elem.elements[0].contours[0].nodes[3].RegisterMove(params);
+			}
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var cp    = smartShape.currentControlPoint;
+	var cp_   = smartShape.elem.controlPoints[(cpIdx==1)?2:1];
+	var cr    = smartShape.elem.controlPoints[(cpIdx==1)?3:4];
+	var cr_   = smartShape.elem.controlPoints[(cpIdx==1)?4:3];
+	var mode  = parseInt(c0.name);
+	var dm    = smartShape.mouseDownPos;
+	var cm    = smartShape.currentMousePos;
+	var dx    = Math.abs(cm.x - dm.x);
+	var dy    = Math.abs(cm.y - dm.y);
+	var e;
+
+	if ((cpIdx==0) && ((dx<1)&&(dy<1)))
+		rotateLine();
+
+	if ((cpIdx==1) || (cpIdx==2))
+	{
+		e = getElementUnderCP(cpIdx);
+
+		if (e!=null)
+		{
+			attachLine(cpIdx, e);
+			redrawLine(cpIdx, null);
+		}
+		else
+			fixSubPixErr();
+	}
+	else
+		fixSubPixErr();
+
+	updateInfo();
+}
+
+function RedrawSmartShape()
+{
+	var c0  = smartShape.elem.controlPoints[0];
+	var c1  = smartShape.elem.controlPoints[1];
+	var c2  = smartShape.elem.controlPoints[2];
+	var c3  = smartShape.elem.controlPoints[3];
+	var c4  = smartShape.elem.controlPoints[4];
+	var m   = parseInt(c0.name);
+	var o1  = parseInt(smartShape.elem.customData["offset1"]);
+	var r1  = parseInt(smartShape.elem.customData["corner1"]);
+	var o2  = parseInt(smartShape.elem.customData["offset2"]);
+	var r2  = parseInt(smartShape.elem.customData["corner2"]);
+	var r1_ = Math.abs(r1);
+	var r2_ = Math.abs(r2);
+	var c   = smartShape.elem.elements[0].contours[0];
+	var w, h, x, y, px, py, sx, sy;
+
+	if (!(m&0x1))
+	{
+		h = parseInt(smartShape.elem.customData["size"]);
+
+		o1 = ((c1.x<c0.x)?-1:1) * o1;
+		r1 = ((c1.x<c0.x)?-1:1) * r1;
+		o2 = ((c2.x<c0.x)?-1:1) * o2;
+		r2 = ((c2.x<c0.x)?-1:1) * r2;
+
+		c1.x = c0.x + o1;
+		c1.y = c0.y - ((c1.y<c0.y)?1:-1) * h/2;
+
+		c3.x = c0.x + r1;
+		c3.y = c1.y;
+
+		c2.x = c0.x + o2;
+		c2.y = c0.y + ((c2.y>c0.y)?1:-1) * h/2;
+
+		c4.x = c0.x + r2;
+		c4.y = c2.y;
+
+		moveNode(c.nodes[0], c1.x, c1.y, c1.x, c1.y, c1.x, c1.y);
+
+		x  = c3.x;
+		y  = c3.y;
+		px = x;
+		py = y;
+		sx = x + ((c1.x<c0.x)? r1_ : -r1_) * fw.ellipseBCPConst;
+		sy = y;
+		moveNode(c.nodes[1], x, y, px, py, sx, sy);
+
+		x  = c0.x;
+		y  = c3.y + ((c1.y<c0.y)? r1_ : -r1_);
+		px = x;
+		py = y + ((c1.y<c0.y)? -r1_ : r1_) * fw.ellipseBCPConst;
+		sx = x;
+		sy = y;
+		moveNode(c.nodes[2], x, y, px, py, sx, sy);
+
+		x  = c0.x;
+		y  = c4.y - ((c2.y>c0.y)? r2_ : -r2_);
+		px = x;
+		py = y;
+		sx = x;
+		sy = y + ((c2.y>c0.y)? r2_ : -r2_) * fw.ellipseBCPConst;
+		moveNode(c.nodes[3], x, y, px, py, sx, sy);
+
+		x  = c4.x;
+		y  = c4.y;
+		px = x - ((c2.x>c0.x)? r2_ : -r2_) * fw.ellipseBCPConst;
+		py = y;
+		sx = x;
+		sy = y;
+		moveNode(c.nodes[4], x, y, px, py, sx, sy);
+
+		moveNode(c.nodes[5], c2.x, c2.y, c2.x, c2.y, c2.x, c2.y);
+	}
+	else
+	{
+		w = parseInt(smartShape.elem.customData["size"]);
+
+		o1 = ((c1.y<c0.y)?-1:1) * o1;
+		r1 = ((c1.y<c0.y)?-1:1) * r1;
+		o2 = ((c2.y<c0.y)?-1:1) * o2;
+		r2 = ((c2.y<c0.y)?-1:1) * r2;
+
+		c1.x = c0.x + ((c1.x>c0.x)?1:-1) * w/2;
+		c1.y = c0.y + o1;
+
+		c3.x = c1.x;
+		c3.y = c0.y + r1;
+
+		c2.x = c0.x - ((c2.x<c0.x)?1:-1) * w/2;
+		c2.y = c0.y + o2;
+
+		c4.x = c2.x;
+		c4.y = c0.y + r2;
+
+		moveNode(c.nodes[0], c1.x, c1.y, c1.x, c1.y, c1.x, c1.y);
+
+		x  = c3.x;
+		y  = c3.y;
+		px = x;
+		py = y;
+		sx = x;
+		sy = y + ((c1.y<c0.y)? r1_ : -r1_) * fw.ellipseBCPConst;
+		moveNode(c.nodes[1], x, y, px, py, sx, sy);
+
+		x  = c3.x + ((c1.x<c0.x)? r1_ : -r1_);
+		y  = c0.y;
+		px = x + ((c1.x<c0.x)? -r1_ : r1_) * fw.ellipseBCPConst;
+		py = y;
+		sx = x;
+		sy = y;
+		moveNode(c.nodes[2], x, y, px, py, sx, sy);
+
+		x  = c4.x + ((c2.x<c0.x)? r2_ : -r2_);
+		y  = c0.y;
+		px = x;
+		py = y;
+		sx = x - ((c2.x<c0.x)? r2_ : -r2_) * fw.ellipseBCPConst;
+		sy = y;
+		moveNode(c.nodes[3], x, y, px, py, sx, sy);
+
+		x  = c4.x;
+		y  = c4.y;
+		px = x;
+		py = y - ((c2.y>c0.y)? r2_ : -r2_) * fw.ellipseBCPConst;
+		sx = x;
+		sy = y;
+		moveNode(c.nodes[4], x, y, px, py, sx, sy);
+
+		moveNode(c.nodes[5], c2.x, c2.y, c2.x, c2.y, c2.x, c2.y);
+	}
+
+	updateInfo();
+}
+
+/*============================================================================*/
+/*                           User defined functions                           */
+/*============================================================================*/
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+/*----------------------------------------------------------------------------*/
+/* rotateLine                                                                 */
+/*                                                                            */
+/*   Description: rotates the line 90 degrees clockwise                       */
+/*                                                                            */
+/*     Arguments: none                                                        */
+/*                                                                            */
+/*       Returns: none                                                        */
+/*----------------------------------------------------------------------------*/
+function rotateLine()
+{
+	var c0  = smartShape.elem.controlPoints[0];
+	var x, y, px, py, sx, sy;
+	var n, i;
+	var contour = smartShape.elem.elements[0].contours[0];
+
+	for (i=0; i<contour.nodes.length; i++)
+	{
+		n  = contour.nodes[i];
+		x  = c0.x - (n.y-c0.y);
+		y  = c0.y + (n.x-c0.x);
+		px = c0.x - (n.predY-c0.y);
+		py = c0.y + (n.predX-c0.x);
+		sx = c0.x - (n.succY-c0.y);
+		sy = c0.y + (n.succX-c0.x);
+
+		n.x     = x;
+		n.y     = y;
+		n.predX = px;
+		n.predY = py;
+		n.succX = sx;
+		n.succY = sy;
+
+		switch (i)
+		{
+			case 0:
+				smartShape.elem.controlPoints[1].x = x;
+				smartShape.elem.controlPoints[1].y = y;
+				break;
+			case 1:
+				smartShape.elem.controlPoints[3].x = x;
+				smartShape.elem.controlPoints[3].y = y;
+				break;
+			case 4:
+				smartShape.elem.controlPoints[4].x = x;
+				smartShape.elem.controlPoints[4].y = y;
+				break;
+			case 5:
+				smartShape.elem.controlPoints[2].x = x;
+				smartShape.elem.controlPoints[2].y = y;
+				break;
+			default:
+				break;
+		}
+	}
+
+	// update the name so that the line's orientation can be determined
+	c0.name = (parseInt(c0.name)+1)&3;
+}
+
+function fixSubPixErr()
+{
+	var c0  = smartShape.elem.controlPoints[0];
+	var c1  = smartShape.elem.controlPoints[1];
+	var c2  = smartShape.elem.controlPoints[2];
+	var c3  = smartShape.elem.controlPoints[3];
+	var c4  = smartShape.elem.controlPoints[4];
+	var n0  = smartShape.elem.elements[0].contours[0].nodes[0];
+	var n1  = smartShape.elem.elements[0].contours[0].nodes[1];
+	var n2  = smartShape.elem.elements[0].contours[0].nodes[2];
+	var n3  = smartShape.elem.elements[0].contours[0].nodes[3];
+	var n4  = smartShape.elem.elements[0].contours[0].nodes[4];
+	var n5  = smartShape.elem.elements[0].contours[0].nodes[5];
+	var d   = parseInt(c0.name);
+	var d0  = (d==0);
+	var d1  = (d==1);
+	var d2  = (d==2);
+	var d3  = (d==3);
+	var d02 = d0 || d2;
+	var d13 = d1 || d3;
+
+	n0.x     = Math.round(n0.x);
+	n0.y     = Math.round(n0.y);
+	n0.predX = n0.x;
+	n0.predY = n0.y;
+	n0.succX = n0.x;
+	n0.succY = n0.y;
+
+	n1.x     = (d13)? n0.x : Math.round(n1.x);
+	n1.y     = (d02)? n0.y : Math.round(n1.y);
+	n1.predX = c3.x = n1.x;
+	n1.predY = c3.y = n1.y;
+	n1.succX = (d13)? n0.x : Math.round(n1.succX);
+	n1.succY = (d02)? n0.y : Math.round(n1.succY);
+
+	n2.x     = Math.round(n2.x);
+	n2.y     = Math.round(n2.y);
+	n2.predX = (d02)? n2.x : Math.round(n2.predX);
+	n2.predY = (d13)? n2.y : Math.round(n2.predY);
+	n2.succX = n2.x;
+	n2.succY = n2.y;
+
+	n3.x     = (d02)? n2.x : Math.round(n3.x);
+	n3.y     = (d13)? n2.y : Math.round(n3.y);
+	n3.predX = n3.x;
+	n3.predY = n3.y;
+	n3.succX = (d02)? n2.x : Math.round(n3.succX);
+	n3.succY = (d13)? n2.y : Math.round(n3.succY);
+
+	n4.x     = Math.round(n4.x);
+	n4.y     = Math.round(n4.y);
+	n4.predX = (d13)? n4.x : Math.round(n4.predX);
+	n4.predY = (d02)? n4.y : Math.round(n4.predY);
+	n4.succX = n4.x;
+	n4.succY = n4.y;
+
+	n5.x     = (d13)? n4.x : Math.round(n5.x);
+	n5.y     = (d02)? n4.y : Math.round(n5.y);
+	n5.predX = n5.x;
+	n5.predY = n5.y;
+	n5.succX = n5.x;
+	n5.succY = n5.y;
+
+	c0.x     = (d02)? n2.x : Math.round(c0.x);
+	c0.y     = (d13)? n2.y : Math.round(c0.y);
+	c1.x     = n0.x;
+	c1.y     = n0.y;
+	c2.x     = n5.x;
+	c2.y     = n5.y;
+	c3.x     = n1.x;
+	c3.y     = n1.y;
+	c4.x     = n4.x;
+	c4.y     = n4.y;
+}
+
+function moveNode(n, x, y, px, py, sx, sy)
+{
+	n.x     = x;
+	n.y     = y;
+	n.predX = px;
+	n.predY = py;
+	n.succX = sx;
+	n.succY = sy;
+}
+
+function getElementUnderCP(cpIdx)
+{
+	var c = smartShape.elem.controlPoints[cpIdx];
+	var e = fw.getDocumentDOM().elementsAt({left:c.x, right:c.x, top:c.y, bottom:c.y})[0];
+
+	if ((e==undefined)||(e.customData["shapeName"]=="connector"))
+	   e = null;
+
+	return e;
+}
+
+function attachLine(cpIdx, e)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var cp = smartShape.elem.controlPoints[cpIdx];
+	var h  = !(parseInt(c0.name)&0x1);
+	var l, t, r, b, dx, dy;
+
+	l = e.left;
+	t = e.top;
+	r = l+e.width;
+	b = t+e.height;
+
+	if (h)
+	{
+		dx = (c0.x<l)? (l-cp.x) : (r-cp.x);
+		dy = ((t+b)/2) - cp.y;
+	}
+	else
+	{
+		dx = ((l+r)/2) - cp.x;
+		dy = (c0.y<t)? (t-cp.y) : (b-cp.y);
+	}
+
+	cp.x += dx;
+	cp.y += dy;
+}
+
+function redrawLine(cpIdx, c)
+{
+	var c0   = smartShape.elem.controlPoints[0];
+	var c1   = smartShape.elem.controlPoints[1];
+	var c2   = smartShape.elem.controlPoints[2];
+	var c3   = smartShape.elem.controlPoints[3];
+	var c4   = smartShape.elem.controlPoints[4];
+	var cp   = smartShape.elem.controlPoints[cpIdx];
+	var cp_  = smartShape.elem.controlPoints[cpIdx^3];
+	var cr   = smartShape.elem.controlPoints[(cpIdx==1)?3:4];
+	var cr_  = smartShape.elem.controlPoints[(cpIdx==1)?4:3];
+	var h    = !(parseInt(c0.name)&0x1);
+	var r, r_, R, n, x, y, px, py, sx, sy;
+
+	n = smartShape.elem.elements[0].contours[0].nodes[(cpIdx==1)?0:5];
+	moveNode(n, cp.x, cp.y, cp.x, cp.y, cp.x, cp.y);
+
+	r  = (h)? Math.abs(c0.x - cr.x)  : Math.abs(c0.y - cr.y);
+	r_ = (h)? Math.abs(c0.x - cr_.x) : Math.abs(c0.y - cr_.y);
+
+	if (h)
+	{
+		if (((cp.x-c0.x)*(c0.x-cp_.x))>0)
+			c0.x = (cp.x+cp_.x)/2;
+
+		if (c==null)
+			c0.y = (cp.y+cp_.y)/2;
+		else
+			if (c1.x<c2.x)
+				c0.x = c1.x + (c2.x-c1.x)*c;
+			else
+				c0.x = c2.x + (c1.x-c2.x)*(1-c);
+	}
+	else
+	{
+	    if (c==null)
+			c0.x = (cp.x+cp_.x)/2;
+		else
+			if (c1.y<c2.y)
+				c0.y = c1.y + (c2.y-c1.y)*c;
+			else
+				c0.y = c2.y + (c1.y-c2.y)*(1-c);
+
+		if (((cp.y-c0.y)*(c0.y-cp_.y))>0)
+			c0.y = (cp.y+cp_.y)/2;
+	}
+
+	cr.x  = (h)? c0.x+((cp.x>cr.x)?r:-r) : cp.x;
+	cr.y  = (h)? cp.y                    : c0.y+((cp.y>cr.y)?r:-r);
+
+	cr_.x = (h)? c0.x+((cp_.x>cr_.x)?r_:-r_) : cp_.x;
+	cr_.y = (h)? cp_.y                       : c0.y+((cp_.y>cr_.y)?r_:-r_);
+
+	R = (cpIdx==1)? r : r_;
+
+	n  = smartShape.elem.elements[0].contours[0].nodes[1];
+	x  = c3.x;
+	y  = c3.y;
+	px = x;
+	py = y;
+	sx = (h)? x+((c1.x<c3.x)?R:-R)*fw.ellipseBCPConst : x;
+	sy = (h)? y                            : y+((c1.y<c3.y)?R:-R)*fw.ellipseBCPConst;
+	moveNode(n, x, y, px, py, sx, sy);
+
+	n  = smartShape.elem.elements[0].contours[0].nodes[2];
+	x  = (h)? c0.x                    : c3.x+((c1.x<c0.x)?R:-R);
+	y  = (h)? c3.y+((c1.y<c0.y)?R:-R) : c0.y;
+	px = (h)? x                            : x-((c1.x<c0.x)?R:-R)*fw.ellipseBCPConst;
+	py = (h)? y-((c1.y<c0.y)?R:-R)*fw.ellipseBCPConst : y;
+	sx = x;
+	sy = y;
+	moveNode(n, x, y, px, py, sx, sy);
+
+	R = (cpIdx==2)? r : r_;
+
+	n  = smartShape.elem.elements[0].contours[0].nodes[3];
+	x  = (h)? c0.x                    : c4.x-((c2.x>c0.x)?R:-R);
+	y  = (h)? c4.y-((c2.y>c0.y)?R:-R) : c0.y;
+	px = x;
+	py = y;
+	sx = (h)? x                            : x+((c2.x>c0.x)?R:-R)*fw.ellipseBCPConst;
+	sy = (h)? y+((c2.y>c0.y)?R:-R)*fw.ellipseBCPConst : y;
+	moveNode(n, x, y, px, py, sx, sy);
+
+	n  = smartShape.elem.elements[0].contours[0].nodes[4];
+	x  = c4.x;
+	y  = c4.y;
+	px = (h)? x+((c2.x<c4.x)?R:-R)*fw.ellipseBCPConst : x;
+	py = (h)? y                            : y+((c2.y<c4.y)?R:-R)*fw.ellipseBCPConst;
+	sx = x;
+	sy = y;
+	moveNode(n, x, y, px, py, sx, sy);
+}
+
+function updateInfo()
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var c4 = smartShape.elem.controlPoints[4];
+	var offset1, offset2, corner1, corner2, width, height;
+
+	mode = parseInt(c0.name);
+
+	if (!(mode&0x1))
+	{
+		offset1 = c1.x - c0.x;
+		corner1 = c3.x - c0.x;
+		offset2 = c2.x - c0.x;
+		corner2 = c4.x - c0.x;
+		width   = -1;
+		height  = Math.abs(c1.y - c2.y);
+	}
+	else
+	{
+		offset1 = c1.y - c0.y;
+		corner1 = c3.y - c0.y;
+		offset2 = c2.y - c0.y;
+		corner2 = c4.y - c0.y;
+		width   = Math.abs(c1.x - c2.x);
+		height  = -1;
+	}
+
+	smartShape.elem.customData["mode"]    = mode;
+	smartShape.elem.customData["offset1"] = offset1;
+	smartShape.elem.customData["corner1"] = corner1;
+	smartShape.elem.customData["offset2"] = offset2;
+	smartShape.elem.customData["corner2"] = corner2;
+	smartShape.elem.customData["width"]   = width;
+	smartShape.elem.customData["height"]  = height;
+}
+
+/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/

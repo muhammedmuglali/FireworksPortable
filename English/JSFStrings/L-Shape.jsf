@@ -1,0 +1,10 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["roundness"] = "Roundness";
+__tooltips["thickness"] = "Thickness";
+__tooltips["arrowsize"] = "Arrow Size";
+__tooltips["arrowtip"] = "Arrow Tip";
+__tooltips["width"] = "Width";
+__tooltips["height"] = "Height";

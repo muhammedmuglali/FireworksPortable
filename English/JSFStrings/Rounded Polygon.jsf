@@ -1,0 +1,7 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["center"] = "Center";
+__tooltips["curveradius"] = "Curve Radius";
+__tooltips["sides"] = "Sides";

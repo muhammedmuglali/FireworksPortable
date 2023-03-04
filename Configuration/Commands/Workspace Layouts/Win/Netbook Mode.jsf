@@ -1,0 +1,1 @@
+﻿fw.readPanelStateFromFile(fw.currentScriptDir + '/Netbook Mode.xml');

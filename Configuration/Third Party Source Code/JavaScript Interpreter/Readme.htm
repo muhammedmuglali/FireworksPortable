@@ -1,0 +1,68 @@
+<html>
+<head>
+<title>Netscape JavaScript Interpreter Code Changes</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000">
+<p>The following lines of code have been added to the original JavaScript Interpreter 
+  source code supplied herewith:<br>
+  --------------------------------------------------------------<br>
+  jsapi.c &#150; modified 11/15/2001 </p>
+<p>- lines 819-822<br>
+  -&gt; #if XP_MAC //AJFMOD<br>
+  -&gt; #pragma export on<br>
+  -&gt; #endif<br>
+  -&gt; </p>
+<p>lines 835-839<br>
+  -&gt; #if XP_MAC //AJFMOD<br>
+  -&gt; #pragma export reset<br>
+  -&gt; #endif<br>
+  -&gt; </p>
+<p>--------------------------------------------------------------------<br>
+  jsapi.h &#150; modified 11/15/2001</p>
+<p>lines 921-932<br>
+  -&gt; #if XP_MAC<br>
+  -&gt; /************************************************************************/<br>
+  -&gt; <br>
+  -&gt; /*<br>
+  -&gt; * Fireworks specific<br>
+  -&gt; */<br>
+  -&gt; typedef JSBool (*EnumDestroyerProcPtr)(jsval iter_state);<br>
+  -&gt; <br>
+  -&gt; extern JS_PUBLIC_API(void) <br>
+  -&gt; js_SetFwEnumDestroyer(EnumDestroyerProcPtr destroyer);<br>
+  -&gt; <br>
+  -&gt; #endif<br>
+  -&gt; </p>
+<p>----------------------------------------------------------------------<br>
+  jsinterp.c &#150; modified 11/15/2001</p>
+<p>lines 114-122<br>
+  -&gt; #if XP_MAC //SRJMOD<br>
+  -&gt; static EnumDestroyerProcPtr FwEnumDestroyer;<br>
+  -&gt; <br>
+  -&gt; void js_SetFwEnumDestroyer(EnumDestroyerProcPtr destroyer)<br>
+  -&gt; {<br>
+  -&gt; FwEnumDestroyer = destroyer;<br>
+  -&gt; }<br>
+  -&gt; #else<br>
+  extern JSBool FwEnumDestroyer(jsval iter_state);<br>
+  -&gt; #endif</p>
+<p>lines 140-144<br>
+  -&gt; #if XP_MAC<br>
+  -&gt; if((*FwEnumDestroyer)(iter_state))<br>
+  -&gt; #else<br>
+  if (FwEnumDestroyer(iter_state))<br>
+  -&gt; #endif</p>
+<p>-----------------------------------------------------------------------------<br>
+  jsinterp.h &#150; modified 11/15/2001</p>
+<p>lines 209-213<br>
+  -&gt; #if XP_MAC //AJFMOD<br>
+  -&gt; typedef JSBool (*EnumDestroyerProcPtr)(jsval iter_state);<br>
+  -&gt; <br>
+  -&gt; extern void js_SetFwEnumDestroyer(EnumDestroyerProcPtr destroyer);<br>
+  -&gt; <br>
+  -&gt; #endif</p>
+<p></p>
+</body>
+</html>

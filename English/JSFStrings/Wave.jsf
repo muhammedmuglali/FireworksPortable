@@ -1,0 +1,14 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["segments"] = "Segments";
+__tooltips["segment"] = "Segment";
+__tooltips["anchor"] = "Anchor";
+__tooltips["resize"] = "Resize";
+__tooltips["rotation"] = "Rotation";
+__tooltips["length"] = "Length";
+__tooltips["height"] = "Height";
+__tooltips["wavelength"] = "Wavelength";
+__tooltips["curvature"] = "Curvature";
+__tooltips["px"] = "px";

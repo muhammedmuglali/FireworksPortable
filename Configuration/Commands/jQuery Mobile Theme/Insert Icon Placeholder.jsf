@@ -1,0 +1,339 @@
+var allSlices = new Array();
+var slicecntr = 0;
+var sliceNameArr = new Array();
+
+function __main()
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+	localizedStr = __jQuerytooltips;
+	//If no documents are open, shown an error message and return
+	if(fw.documents.length == 0)
+	{
+		alert(localizedStr.active);	
+		return;
+	}
+	var currentPage = fw.getDocumentDOM().currentPageNum;
+	if((currentPage != 0) && (fw.getDocumentDOM().pagesCount > 1))	//Change the current page to first page
+		fw.getDocumentDOM().changeCurrentPage(0);
+	
+	var invalidName = true; 
+	while(invalidName)
+	{
+		sliceName = prompt(localizedStr.enterIconName, "name");
+		if((sliceName != null) || (sliceName != undefined))
+		{
+			invalidName = __isSelNameInvalid(sliceName);	
+			if(invalidName)
+				alert(localizedStr.invalidIconName);
+		}
+		else
+			return;
+	}
+	if(!invalidName && sliceName != undefined)
+	{
+		var myFrames = fw.getDocumentDOM().frames;
+		var webLayerIndex = myFrames[0].topLayers.length;	//Get the number of top layer. This returns ony the top layers and not the sub layers.
+		
+		var topLayer = myFrames[0].topLayers[webLayerIndex-1];	
+		var length = webLayerIndex;	//Get the number of layers to get the sub layer of web layer.
+		var elements = topLayer.elemsandsublayers;
+		var cntk = elements.length - 1;
+		
+		__traverseForSliceNames();
+		for(cntk = elements.length - 1 ; cntk >= 0 ; cntk--)
+		{	
+			if(("[object Text]"==(elements[cntk].toString())) && (undefined == (elements[cntk].textRuns.textRuns)))
+			{
+				continue;
+			}
+			else
+			{
+				if(elements[cntk].isLayer)
+				{
+					if(("icons-18-white" == elements[cntk].name) || ("icons-18-black" == elements[cntk].name) || ("icons-36-white" == elements[cntk].name) || ("icons-36-black" == elements[cntk].name))
+					{
+						var farthestSlicePresent = __findFarthest(elements[cntk]);
+						sliceName = __makeUnique(sliceName);
+						if("" != farthestSlicePresent)//If there is atleast a single slice present, then the value is computed. If the value is empty string, then do not draw a slice.
+						{
+							var moveSliceToIndex = elements[cntk].elems.length;
+							__drawSlice(farthestSlicePresent, elements[cntk].name, sliceName, length, moveSliceToIndex);
+						}
+						length++;
+					}
+				}      		
+			}
+		}
+		/*if(sliceNameArr.length <= 1)	//If the layers exist but there are no slices. Cannot compute the first position
+		{
+			alert(localizedStr.cannotAddIcon);
+			sliceNameArr.splice(0, sliceNameArr.length);
+			fw.getDocumentDOM().changeCurrentPage(currentPage);
+			return;
+		}*/
+		sliceNameArr.splice(0, sliceNameArr.length);	//Empty the slice array
+		fw.getDocumentDOM().selectNone();
+		fw.logPipEvent("jQuery Mobile Theme", null, "Insert Icon Placeholder");
+	}
+}
+
+//Check for duplicate names and invalid swatch names
+function __makeUnique(sliceName)
+{
+	var newName = "";
+	var x = 0;
+	newName = sliceName;
+	if(newName == "")
+	{
+		newName = "s_" + slicecntr;
+		slicecntr++;
+	}
+	else if(undefined == newName)
+	{
+		newName = "s_" + slicecntr;
+		slicecntr++;
+	}
+	else if(__CheckIfDoubleBytePresent(newName))
+	{
+		newName = "s_" + slicecntr;
+		slicecntr++;		
+	}
+	for( x in sliceNameArr)	
+	{	
+		if((sliceNameArr[x] == newName)	|| (sliceNameArr[x] == newName+"_18w") || (sliceNameArr[x] == newName+"_18b") || (sliceNameArr[x] == newName+"_36w") || (sliceNameArr[x] == newName+"_36b"))//Also check if suffix
+		{
+			newName= newName + "_" + slicecntr;
+			slicecntr++;
+		}
+	}
+	return newName;
+}
+
+	
+function __findFarthest( fwObjects )
+{
+	__traverseElement(fwObjects);
+	var farthestSlice = new Array();
+	var farthestSlicePos = "";
+	if(allSlices.length != 0)
+	{
+		var thisSlicePos = "";
+		farthestSlicePos = allSlices[0].left + allSlices[0].width; 
+		farthestSlice = allSlices[0];
+		for(var i=1;i < allSlices.length;i++)
+		{  
+			thisSlicePos = allSlices[i].left + allSlices[i].width; 
+			if(thisSlicePos > farthestSlicePos){  
+				farthestSlicePos = thisSlicePos;
+				farthestSlice =  allSlices[i];
+			}  
+		}  	
+		allSlices.splice(0, allSlices.length);		
+	}
+	return farthestSlice;
+}	
+function __traverseElement( fwElements )
+{
+	var fwElem = fwElements;
+	var sliceObjects = fwElements.elems;
+	
+	var sliceInd = 0;
+	for(sliceInd = sliceObjects.length-1; sliceInd >= 0 ; sliceInd--)
+	{
+		if(sliceObjects[sliceInd].isLayer)
+		{
+			__traverseElement(sliceObjects[sliceInd]);
+		}
+		else
+		{
+			allSlices.push(sliceObjects[sliceInd]);
+		}
+	}
+}
+
+function __traverseForSliceNames( )
+{
+	var webLayerInd = fw.getDocumentDOM().frames[0].topLayers.length;
+	var tpLayer = fw.getDocumentDOM().frames[0].topLayers[webLayerInd-1];
+	var fwElems = tpLayer.elemsandsublayers;
+	var cntr = fwElems.length;
+	for(cntr = fwElems.length - 1 ; cntr >= 0 ; cntr--)
+	{	
+		if(("[object Text]"==(fwElems[cntr].toString())) && (undefined == (fwElems[cntr].textRuns.textRuns)))
+		{
+			continue;
+		}
+		else
+		{
+			if(fwElems[cntr].isLayer)
+			{
+				__getSliceNames(  fwElems[cntr] );
+			}
+			else
+			{
+				sliceNameArr.push(fwElems[cntr].baseName);
+			}
+		}
+	}
+}
+
+function __getSliceNames( fwElements )
+{
+	var fwElems = fwElements;
+	var sliceObjects = fwElements.elems;
+	
+	var sliceIndex = 0;
+	for(sliceIndex = sliceObjects.length-1; sliceIndex >= 0 ; sliceIndex--)
+	{
+		if(sliceObjects[sliceIndex].isLayer)
+		{
+			__getSliceNames(sliceObjects[sliceIndex]);
+		}
+		else
+		{
+			sliceNameArr.push(sliceObjects[sliceIndex].baseName);
+		}
+	}
+}
+
+function __CheckIfDoubleBytePresent(font)
+{
+  var ReturnFont = "";
+  for(var i = 0; i < font.length; i++)
+  {
+
+    if(font.charCodeAt(i) > 255)
+			return true;
+         
+  }
+
+	return false;
+}
+
+function __drawSlice( myFarthestSlice, layerName, sliceName, length, moveSliceToIndex)
+{
+	var layerInd = length;
+	var leftVal = "";
+	var topVal = "";
+	var rightVal = "";
+	var bottomVal = "";
+	var displacementVal = 0;
+	var lastPosIndexForSlice = moveSliceToIndex;
+	if((layerName.search(/18/) != -1))
+		displacementVal = 36;
+	else
+		displacementVal = 72;
+	leftVal = myFarthestSlice.left + displacementVal;
+	topVal = myFarthestSlice.top;
+	rightVal = myFarthestSlice.left + myFarthestSlice.width + displacementVal; 
+	bottomVal = myFarthestSlice.top + myFarthestSlice.height;
+	fw.getDocumentDOM().addNewHotspot("slice", "rectangle", {left:leftVal, top:topVal, right:rightVal, bottom:bottomVal});
+	if("icons-18-white" == layerName.toString())
+		sliceName = sliceName + "_18w";
+	else if("icons-18-black" == layerName.toString())
+		sliceName = sliceName + "_18b";
+	else if("icons-36-white" == layerName.toString())
+		sliceName = sliceName + "_36w";
+	else if("icons-36-black" == layerName.toString())
+		sliceName = sliceName + "_36b";
+	fw.getDocumentDOM().setSliceFilename(sliceName);
+	fw.getDocumentDOM().moveSelectionToLayer(layerInd, false, "none", 999);	//Replace 999 with "lastPosIndexForSlice" if everything function as expected.
+	
+	//Import the file required for showing guides on individual slice
+	var iconLeft = 0;
+	var iconRight = 0;
+	var iconTop = 0;
+	var iconBottom = 0;
+	var displacement = 4;
+	var width = 0;
+	var importFileName = "";
+	if(layerName.search(/18/) != -1)
+	{
+		width = 26;
+		importFileName = fw.userJsCommandsDir + "/jQuery/18.png";
+	}
+	else
+	{
+		width = 44;
+		importFileName = fw.userJsCommandsDir + "/jQuery/36.png";
+	}
+	
+	iconLeft = leftVal - displacement;
+	iconRight = iconLeft + width;
+	iconTop =  topVal -displacement; 
+	iconBottom =  iconTop + width;
+	fw.getDocumentDOM().importFile(importFileName, {left: iconLeft, top:iconTop, right:iconRight, bottom:iconBottom}, true);
+	fw.getDocumentDOM().moveSelectionToLayer(1, false, "none", -1);
+
+}
+
+function __isSelNameInvalid( selName)
+{
+	if((selName != null) && (selName != undefined))
+	{
+		//If string is empty return null
+		if(selName == "")
+			return true;
+			
+		var iconName = selName;
+		var isNumber = iconName.toString().charAt(0).search(/[0-9]/);
+		//If first character is a number return true
+		if(isNumber != -1)
+			return true;
+		
+		//If first character is a special character return false
+		else if(__isSpecialCharacter(iconName))
+			return true;
+		else if(iconName.length > 1)	//Test for validity of succeeding characters if the string length is greater than 1.
+		{
+			var strLengthCnt = 0;
+			var isInvalid = true;
+			for(strLengthCnt = 1; strLengthCnt<= iconName.length ; strLengthCnt++)
+			{
+				if(__isSpecialCharacter(iconName.charAt(strLengthCnt)))
+				{	
+					return true;
+				}
+				else
+					isInvalid = false;
+			}
+			return isInvalid;
+		}
+		else
+			return false; //char length is 1 and is valid
+	}
+	else
+		return true; //length is 0.
+}
+function __isSpecialCharacter(iconName)
+{
+
+	if(iconName.charCodeAt(0) == 45)	//check if its hyphen
+		return false;
+	else if(iconName.charCodeAt(0) >=32 &&  iconName.charCodeAt(0) <=47)	//32 is space
+		return true;
+	else if(iconName.charCodeAt(0) >=58 &&  iconName.charCodeAt(0) <=64)
+		return true;
+	else if(iconName.charCodeAt(0) >=91 &&  iconName.charCodeAt(0) <=96)
+		return true;
+	else if(iconName.charCodeAt(0) >=123 &&  iconName.charCodeAt(0) <=126)
+		return true;
+	else
+		return false;
+	
+}
+
+try
+{
+	__main();
+} 
+catch(FwErr)
+{
+		
+	if(FwErr == "Exit")
+		Files.deleteFileIfExisting(folder + "/" + imageFolder);
+	else
+		alert([FwErr, FwErr.lineNumber, FwErr.fileName].join("\n"));
+		
+}
+

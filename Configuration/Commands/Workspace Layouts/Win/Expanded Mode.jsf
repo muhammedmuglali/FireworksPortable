@@ -1,0 +1,1 @@
+﻿fw.readPanelStateFromFile(fw.currentScriptDir + '/Expanded Mode.xml');

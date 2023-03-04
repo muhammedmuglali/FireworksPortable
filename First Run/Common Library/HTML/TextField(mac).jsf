@@ -1,0 +1,37 @@
+function setDefaultValues() {
+	Widget.elem.customData["type"] = "TextField";
+	Widget.elem.customData["currentValues"] = [
+		{name: "Text", type: "text", value: "Text"},
+		{name: "Color", type: "color", value: "#000000"},
+		{name: "Font", type: "combobox", value: "Arial - Helvetica - sans-serif,Arial - Helvetica - sans-serif,Arial Black - Gadget - sans-serif,Comic Sans MS - cursive,Courier New - Courier - monospace,Geneva - Arial - Helvetica - sans-serif,Georgia - Times New Roman - Times - serif,Impact - Charcoal - sans-serif,Lucinda Sans Unicode - Lucinda Grande - sans-serif,Palatino Linotype - Book Antiqua - Palatino - serif,Tahoma - Geneva - sans-serif,Times New Roman - Times - serif,Trebuchet MS - Helvetica - sans-serif,Verdana - Arial - Helvetica - sans-serif"},	 
+		{name: "Size", type: "number", value: "12"},
+		{name: "Style", type: "combobox", value: "normal,normal,italic,oblique"},		
+		{name: "Weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Type", type:"ComboBox", value: "Text,Text,Password"}
+	];
+}
+
+function applyCurrentValues() {
+	var values = Widget.elem.customData["currentValues"];
+	var e = Widget.GetObjectByName("label");
+	
+	e.textChars = (values[0].value.length <= 0 ? "" : values[0].value);
+	e.pathAttributes.fillColor = values[1].value; 
+	e.font = values[2].value.split(" - ")[0];
+	e.fontsize = parseInt(values[3].value);
+	e.italic = (values[4].value.split(",")[0].toLowerCase() == "italic" || values[4].value.split(",")[0].toLowerCase() == "oblique");
+	e.bold = (values[5].value.split(",")[0].toLowerCase() == "bold");
+		
+	Widget.elem.customData["css"] = "\tcolor: "+values[1].value+
+									";\n\tfont-family: "+values[2].value.split(",")[0].replace(/ - /g,", ")+
+									";\n\tfont-size: "+parseInt(values[3].value*10)+"%"+
+									";\n\tfont-style: "+values[4].value.split(",")[0]+
+									";\n\tfont-weight: "+values[5].value.split(",")[0]+
+									";";
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();	 break;
+	case 2: applyCurrentValues(); break;
+}

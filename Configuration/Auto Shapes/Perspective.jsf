@@ -1,0 +1,705 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Perspective.jsf");
+
+gTT[0] = __tooltips["verticalplane"];
+gTT[1] = __tooltips["vanishingpoints"];
+gTT[2] = __tooltips["hide"];
+gTT[3] = __tooltips["drag"];
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var L         = fw.getDocumentDOM().left;
+var T         = fw.getDocumentDOM().top;
+var W         = fw.getDocumentDOM().width;
+var H         = fw.getDocumentDOM().height;
+var D         = H/4;
+var gMaxLines = 10
+var gMinLines = 2;
+var gHLines   = 6;			// no. of horizontal lines (vertical   plane)
+var gVLines   = 6;			// no. of vertical   lines (horizontal plane)
+var gDLines   = 6;			// no. of depth      lines (both       planes)
+var gHGCS     = W/15;			// horizontal grid cell size
+var gVGCS     = H/15;			// vertical   grid cell size
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	// initialisation
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	// on mouse down
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	// on mouse drag
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	// on mouse up
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cp;
+	var gcs = ((W<H)? W:H)/4;
+
+	smartShape.elem.controlPoints.length = 5;
+
+	cp                   = smartShape.elem.controlPoints[0];
+	cp.x                 = W/2;
+	cp.y                 = H;
+	cp.name              = "1";
+	cp.toolTip           = gTT[0];
+	cp.toolTipTracksDrag = true;
+ 	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[1];
+	cp.x                 = 10;
+	cp.y                 = H*4/5;
+	cp.name              = "1";
+	cp.toolTip           = gTT[1];
+	cp.toolTipTracksDrag = true;
+ 	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[2];
+	cp.x                 = gcs;
+	cp.y                 = H;
+	cp.name              = "";
+	cp.toolTip           = gTT[2];
+	cp.toolTipTracksDrag = true;
+ 	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[3];
+	cp.x                 = W/2;
+	cp.y                 = H-gcs;
+	cp.name              = "";
+	cp.toolTip           = gTT[2];
+	cp.toolTipTracksDrag = true;
+ 	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[4];
+	cp.x                 = (W/2)-gcs;
+	cp.y                 = 0;
+	cp.name              = "";
+	cp.toolTip           = gTT[3];
+	cp.toolTipTracksDrag = true;
+ 	cp.type              = "default";
+
+	createPerspectiveGrid();
+}
+
+// On mouse down
+function BeginDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var N     = parseInt(c0.name);
+	var v     = parseInt(c1.name);
+	var e0    = smartShape.elem.elements[(N==1)?1:2];
+	var e1    = smartShape.elem.elements[0];
+	var i, j, e2, e3, hl0, hl, hl_, vl0, vl, vl_;
+	var dXtoX0, dXtoX_;
+
+	switch (cpIdx)
+	{
+		case 0:
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaYtoY = 0;
+
+			c0.RegisterMove(params);
+			c3.RegisterMove(params);
+
+			vl0 = e1.elements[0].elements[0].contours[0];
+
+			for (i=0; i<e1.elements[0].elements.length; i++)
+			{
+				vl = e1.elements[0].elements[i].contours[0];
+
+				params.deltaXtoX = (vl.nodes[1].x - c1.x)/(vl0.nodes[1].x - c1.x);
+
+				vl.nodes[0].RegisterMove(params);
+				vl.nodes[1].RegisterMove(params);
+
+				if (i==0)
+					dXtoX0 = params.deltaXtoX;
+
+				if (i==1)
+					c4.RegisterMove(params);
+			}
+
+			dXtoX_ = (v==0)? 0 : params.deltaXtoX;
+
+			params.deltaXtoX = dXtoX0;
+
+			for (i=0; i<e1.elements[1].elements.length; i++)
+				e1.elements[1].elements[i].contours[0].nodes[0].RegisterMove(params);
+
+			params.deltaXtoX = dXtoX_;
+
+			for (i=0; i<e1.elements[1].elements.length; i++)
+				e1.elements[1].elements[i].contours[0].nodes[1].RegisterMove(params);
+
+			if (e1.elements[2].elements.length>0)
+			{
+				for (i=0; i<e1.elements[2].elements.length; i++)
+				{
+					hl = e1.elements[2].elements[i].contours[0];
+
+					params.deltaXtoX = (hl.nodes[0].x - c1.x)/(c0.x - c1.x);
+
+					hl.nodes[0].RegisterMove(params);
+				}
+
+				params.deltaXtoX = dXtoX_;
+
+				for (i=0; i<e1.elements[2].elements.length; i++)
+					e1.elements[2].elements[i].contours[0].nodes[1].RegisterMove(params);
+			}
+
+			break;
+
+		case 1:
+			params           = smartShape.GetDefaultMoveParms();
+			params.minX      = 1;
+			params.maxX      = W-1;
+			params.minY      = 1;
+			params.maxY      = H-1;
+			params.constrain90Key = "shiftKey";
+
+			c1.RegisterMove(params);
+
+			params.deltaXtoX = (c0.x-c4.x)/(c0.x-c1.x);
+			params.deltaYtoY = 0;
+			params.minX      = c0.x - (params.deltaXtoX * (  c0.x-1));
+			params.maxX      = c0.x + (params.deltaXtoX * (W-c0.x-1));
+
+			c4.RegisterMove(params);
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+function DragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var c5;
+	var cm    = smartShape.currentMousePos;
+	var N     = parseInt(smartShape.elem.controlPoints[0].name);
+	var el    = smartShape.elem.elements[0];
+	var ef    = smartShape.elem.elements[(N==1)?1:2];
+	var c4Min = (c1.x<c0.x)? (c1.x+1)                     : (c0.x-(c0.x-c1.x)/gMaxLines);
+	var c4Max = (c1.x<c0.x)? (c0.x-(c0.x-c1.x)/gMaxLines) : (c1.x+1);
+
+	switch (cpIdx)
+	{
+		case 2:
+			if (cm.x < Math.floor(W/gMaxLines))
+				c2.x = Math.floor(W/gMaxLines);
+			else if (cm.x > W)
+				c2.x = W;
+			else
+			{
+				c2.x = cm.x;
+				createFloor(2);
+			}
+			break;
+
+		case 3:
+			if (cm.y < 0)
+				c3.y = 0;
+			else if (cm.y > (H-Math.floor(H/gMaxLines)))
+				c3.y = H-Math.floor(H/gMaxLines);
+			else
+			{
+				c3.y = cm.y;
+				createSide(0,2);
+			}
+			break;
+
+		case 4:
+			if (cm.x < c4Min)
+				c4.x = c4Min;
+			else if (cm.x > c4Max)
+				c4.x = c4Max;
+			else
+			{
+				c4.x = cm.x;
+				createFloor(1);
+				createSide(0,1);
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c1    = smartShape.elem.controlPoints[1];
+	var c4    = smartShape.elem.controlPoints[4];
+	var N     = parseInt(smartShape.elem.controlPoints[0].name);
+	var dm    = smartShape.mouseDownPos;
+	var cm    = smartShape.currentMousePos;
+	var d;
+
+	switch (cpIdx)
+	{
+		case 0:
+			createSide(0,3);
+			break;
+
+		case 1:
+			d = Math.abs(cm.x - dm.x);
+			if (d<1)
+				c1.name = (c1.name=="0")? 1 : 0;
+		case 4:
+			createFloor(3);
+			createSide(0,3);
+			break;
+
+		case 2:
+			d = Math.abs(cm.x - dm.x);
+			if (d<1)
+				hideShowGrid((N==1)?1:2);
+			break;
+
+		case 3:
+			d = Math.abs(cm.y - dm.y);
+			if (d<1)
+				hideShowGrid(0);
+			break;
+
+		default:
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/g2PI; }
+
+// converts Degrees to Radians
+function deg2rad(a) { return (a/360)*g2PI; }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function addElement(e, c)
+{
+	var i = e.elements.length;
+
+	e.elements[i] = new Path
+	e.elements[i].opacity = 100;
+	e.elements[i].pathAttributes.brush = {	alphaRemap:"none", 
+											angle:0, 
+											antiAliased:false, 
+											aspect:100, 
+											blackness:0, 
+											category:"bc_Pencil", 
+											concentration:100, 
+											dashOffSize1:2, 
+											dashOffSize2:2, 
+											dashOffSize3:2, 
+											dashOnSize1:8, 
+											dashOnSize2:1, 
+											dashOnSize3:1, 
+											diameter:1, 
+											feedback:"none", 
+											flowRate:0, 
+											maxCount:15, 
+											minSize:1, 
+											name:"bn_1-Pixel", 
+											numDashes:0, 
+											shape:"circle", 
+											softenMode:"bell curve", 
+											softness:0, 
+											spacing:15, 
+											textureBlend:0, 
+											textureEdge:0, 
+											tipColoringMode:"random", 
+											tipCount:1, 
+											tipSpacing:0, 
+											tipSpacingMode:"random", 
+											type:"simple" };
+	e.elements[i].pathAttributes.brushColor = c;
+	e.elements[i].pathAttributes.fill = null;
+	e.elements[i].contours[0] = new Contour;
+	e.elements[i].contours[0].nodes.length = 0;
+}
+
+function hideShowGrid(g)
+{
+	var e = smartShape.elem.elements[g];
+	var o = e.opacity;
+
+	e.opacity = (o==0)? 100 : 0;
+}
+
+function createPerspectiveGrid()
+{
+	var c0   = smartShape.elem.controlPoints[0];
+	var c1   = smartShape.elem.controlPoints[1];
+	var N    = parseInt(c0.name);
+	var c2, c3;
+
+	smartShape.elem.elements[0] = new Group;
+	smartShape.elem.elements[1] = new Group;
+
+	if ((N==2) || ((N==3)&&(smartShape.elem.controlPoints.length<3)))
+	{
+		smartShape.elem.controlPoints.length++;
+
+		c2                   = smartShape.elem.controlPoints[2];
+		c2.x                 = W-10;
+		c2.y                 = c1.y;
+		c2.name              = "";
+		c2.type              = "default";
+	}
+
+	createFloor(3);
+
+	createSide(0, 3);
+
+	if (N>2)
+	{
+		smartShape.elem.controlPoints.length++;
+
+		c3                   = smartShape.elem.controlPoints[3];
+		c3.x                 = W-10;
+		c3.y                 = c1.y;
+		c3.name              = "";
+		c3.type              = "default";
+
+		createSide(2);
+	}
+}
+
+function createFloor(dir)
+{
+	var c0  = smartShape.elem.controlPoints[0];
+	var c1  = smartShape.elem.controlPoints[1];
+	var c2  = smartShape.elem.controlPoints[2];
+	var c4  = smartShape.elem.controlPoints[4];
+	var N   = parseInt(c0.name);
+	var v   = parseInt(c1.name);
+	var c   = "#D5E6DE"
+
+	var e, e0, e1, e2;
+	var i, j, k, x, y, y_, y__, tmp;
+	var e1Len;
+	var gcs;
+	var doLoop;
+
+	e = smartShape.elem.elements[(N==1)?1:2];
+
+	if (N==1)
+	{
+		// horizontal
+		if (dir&1)
+		{
+			gcs = Math.abs((c0.x-c4.x)*(c0.y-c1.y)/(c0.x-c1.x))*3/2;
+
+			e.elements[0] = new Group;
+
+			e0 = e.elements[0];
+
+			for (i=0,y=H,tmp=gcs; (y>=c1.y)&&(i<=gMaxLines) ; i++)
+			{
+				addElement(e0, c);
+
+				addPathPoint(e0.elements[i].contours[0], 0, y);
+				addPathPoint(e0.elements[i].contours[0], W, y);
+
+				tmp *= 2/3;
+				y   -= tmp;
+			}
+		}
+
+		// vertical
+		if (dir&2)
+		{
+			y = e.elements[0].elements[e.elements[0].elements.length-1].contours[0].nodes[0].y;
+
+			e.elements[1] = new Group;
+
+			e1 = e.elements[1];
+
+			for (i=0; i<=parseInt(W/c2.x); i++)
+			{
+				addElement(e1, c);
+
+				x = i*c2.x;
+
+				addPathPoint(e1.elements[i].contours[0], x, H);
+
+				x = c1.x + (y-c1.y)*(x-c1.x)/(H-c1.y);
+
+				if (v==0)
+					addPathPoint(e1.elements[i].contours[0], c1.x, c1.y);
+				else
+					addPathPoint(e1.elements[i].contours[0], x, y);
+			}
+
+			e1Len = i-1;
+
+			e.elements[2] = new Group;
+
+			e2 = e.elements[2];
+
+			for (k=0,i=0; k<2; k++)
+			{
+				y__    = H*2;
+				y_     = H;
+				j      = 1;
+				doLoop = true;
+
+				while (doLoop)
+				{
+					y__ = y_;
+					x   = ((k==0)? c1.x : e1Len*c2.x-c1.x) + (j*c2.x);
+					y_  = ((k==0)? c1.x : (W-c1.x)       ) * ((H-c1.y)/x);
+
+					if (y_>(y-c1.y))
+					{
+						addElement(e2, c);
+
+						addPathPoint(e2.elements[i].contours[0], k*W, c1.y+y_);
+
+						x = c1.x + ((k==0)?-1:1)*(y-c1.y)*x/(H-c1.y);
+
+						if (v==0)
+							addPathPoint(e2.elements[i].contours[0], c1.x, c1.y);
+						else
+							addPathPoint(e2.elements[i].contours[0], x, y);
+
+						i++;
+						j++;
+
+						doLoop = ((y__-y_)>5);
+					}
+					else
+						doLoop = false;
+				}
+			}
+		}
+	}
+	else
+	{
+		c2 = smartShape.elem.controlPoints[2];
+
+		// grid 1 - left grid
+		for (i=0,j=0; j<=parseInt(W/gGCS); i++,j++)
+		{
+			addElement(e, c);
+
+			addPathPoint(e.elements[i].contours[0], c1.x,  c1.y);
+			addPathPoint(e.elements[i].contours[0], j*gGCS, H   );
+		}
+
+		// grid 2 - left grid
+		for (j=0; j<=parseInt(W/gGCS); i++,j++)
+		{
+			addElement(e, c);
+
+			addPathPoint(e.elements[i].contours[0], c2.x,  c2.y);
+			addPathPoint(e.elements[i].contours[0], j*gGCS, H   );
+		}
+	}
+}
+
+function createSide(side, dir)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c3 = smartShape.elem.controlPoints[3];
+	var c4 = smartShape.elem.controlPoints[4];
+	var N  = parseInt(c0.name);
+	var v  = parseInt(c1.name);
+	var e_ = smartShape.elem.elements[(N==1)?1:2].elements[0];
+	var c  = (side==0)? "#98C2AE" : "#86FF84"
+	var e, e0, e1, i, j, x, y, a, hl, x_;
+	var e1Len;
+	var doLoop=true;
+
+	e = smartShape.elem.elements[side];
+
+	a = (c0.y-c1.y)/(c0.x-c1.x);
+
+	// vertical
+	if (dir&1)
+	{
+		e.elements[0] = new Group;
+
+		e0 = e.elements[0];
+
+		for (i=0; i<e_.elements.length; i++)
+		{
+			hl = e_.elements[i].contours[0].nodes[0];
+
+			x = ((hl.y-c1.y)/a) + c1.x;
+
+			addElement(e0, c);
+
+			addPathPoint(e0.elements[i].contours[0], x, 0   );
+			addPathPoint(e0.elements[i].contours[0], x, hl.y);
+
+			if (i==1)
+				c4.x = x;
+		}
+	}
+
+	// horizontal
+	if (dir&2)
+	{
+		x = e.elements[0].elements[e.elements[0].elements.length-1].contours[0].nodes[0].x;
+
+		e.elements[1] = new Group;
+
+		e1 = e.elements[1];
+
+		for (i=0; i<=parseInt(H/(H-c3.y)); i++)
+		{
+			addElement(e1, c);
+
+			y = H-(i*(H-c3.y));
+
+			addPathPoint(e1.elements[i].contours[0], c0.x, y);
+
+			y = c1.y - (x-c1.x)*(c1.y-y)/(c0.x-c1.x);
+
+			if (v==0)
+				addPathPoint(e1.elements[i].contours[0], c1.x, c1.y);
+			else
+				addPathPoint(e1.elements[i].contours[0], x, y);
+		}
+
+		e1Len = i-1;
+
+		e.elements[2] = new Group;
+
+		e2 = e.elements[2];
+
+		x_  = c0.x;
+		x__ = x*2;
+		i   = 0;
+		j   = 1;
+
+		while (doLoop)
+		{
+			x__ = x_;
+			y   = ((e1Len+j)*(H-c3.y))-(H-c1.y);
+
+			if (c1.x<c0.x)
+				x_  = c1.x + c1.y*(c0.x-c1.x)/y;
+			else
+				x_  = c1.x - c1.y*(c1.x-c0.x)/y;
+
+			if ( ((c1.x<c0.x)&&(x_>x)) || ((c1.x>c0.x)&&(x_<x)) )
+			{
+				addElement(e2, c);
+
+				addPathPoint(e2.elements[i].contours[0], x_, 0);
+
+				if (v==0)
+					addPathPoint(e2.elements[i].contours[0], c1.x, c1.y);
+				else
+				{
+					if (c1.x<c0.x)
+						y = c1.y - (x-c1.x)*y/(c0.x-c1.x);
+					else
+						y = c1.y + (x-c1.x)*y/(c1.x-c0.x);
+
+					addPathPoint(e2.elements[i].contours[0], x, y);
+				}
+
+				i++;
+				j++;
+
+				doLoop = (Math.abs(x__-x_)>5);
+			}
+			else
+			{
+				doLoop = false;
+			}
+		}
+	}
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FWACPlayer>
+	<Player name="Dreamworld - Green (Flash)" preview="dream_green.jpg" launch="index.html">
+		<File src="index.html"            dst="index.html"/>
+		<File src="scripts/AC_RunActiveContent.js" dst="scripts/AC_RunActiveContent.js"/>
+		<File src="slideshow.sw_"    dst="slideshow.swf"   />
+	</Player>
+</FWACPlayer>

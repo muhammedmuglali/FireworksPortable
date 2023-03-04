@@ -1,0 +1,39 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	var values = new Array();
+
+	values.push({ name:"Color",               type:"color", value:"#FFFFFF" });
+	values.push({ name:"Font",                type:"font",  value:"Arial"   });
+	values.push({ name:"Label",               type:"text",  value:"Button"  });
+	values.push({ name:"Fill Color (top)",    type:"color", value:"#00CC00" });
+	values.push({ name:"Fill Color (bottom)", type:"color", value:"#006600" });
+
+	Widget.elem.customData["currentValues"] = values;
+}
+
+function applyCurrentValues()
+{
+	var values = Widget.elem.customData["currentValues"];
+
+	Widget.GetObjectByName("label").pathAttributes.fillColor                    = values[0].value;
+	Widget.GetObjectByName("label").font                                        = values[1].value;
+	Widget.GetObjectByName("label").textChars                                   = values[2].value;
+	Widget.GetObjectByName("path3").pathAttributes.fill.gradient.nodes[0].color = values[3].value;
+	Widget.GetObjectByName("path3").pathAttributes.fill.gradient.nodes[1].color = values[4].value;
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

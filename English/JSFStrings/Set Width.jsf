@@ -1,0 +1,5 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["alrtmsg"] = "Textfield Width (pixels; 0 for auto)";

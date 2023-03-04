@@ -1,0 +1,6 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["rotate"] = "Click to rotate";
+__tooltips["altopt"] = "Alt/Opt for individual corners";

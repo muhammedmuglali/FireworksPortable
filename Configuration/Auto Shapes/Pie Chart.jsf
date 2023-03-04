@@ -1,0 +1,1312 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Pie Chart.jsf");
+
+gTT[0] = __tooltips["reset"];
+gTT[1] = __tooltips["innerradius"];
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCircleCPDist = fw.ellipseBCPConst;
+var gPI2  = Math.PI/2;		//  90 degrees
+var gPI   = Math.PI;		// 180 degrees
+var g6PI4 = (6*Math.PI)/4;	// 270 degrees
+var g2PI  = 2*Math.PI;		// 360 degrees
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var c   = {x:cmp.x, y:cmp.y};
+	var r   = 0;
+	var cp;
+
+	// add 6 control points
+	smartShape.elem.controlPoints.length = 6;
+
+	// control point for the centre - remains fixed
+	cp                   = smartShape.elem.controlPoints[0];
+	cp.x                 = c.x;
+	cp.y                 = c.y;
+	cp.name              = "";
+	cp.toolTip           = gTT[1];
+	cp.toolTipTracksDrag = false;
+	cp.type              = "default";
+
+	// control point for inner arc/circle
+	cp                   = smartShape.elem.controlPoints[1];
+	cp.x                 = c.x + r;
+	cp.y                 = c.y;
+	cp.name              = "";
+	cp.toolTip           = gTT[1];
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[2];
+	cp.x                 = c.x + R * Math.cos(-gPI2);
+	cp.y                 = c.y + R * Math.sin(-gPI2);
+	cp.name              = "";
+	cp.toolTip           = "0%";
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[3];
+	cp.x                 = c.x + R * Math.cos(0);
+	cp.y                 = c.y + R * Math.sin(0);
+	cp.name              = "";
+	cp.toolTip           = "25%";
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[4];
+	cp.x                 = c.x + R * Math.cos(deg2rad(135));
+	cp.y                 = c.y + R * Math.sin(deg2rad(135));
+	cp.name              = "";
+	cp.toolTip           = ((75/2)+25)+"%";
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[5];
+	cp.x                 = c.x + R * Math.cos(-gPI2);
+	cp.y                 = c.y + R * Math.sin(-gPI2);
+	cp.name              = "";
+	cp.toolTip           = "100%";
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	// allocate space for the shape
+	addElement(smartShape.elem, "#000000", "#FF0000");
+	addElement(smartShape.elem, "#000000", "#00FF00");
+	addElement(smartShape.elem, "#000000", "#0000FF");
+
+	createShape(0, -gPI2,        0,            R, r);
+	createShape(1, 0,            deg2rad(135), R, r);
+	createShape(2, deg2rad(135), -gPI2,        R, r);
+
+	var e = smartShape.elem;
+
+	e.effectList= {	category:"UNUSED",
+					effects:[	{	EffectIsVisible:true, 
+									EffectMoaID:"{a7944db8-6ce2-11d1-8c76000502701850}", 
+									ShadowAngle:315, 
+									ShadowBlur:4, 
+									ShadowColor:"#000000a5", 
+									ShadowDistance:7, 
+									ShadowType:0, 
+									category:"Shadow and Glow", 
+									name:"Drop Shadow" } ], 
+					name:"UNUSED" };
+}
+
+// On mouse down
+function BeginDragControlPoint()
+{
+	var cpLen = smartShape.elem.controlPoints.length;
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var cp    = smartShape.currentControlPoint;
+	var R     = dist(c0.x, c0.y, c2.x, c2.y);
+	var r     = dist(c0.x, c0.y, c1.x, c1.y);
+	var cpdist;
+	var params;
+	var contour;
+	var cpLen, cpNew, cpCurr, cpMin, cpMax;
+	var aMin, minX, minY;
+	var elemIdx;
+	var aNew;
+
+	switch (cpIdx)
+	{
+		case 0:
+			// snap control point for inner radius to the centre
+			c1.x = c0.x + 1;
+			c1.y = c0.y;
+
+		case 1:
+			// add preview circle for the inner radius
+			elemIdx = addPreview(cpIdx);
+
+			// set flag to indicate that the control point for inner radius is being moved
+			smartShape.elem.controlPoints[1].name = "Q";
+
+			// control point for inner radius moves only along the x-axis
+			params = setMoveParams(true, true, true, 1, 0, 0, 0, c0.x, c0.x+R, c0.y, c0.y);
+			c1.RegisterMove(params);
+
+			// preview circle for inner arc resizes accordingly
+			contour = smartShape.elem.elements[elemIdx].contours[0];
+			cpdist  = R * gCircleCPDist;
+
+			// register movement for predecessor, point, and successor
+			params = setMoveParams(true, false, false, 1, 0, -gCircleCPDist, 0, c0.x, c0.x+R, c0.y-cpdist, c0.y       );
+			contour.nodes[0].RegisterMove(params);
+			params = setMoveParams(false, true, false, 1, 0,  0,             0, c0.x, c0.x+R, c0.y,        c0.y       );
+			contour.nodes[0].RegisterMove(params);
+			params = setMoveParams(false, false, true, 1, 0,  gCircleCPDist, 0, c0.x, c0.x+R, c0.y,        c0.y+cpdist);
+			contour.nodes[0].RegisterMove(params);
+
+			params = setMoveParams(true, false, false,  gCircleCPDist, 0, 1, 0, c0.x,        c0.x+cpdist, c0.y, c0.y+R);
+			contour.nodes[1].RegisterMove(params);
+			params = setMoveParams(false, true, false,  0,             0, 1, 0, c0.x,        c0.x,        c0.y, c0.y+R);
+			contour.nodes[1].RegisterMove(params);
+			params = setMoveParams(false, false, true, -gCircleCPDist, 0, 1, 0, c0.x-cpdist, c0.x,        c0.y, c0.y+R);
+			contour.nodes[1].RegisterMove(params);
+
+			params = setMoveParams(true, false, false, -1, 0,  gCircleCPDist, 0, c0.x-R, c0.x, c0.y,        c0.y+cpdist);
+			contour.nodes[2].RegisterMove(params);
+			params = setMoveParams(false, true, false, -1, 0,  0,             0, c0.x-R, c0.x, c0.y,        c0.y       );
+			contour.nodes[2].RegisterMove(params);
+			params = setMoveParams(false, false, true, -1, 0, -gCircleCPDist, 0, c0.x-R, c0.x, c0.y-cpdist, c0.y       );
+			contour.nodes[2].RegisterMove(params);
+
+			params = setMoveParams(true, false, false, -gCircleCPDist, 0, -1, 0, c0.x-cpdist, c0.x,        c0.y-R, c0.y);
+			contour.nodes[3].RegisterMove(params);
+			params = setMoveParams(false, true, false,  0,             0, -1, 0, c0.x,        c0.x,        c0.y-R, c0.y);
+			contour.nodes[3].RegisterMove(params);
+			params = setMoveParams(false, false, true,  gCircleCPDist, 0, -1, 0, c0.x,        c0.x+cpdist, c0.y-R, c0.y);
+			contour.nodes[3].RegisterMove(params);
+
+			break;
+
+		default:
+
+			// current control point
+			cpCurr = smartShape.elem.controlPoints[cpIdx];
+
+			if ( smartShape.ctrlCmdKeyDown && (smartShape.elem.controlPoints.length<5) )
+			{
+				smartShape.elem.controlPoints[2].name = "X";
+			}
+			// if Shift key is pressed...
+			else if (smartShape.altOptKeyDown)
+			{
+				// add a new control point at where the current control point is
+				cpLen      = ++smartShape.elem.controlPoints.length;
+				cpNew      = smartShape.elem.controlPoints[cpLen-1];
+				cpNew.x    = cp.x;
+				cpNew.y    = cp.y;
+				cpNew.name = cpIdx + "," +								// source
+				             ((cpIdx==cpLen-2)? 2 : cpIdx+1) + "," +	// min
+				             ((cpIdx==2)? cpLen-2 : cpIdx-1);			// max
+
+				// add tool tip to the new control point
+				cpNew.toolTip           = "";
+				cpNew.toolTipTracksDrag = true;
+				cpNew.type              = "default";
+
+				// allocate space for another shape
+				smartShape.elem.elements[smartShape.elem.elements.length++] = new Path;
+
+				cpCurr.name = "Q";
+			}
+			else
+				cpCurr.name = "Q";
+
+			// add preview handle for the control point
+			elemIdx = addPreview(cpIdx);
+
+			// control point moves along the circumference, and between two control points
+			params = smartShape.GetDefaultMoveParms();
+
+			// get the latest number of control points
+			cpLen  = smartShape.elem.controlPoints.length;
+
+			// determine min/max angles that the current control point is allowed to rotate
+			if (smartShape.altOptKeyDown)
+			{
+				if ( (cpLen < 5) &&
+				     (smartShape.elem.controlPoints[2].x == smartShape.elem.controlPoints[3].x) &&
+				     (smartShape.elem.controlPoints[2].y == smartShape.elem.controlPoints[3].y) )
+				{
+					cpMin = smartShape.elem.controlPoints[3];
+					cpMax = smartShape.elem.controlPoints[2];
+
+					aMin = evalAngle(cpMin.x-c0.x, cpMin.y-c0.y);
+
+					minX = c0.x + R*Math.cos(aMin-(g2PI/100));
+					minY = c0.y + R*Math.sin(aMin-(g2PI/100));
+
+					params.minAngle = {x:minX,    y:minY};
+					params.maxAngle = {x:cpMax.x, y:cpMax.y};
+				}
+				else
+				{
+					cpMin = smartShape.elem.controlPoints[(cpIdx==cpLen-2)? 2       : cpIdx+1];
+					cpMax = smartShape.elem.controlPoints[(cpIdx==2)?       cpLen-2 : cpIdx-1];
+				}
+			}
+			else
+			{
+				cpMin = smartShape.elem.controlPoints[(cpIdx==cpLen-1)? 2       : cpIdx+1];
+				cpMax = smartShape.elem.controlPoints[(cpIdx==2)?       cpLen-1 : cpIdx-1];
+			}
+
+			if ( Math.abs(evalAngle(cpMin.x,cpMin.y)-evalAngle(cpMax.x,cpMax.y)) > g2PI/1000)
+			{
+				params.minAngle = {x:cpMin.x, y:cpMin.y};
+				params.maxAngle = {x:cpMax.x, y:cpMax.y};
+			}
+
+			// register circular movement for the current control point
+			smartShape.elem.controlPoints[cpIdx].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+			// preview handle follows the control point
+			smartShape.elem.elements[elemIdx].contours[0].nodes[0].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+			smartShape.elem.elements[elemIdx].contours[0].nodes[1].RegisterCircularMove({x:c0.x, y:c0.y}, params);
+
+			break;
+	}
+}
+
+// On mouse up
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var cpLen = smartShape.elem.controlPoints.length;
+	var cpc   = smartShape.elem.controlPoints[0];	// control point for centre
+	var cpr   = smartShape.elem.controlPoints[1];	// control point for inner radius
+	var cpa   = smartShape.elem.controlPoints[2];	// control point for first angle
+	var cpz;										// control point for last angle
+	var pm    = smartShape.mouseDownPos;
+	var cm    = smartShape.currentMousePos;
+	var d     = dist(pm.x, pm.y, cm.x, cm.y);
+	var aa, az, a;
+	var R, r;
+	var e;
+	var i;
+	var p, cp, p_;
+	var aMin, aMax, aNew, aOld;
+
+	// remove the preview element
+	smartShape.elem.elements.length--;
+
+	R = dist(cpc.x, cpc.y, cpa.x, cpa.y);	// outer radius
+
+	if ((cpIdx>1) && (d<1))
+	{
+		aMin = (cpIdx==2)?         0 : evalPercentage(cpIdx-1);
+		aMax = (cpIdx==cpLen-1)? 100 : evalPercentage(cpIdx+1);
+
+		if ((cpLen>4) && (cpIdx==3) && (aMin==100))
+			aMin = 0;
+
+		aOld = evalPercentage(cpIdx);
+		aNew = prompt("Please enter a new percentage value (Min="+aMin+", Max="+aMax+").", aOld);
+
+		if ( (aNew!="") && (aNew!=null))
+		{
+			aNew = parseFloat(aNew);
+
+			if ( isNaN(aNew) || (aNew<aMin) || (aNew>aMax) )
+				alert("ERROR: invalid percentage. Please try again.");
+			else
+			{
+				aNew = (g2PI*aNew/100)-gPI2;
+				aNew = (aNew>gPI2)? aNew-g2PI : aNew;
+
+				cp   = smartShape.elem.controlPoints[cpIdx];
+				cp.x = cpc.x + R * Math.cos(aNew);
+				cp.y = cpc.y + R * Math.sin(aNew);
+			}
+		}
+		else
+			return;
+	}
+
+	// if only two control points along circumference AND Ctrl/Cmnd key pressed, swap control points
+	if ( (cpLen<5) && (smartShape.elem.controlPoints[2].name=="X") )
+	{
+		swapControlPoints(2, 3);
+	}
+	// if a new control point was added, sort the control points
+	else if ( (smartShape.elem.controlPoints[cpLen-1].name!="") && 
+	          (smartShape.elem.controlPoints[cpLen-1].name!="Q") )
+	{
+		sortControlPoints();
+	}
+
+	cpz = smartShape.elem.controlPoints[cpLen-1];
+
+	// if control point for inner radius is within N pixels of the centre,
+	// where N is the SnapDistance pref...
+	if ( Math.abs(cpr.x-cpc.x) <= fw.getPref("SnapDistance") )
+	{
+		// snap to centre; inner radius = 0
+		cpr.x = cpc.x;
+	}
+
+	aa = evalAngle(cpa.x-cpc.x, cpa.y-cpc.y);
+	az = evalAngle(cpz.x-cpc.x, cpz.y-cpc.y);
+
+	r = dist(cpc.x, cpc.y, cpr.x, cpr.y);	// inner radius
+
+	if (r>0)
+		cpc.toolTip = gTT[0];
+	else
+		cpc.toolTip = gTT[1];
+
+	// if two end control points are close enough, close the circle
+	if ( dist(cpa.x, cpa.y, cpz.x, cpz.y) <= fw.getPref("SnapDistance") )
+	{
+		cpz.x = cpa.x;
+		cpz.y = cpa.y;
+		az    = aa;
+	}
+
+	// if there is only one sector, simply recreate the shape
+	if (cpLen < 5)
+	{
+		// recreate shape
+		createShape(0, aa, az, R, r);
+
+		smartShape.elem.controlPoints[2].name = "";	
+		smartShape.elem.controlPoints[3].name = "";	
+	}
+	else
+	{
+		// for each control point...
+		for (i=2; i<cpLen-1; i++)
+		{
+			// get the two adjacent control points
+			cpa = smartShape.elem.controlPoints[i];
+			cpz = smartShape.elem.controlPoints[i+1];
+
+			// if inner radius or current and/or next control point was moved...
+			// (i.e. recreate up to two shapes to speed up redraw)
+			if ( (cpr.name=="Q") || (cpa.name=="Q") || (cpz.name=="Q") )
+			{
+				// calculate start and end angles
+				aa = evalAngle(cpa.x-cpc.x, cpa.y-cpc.y);
+				az = evalAngle(cpz.x-cpc.x, cpz.y-cpc.y);
+
+				// if the angle difference is less then 0.36 degrees...
+				if (Math.abs(az-aa) < g2PI/1000)
+				{
+					// delete next control point and get new number of control points
+					cpLen = deleteControlPoint(i+1);
+
+					// if the deleted control point was NOT the last one
+					// get new control point and calculate its angle
+					if (i<cpLen-1)
+					{
+						cpz = smartShape.elem.controlPoints[i+1];
+						az  = evalAngle(cpz.x-cpc.x, cpz.y-cpc.y);
+					}
+				}
+
+				// if the control point is less than the last one
+				// recreate shape
+				if (i<cpLen-1)
+					createShape(i-2, aa, az, R, r);
+			}
+
+			// reset control point's name
+			cpa.name = "";
+		}
+		// reset last control point's name
+		if (i<cpLen)
+			smartShape.elem.controlPoints[i].name = "";	
+	}
+
+	// reset name of control point for inner radius
+	cpr.name = "";
+
+	for (i=2; i<cpLen; i++)
+		smartShape.elem.controlPoints[i].toolTip = evalPercentage(i) + "%";
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/g2PI; }
+
+// converts Degrees to Radians
+function deg2rad(a) { return (a/360)*g2PI; }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function evalPercentage(n)
+{
+	var cpLen = smartShape.elem.controlPoints.length;
+	var c0    = smartShape.elem.controlPoints[0];
+	var cp;
+	var a, p, p_;
+	var retVal;
+
+	cp = smartShape.elem.controlPoints[n];
+	a  = evalAngle(cp.x-c0.x, cp.y-c0.y);
+	a  = ((a<0)? a+g2PI : a) + gPI2;
+	a  = (a>g2PI)? a-g2PI : a;
+	p  = parseFloat(a*100/g2PI);
+
+	if ((n==cpLen-1) && (p==0))
+		p = 100;
+
+	p_ = p.toString().split(".");
+
+	if ((p_.length>1) && (p_[1].substr(0,2)=="00"))
+		p_.length = 1;
+
+	retVal = p_[0] + ((p_.length==1)? "" : "."+p_[1].substr(0,2));
+
+	return retVal;
+}
+
+function addElement(element, bc, fc)
+{
+	element.elements[element.elements.length] = new Path;
+
+	var e = element.elements[element.elements.length-1];
+
+	e.contours[0] = new Contour;
+	e.contours[0].nodes.length = 0;
+
+	e.opacity = 100;
+
+	if (bc!="")
+	{
+		e.pathAttributes.brush = {	alphaRemap:"none",
+									angle:0, 
+									antiAliased:true, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Basic", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:10, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"brush", 
+									flowRate:0, 
+									maxCount:14, 
+									minSize:1, 
+									name:"bn_Soft Line", 
+									numDashes:0, 
+									shape:"square", 
+									softenMode:"bell curve", 
+									softness:50, 
+									spacing:6, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = bc;
+	}
+
+	if (fc!="")
+	{
+		e.pathAttributes.fill = {	category:"fc_Solid", 
+									ditherColors:[ "#000000", "#000000" ], 
+									edgeType:"antialiased", 
+									feather:0, 
+									gradient:null, 
+									name:"fn_Normal", 
+									pattern:null, 
+									shape:"solid", 
+									stampingMode:"blend opaque", 
+									textureBlend:0, 
+									webDitherTransparent:false };
+		e.pathAttributes.fillColor = fc;
+	}
+
+	e.effectList= {	category:"UNUSED",
+					effects:[	{	AngleSoftness:9,
+									BevelContrast:70, 
+									BevelType:0, 
+									BevelWidth:8, 
+									ButtonState:0, 
+									DownBlendColor:"#0000003f", 
+									EdgeThreshold:0, 
+									EffectIsVisible:true, 
+									EffectMoaID:"{7fe61102-6ce2-11d1-8c76000502701850}", 
+									EmbossFaceColor:"#ffffff00", 
+									GlowStartDistance:0, 
+									GlowWidth:0, 
+									HiliteColor:"#ffffff", 
+									HitBlendColor:"#ffffff3f", 
+									LightAngle:135, 
+									LightDistance:100, 
+									MaskSoftness:0, 
+									OuterBevelColor:"#df0000", 
+									ShadowColor:"#000000", 
+									ShowObject:false, 
+									SlopeMultiplier:1, 
+									SlopeType:0, 
+									category:"Inner Bevel", 
+									name:"Inner Bevel" }], 
+					name:"UNUSED" };
+}
+
+/*--------------------------------------------------------------------------*/
+/* createDefaultShape                                                       */
+/*                                                                          */
+/*   Description: creates a default shape with ten nodes                    */
+/*                                                                          */
+/*     Arguments: elemNum - element number                                  */
+/*                aLen    - number of nodes per 'side' (inner/outer) to     */
+/*                          create                                          */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*                                                                          */
+/* This function creates a simple shape with sufficient number of nodes to  */
+/* recreate a particular sector. The createShape function then reshapes it  */
+/* by repositioning all the nodes, including their predecessors and         */
+/* successors.                                                              */
+/*--------------------------------------------------------------------------*/
+function createDefaultShape(contour, aLen)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var i;
+
+	// add nodes for inner & outer arcs
+	for (i=0; i<(aLen*2); i++)
+		// adding nodes at (c0.x+i, c0.y+i), so that when this
+		// contour is closed, it won't become a single node.
+		addPathPoint(contour, c0.x+i, c0.y+i);
+
+	// close the path
+	contour.isClosed = true;
+}
+
+/*--------------------------------------------------------------------------*/
+/* resizeCircle                                                             */
+/*                                                                          */
+/*   Description: resizes circle to a particular radius                     */
+/*                                                                          */
+/*     Arguments: contour - circle to resize                                */
+/*                r       - radius                                          */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*--------------------------------------------------------------------------*/
+function resizeCircle(contour, r)
+{
+	var c0     = smartShape.elem.controlPoints[0];
+	var cpdist = r * gCircleCPDist;
+	
+	contour.nodes[0].x     = c0.x+r;
+	contour.nodes[0].y     = c0.y;
+	contour.nodes[0].predX = c0.x;
+	contour.nodes[0].predY = c0.y-cpdist;
+	contour.nodes[0].succX = c0.x;
+	contour.nodes[0].succY = c0.y+cpdist;
+
+	contour.nodes[1].x     = c0.x;
+	contour.nodes[1].y     = c0.y+r;
+	contour.nodes[1].predX = c0.x-cpdist;
+	contour.nodes[1].predY = c0.y;
+	contour.nodes[1].succX = c0.x+cpdist;
+	contour.nodes[1].succY = c0.y;
+
+	contour.nodes[2].x     = c0.x-r;
+	contour.nodes[2].y     = c0.y;
+	contour.nodes[2].predX = c0.x;
+	contour.nodes[2].predY = c0.y+cpdist;
+	contour.nodes[2].succX = c0.x;
+	contour.nodes[2].succY = c0.y-cpdist;
+
+	contour.nodes[3].x     = c0.x;
+	contour.nodes[3].y     = c0.y-r;
+	contour.nodes[3].predX = c0.x-cpdist;
+	contour.nodes[3].predY = c0.y;
+	contour.nodes[3].succX = c0.x+cpdist;
+	contour.nodes[3].succY = c0.y;
+}
+
+/*--------------------------------------------------------------------------*/
+/* moveNodePos                                                              */
+/*                                                                          */
+/*   Description: moves a node (including its pred & succ points) based on  */
+/*                given arguments                                           */
+/*                                                                          */
+/*     Arguments: n  - node                                                 */
+/*                r  - radius                                               */
+/*                a  - angle of node n                                      */
+/*                ap - angle of previous/next node; used to calculate pred  */
+/*                as - angle of next/previous node; used to calculate succ  */
+/*                w  - 0=inner arc, else outer arc                          */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*--------------------------------------------------------------------------*/
+function moveNodePos(n, r, a, ap, as, w)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var cpdist0, dx0, dy0;
+	var cpdist1, dx1, dy1;
+
+	cpdist0 = r * gCircleCPDist * ap/gPI2;
+	cpdist1 = r * gCircleCPDist * as/gPI2;
+
+	n.x = c0.x + r * Math.cos(a);
+	n.y = c0.y + r * Math.sin(a);
+	dx0 = cpdist0 * Math.sin(a);
+	dy0 = cpdist0 * Math.cos(a);
+	dx1 = cpdist1 * Math.sin(a);
+	dy1 = cpdist1 * Math.cos(a);
+
+	if (w==0)
+	{
+		n.predX = n.x + dx0;
+		n.predY = n.y - dy0;
+		n.succX = n.x - dx1;
+		n.succY = n.y + dy1;
+	}
+	else
+	{
+		n.predX = n.x - dx0;
+		n.predY = n.y + dy0;
+		n.succX = n.x + dx1;
+		n.succY = n.y - dy1;
+	}
+}
+
+/*--------------------------------------------------------------------------*/
+/* distributeAngles                                                         */
+/*                                                                          */
+/*   Description: calculates where the nodes need to be based on start and  */
+/*                end angles                                                */
+/*                                                                          */
+/*     Arguments: a0 - start angle                                          */
+/*                a1 - end angle                                            */
+/*                                                                          */
+/*       Returns: array of 5 elements (angles)                              */
+/*--------------------------------------------------------------------------*/
+function distributeAngles(a0, a1)
+{
+	var a = new Array()	// array for all five angles
+	var da;				// difference between a0 and a1
+	var N;
+	var i=1;
+
+	if ( a0 == a1 ) da = g2PI;
+	else            da = (a1<a0)? (g2PI-a0+a1) : Math.abs(a1-a0);
+
+	if      (da <= gPI2)  N = 2;	// <= 90 degs; need 2 nodes
+	else if (da <= gPI)   N = 3;	// <=180 degs; need 3 nodes
+	else if (da <= g6PI4) N = 4;	// <=270 degs; need 4 nodes
+	else                  N = 5;	//           ; need 5 nodes
+
+	a[0] = a0;
+	if (N > 2)
+	{
+		for (; i<N-1; i++)
+		{
+			if ( (a[0]+(da/(N-1))*i) >= g2PI ) a[i] = a[0]+((da/(N-1))*i)-g2PI;
+			else                               a[i] = a[0]+(da/(N-1))*i;
+		}
+	}
+	a[i] = a1;
+
+	return a;
+}
+
+/*--------------------------------------------------------------------------*/
+/* setMoveParams                                                            */
+/*                                                                          */
+/*   Description: returns a new parameter object with values provided in    */
+/*                the argument                                              */
+/*                                                                          */
+/*     Arguments: mvPred - move predecessor (true/false)                    */
+/*                mvPt   - move point       (true/false)                    */
+/*                mvSucc - move successor   (true/false)                    */
+/*                xx     - change in x that applies to x (-1 <= xx <= 1)    */
+/*                yy     - change in y that applies to y (-1 <= yy <= 1)    */
+/*                xy     - change in x that applies to y (-1 <= xy <= 1)    */
+/*                yx     - change in y that applies to x (-1 <= yx <= 1)    */
+/*                minX   - mininum value in x-axis                          */
+/*                maxX   - maximum value in x-axis                          */
+/*                minY   - mininum value in y-axis                          */
+/*                maxY   - maximum value in y-axis                          */
+/*                                                                          */
+/*       Returns: new parameter object                                      */
+/*--------------------------------------------------------------------------*/
+function setMoveParams(mvPred, mvPt, mvSucc, xx, yy, xy, yx, minX, maxX, minY, maxY)
+{
+	var p = smartShape.GetDefaultMoveParms();
+
+	p.movePred  = mvPred;
+	p.movePt    = mvPt;
+	p.moveSucc  = mvSucc;
+	p.deltaXtoX = xx;
+	p.deltaYtoY = yy;
+	p.deltaXtoY = xy;
+	p.deltaYtoX = yx;
+	p.minX      = minX;
+	p.maxX      = maxX;
+	p.minY      = minY;
+	p.maxY      = maxY;
+
+	return p;
+}
+
+/*--------------------------------------------------------------------------*/
+/* addPreview                                                               */
+/*                                                                          */
+/*   Description: adds preview handle/circle for a control point            */
+/*                                                                          */
+/*     Arguments: cpIdx - control point number                              */
+/*                                                                          */
+/*       Returns: element index for the preview                             */
+/*--------------------------------------------------------------------------*/
+function addPreview(cpIdx)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var cp = smartShape.elem.controlPoints[cpIdx];
+	var R  = dist(c0.x, c0.y, cp.x, cp.y);
+	var r  = dist(c0.x, c0.y, c1.x, c1.y);
+	var a  = evalAngle(cp.x-c0.x, cp.y-c0.y);
+	var dX = R * Math.cos(a);
+	var dY = R * Math.sin(a);
+	var dx = r * Math.cos(a);
+	var dy = r * Math.sin(a);
+	var cd = r * gCircleCPDist;
+
+	var elemIdx = smartShape.elem.elements.length;
+
+	smartShape.elem.elements.length++;
+
+	smartShape.elem.elements[elemIdx].contours[0] = new Contour;
+	var contour = smartShape.elem.elements[elemIdx].contours[0];
+	contour.nodes.length = 0;
+
+	// if one of the control points along the circumference
+	// add preview handle
+	if (cpIdx > 1)
+	{
+		addPathPoint(contour, c0.x+dx, c0.y+dy);
+		addPathPoint(contour, c0.x+dX, c0.y+dY);
+	}
+	// else add preview circle and close it
+	// if inner radius is 0, then make it 2 pixels wide (radius of 1 pixel)
+	else
+	{
+		if (r==0) r++;
+		addPathPointBez(contour, c0.x+r, c0.y,   c0.x+r,  c0.y-cd, c0.x+r,  c0.y+cd);
+		addPathPointBez(contour, c0.x,   c0.y+r, c0.x+cd, c0.y+r,  c0.x-cd, c0.y+r );
+		addPathPointBez(contour, c0.x-r, c0.y,   c0.x-r,  c0.y+cd, c0.x-r,  c0.y-cd);
+		addPathPointBez(contour, c0.x,   c0.y-r, c0.x-cd, c0.y-r,  c0.x+cd, c0.y-r );
+		contour.isClosed = true;
+	}
+
+	return elemIdx;
+}
+
+/*--------------------------------------------------------------------------*/
+/* createShape                                                              */
+/*                                                                          */
+/*   Description: creates a circle or a sector based on angles and radius   */
+/*                                                                          */
+/*     Arguments: elemNum - element number; indicates which shape to create */
+/*                a       - array of angles for each node in current shape  */
+/*                R       - outer radius                                    */
+/*                r       - inner radius                                    */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*                                                                          */
+/* Pseudo Code:-                                                            */
+/*                                                                          */
+/*	if (if there is only one shape AND first and last angles are identical)
+	{
+		draw a circle
+		if (inner radius is > 0)
+			draw inner circle
+	}
+	else
+	{
+		distribute angles evenly
+
+		for each node on the inner arc
+		{
+			if (first node on inner arc)
+				pred=0
+			else
+			{
+				if (current angle < previous angle)
+				{
+					if (previous angle > 0)
+						pred = 360 - (previous - current)
+					else
+						pred = previous - current
+				}
+				else
+					pred = current angle - previous angle
+			}
+			if (last node on inner arc)
+				succ = 0
+			else
+			{
+				if (next angle < current angle)
+				{
+					if (current angle > 0)
+						succ = 360 - (current- next)
+					else
+						succ = current - next
+				}
+				else
+					succ = next - current
+			}
+		}
+
+		if inner radius was alered, no need to reposition outer nodes
+			return
+
+		for each node on the outer arc
+		{
+			if (first node on outer arc)
+				pred = 0
+			else
+			{
+				if (previous angle < current angle)
+				{
+					if (current > 0)
+						pred = 360 - (current - previous)
+					else
+						pred = current - previous
+				}
+				else
+					pred = previous - current
+			}
+			if (last node on outer arc)
+				succ = 0
+			else
+			{
+				if (current angle < next angle)
+				{
+					if (next > 0)
+						succ = 360 - (next - current)
+					else
+						succ = next - current
+				}
+				else
+					succ = current - next
+			}
+		}
+	}
+                                                                            */
+/*--------------------------------------------------------------------------*/
+function createShape(elemNum, a0, a1, R, r)
+{
+	var cpLen = smartShape.elem.controlPoints.length;
+	var c0    = smartShape.elem.controlPoints[0];
+	var i, n;
+	var pred;	// node's predecessor
+	var succ;	// node's successor
+	var cpdist;
+	var a, aLen;
+
+	smartShape.elem.elements[elemNum].contours.length = 1;
+
+	smartShape.elem.elements[elemNum].contours[0] = new Contour;
+
+	// remove existing nodes
+	contour = smartShape.elem.elements[elemNum].contours[0];
+	contour.nodes.length = 0;
+
+	// if there is only one shape AND first and last angles are identical, draw a circle
+	if ( (cpLen<5) && (a0==a1) )
+	{
+		cpdist = R * gCircleCPDist;
+
+		// draw outer circle and close it
+		addPathPointBez(contour, c0.x,   c0.y-R, c0.x-cpdist, c0.y-R,      c0.x+cpdist, c0.y-R     );
+		addPathPointBez(contour, c0.x+R, c0.y,   c0.x+R,      c0.y-cpdist, c0.x+R,      c0.y+cpdist);
+		addPathPointBez(contour, c0.x,   c0.y+R, c0.x+cpdist, c0.y+R,      c0.x-cpdist, c0.y+R     );
+		addPathPointBez(contour, c0.x-R, c0.y,   c0.x-R,      c0.y+cpdist, c0.x-R,      c0.y-cpdist);
+		contour.isClosed = true;
+
+		// if inner radius is > 0, draw inner circle
+		if (r > 0)
+		{
+			smartShape.elem.elements[elemNum].contours[1] = new Contour;
+
+			// remove existing nodes
+			contour = smartShape.elem.elements[elemNum].contours[1];
+			contour.nodes.length = 0;
+
+			cpdist = r * gCircleCPDist;
+
+			// draw inner circle and close it
+			addPathPointBez(contour, c0.x,   c0.y-r, c0.x-cpdist, c0.y-r,      c0.x+cpdist, c0.y-r     );
+			addPathPointBez(contour, c0.x+r, c0.y,   c0.x+r,      c0.y-cpdist, c0.x+r,      c0.y+cpdist);
+			addPathPointBez(contour, c0.x,   c0.y+r, c0.x+cpdist, c0.y+r,      c0.x-cpdist, c0.y+r     );
+			addPathPointBez(contour, c0.x-r, c0.y,   c0.x-r,      c0.y+cpdist, c0.x-r,      c0.y-cpdist);
+			contour.isClosed = true;
+		}
+
+		// reset name
+		smartShape.elem.controlPoints[1].name = "";
+	}
+	else
+	{
+		// calculate at what angle each node needs to be
+		a = distributeAngles(a0, a1);
+
+		aLen = a.length;
+
+		createDefaultShape(contour, aLen);
+
+		// move nodes on the inner arc
+		for (i=0,n=0; i<aLen; i++,n++)
+		{
+			if (i==0)               pred = 0;
+			else 
+			{
+				if (a[i] < a[i-1])
+				{
+					if (a[i-1] > 0) pred = g2PI-(a[i-1]-a[i]);
+					else            pred = a[i-1]-a[i];
+				}
+				else                pred = a[i]-a[i-1];
+			}
+
+			if (i==aLen-1)          succ = 0;
+			else
+			{
+				if (a[i+1] < a[i])
+				{
+					if (a[i] > 0)   succ = g2PI-(a[i]-a[i+1]);
+					else            succ = a[i]-a[i+1];
+				}
+				else                succ = a[i+1] - a[i];
+			}
+
+			moveNodePos(contour.nodes[n], r, a[i], pred, succ, 0);
+		}
+
+		// move nodes on the outer arc
+		for (i=aLen-1; i>=0; i--,n++)
+		{
+			if (i==aLen-1)          pred = 0;
+			else
+			{
+				if (a[i+1] < a[i])
+				{
+					if (a[i] > 0)   pred = g2PI-(a[i]-a[i+1]);
+					else            pred = a[i]-a[i+1];
+				}
+				else                pred = a[i+1]-a[i];
+			}
+
+			if (i==0)               succ = 0;
+			else
+			{
+				if (a[i] < a[i-1])
+				{
+					if (a[i-1] > 0) succ = g2PI-(a[i-1]-a[i]);
+					else            succ = a[i-1]-a[i];
+				}
+				else                succ = a[i]-a[i-1];
+			}
+
+			moveNodePos(contour.nodes[n], R, a[i], pred, succ, 5);
+		}
+	}
+}
+
+/*--------------------------------------------------------------------------*/
+/* sortControlPoint                                                         */
+/*                                                                          */
+/*   Description: sorts the control points when a new one is added          */
+/*                                                                          */
+/*     Arguments: none                                                      */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*                                                                          */
+/* This function sorts the controlPoints array.                             */
+/* When a new control point is added, it is added on the end of the array,  */
+/* and since the createShape function looks at this array to redraw the     */
+/* shape in order, the array must first be sorted.                          */
+/* The process begins by knowing which control point was used to create the */
+/* new control point. This information is then used to determine whether    */
+/* it was rotated clockwise or anti-clockwise. The next step involves the   */
+/* actual rearranging of the control points. In the final step, the         */
+/* associated elements' pathAttributes are also rearranged. The contours    */
+/* do not need to be rearranged, since this will be taken care of in the    */
+/* createShape function.                                                    */
+/*                                                                          */
+/* For example, suppose that the shape currently has four control points    */
+/* around the circumference, i.e. contolPoints[2] to controlPoints[5].      */
+/* Shift-Dragging controlPoints[3] anti-clockwise causes the following to   */
+/* happen:-                                                                 */
+/*                                                                          */
+/*  - a new control point is added at controlPoints[6]                      */
+/*  - controlPoints[6].name = 3                                             */
+/*  - position of controlPoints[6] is equal to that of [3] before dragging  */
+/*                                                                          */
+/* Counting the control points clockwise, their positions are now 2, 3, 6,  */
+/* 4, and 5. The rearranging of these control points takes place as         */
+/* follows:-                                                                */
+/*                                                                          */
+/*  - remember wher controlPoints[6] is                                     */
+/*  - move controlPoints[6] to where controlPoints[5] is                    */
+/*  - mark controlPoints[6] as being 'moved'                                */
+/*  - move controlPoints[5] to where controlPoints[4] is                    */
+/*  - mark controlPoints[5] as being 'moved'                                */
+/*  - move controlPoints[4] to where controlPoints[6] was                   */
+/*  - mark controlPoints[4] as being 'moved'                                */
+/*                                                                          */
+/* Additionally, the elements associated with the these control points      */
+/* have to be rearranged. In the above example, the following also          */
+/* happens:-                                                                */
+/*                                                                          */
+/*  - set pathAttributes of elements[4] to that of elements[3]              */
+/*  - set pathAttributes of elements[3] to that of elements[2]              */
+/*  - set pathAttributes of elements[2] to that of elements[1]              */
+/*                                                                          */
+/*--------------------------------------------------------------------------*/
+function sortControlPoints()
+{
+	var cpIdx, cpLen;
+	var c0, cp0, cp1, cpMin, cpMax;
+	var a0, a1, aMin, aMax;
+	var i, n, x, y;
+	var clockwise;
+
+	c0    = smartShape.elem.controlPoints[0];
+	cpLen = smartShape.elem.controlPoints.length;
+	n     = (smartShape.elem.controlPoints[cpLen-1].name).split(",");
+
+	// get control point number from which the new control point was created
+	cpIdx = parseInt(n[0]);
+	cp0   = smartShape.elem.controlPoints[cpIdx];	//control point moved by user
+	cp1   = smartShape.elem.controlPoints[cpLen-1];	//new control point
+	cpMin = smartShape.elem.controlPoints[parseInt(n[1])];
+
+	// clear new control point's name
+	smartShape.elem.controlPoints[cpLen-1].name = "";
+
+	a0   = evalAngle(cp0.x-c0.x, cp0.y-c0.y);
+	a1   = evalAngle(cp1.x-c0.x, cp1.y-c0.y);
+	aMin = evalAngle(cpMin.x-c0.x, cpMin.y-c0.y);
+
+	// make all the angles positive (0-360)
+	a0   = (a0  <0)? a0  +g2PI : a0;
+	a1   = (a1  <0)? a1  +g2PI : a1;
+	aMin = (aMin<0)? aMin+g2PI : aMin;
+
+	a0   = (a0  <a1)? a0  +g2PI-a1 : a0  -a1;
+	aMin = (aMin<a1)? aMin+g2PI-a1 : ((aMin==a1)? g2PI : (aMin-a1));
+	a1  -= a1;
+
+	// cp0 was rotated clockwise if it's between cp1 and cpMin
+	clockwise = (a1 < a0) && (a0 <= aMin);
+
+	// remember where the new control point is
+	x  = smartShape.elem.controlPoints[cpLen-1].x;
+	y  = smartShape.elem.controlPoints[cpLen-1].y;
+
+	// working backwards from the new one, move control points
+	// e.g. cp5->cp4, cp4->cp3, cp3->cp2, etc.
+	// indicate that the control point was moved
+	for (i=cpLen-1; i>((clockwise)?cpIdx:cpIdx+1); i--)
+	{
+		cp0      = smartShape.elem.controlPoints[i];
+		cp1      = smartShape.elem.controlPoints[i-1];
+
+		cp0.x    = cp1.x;
+		cp0.y    = cp1.y;
+		cp0.name = "Q";
+	}
+	// move last control point to where the new one was
+	// e.g. cp1 -> cp5's old position
+	// indicate that the control point was moved
+	cp0      = smartShape.elem.controlPoints[i];
+	cp0.x    = x;
+	cp0.y    = y;
+	cp0.name = "Q";
+
+	// sort the pathAttributes to preserve fill/stroke colour, etc. for each shape
+	// if the new one is on the end, simply use the previous attributes
+	if (cpIdx==cpLen-2)
+		smartShape.elem.elements[cpLen-4].pathAttributes = smartShape.elem.elements[cpLen-5].pathAttributes;
+	// else, shift the attributes accordingly
+	else
+	{
+		// if the new one was added from the first control point,
+		// shift attributes down for all shapes
+		// else, shift attributes for required shapes only
+		for (i=cpLen-4; i>((cpIdx==2)? ((clockwise)?1:0) : ((clockwise)?cpIdx-2:cpIdx-3)); i--)
+		{
+			smartShape.elem.elements[i].blendMode      = smartShape.elem.elements[i-1].blendMode;
+			smartShape.elem.elements[i].effectList     = smartShape.elem.elements[i-1].effectList;
+			smartShape.elem.elements[i].opacity        = smartShape.elem.elements[i-1].opacity;
+			smartShape.elem.elements[i].pathAttributes = smartShape.elem.elements[i-1].pathAttributes;
+		}
+	}
+}
+
+/*--------------------------------------------------------------------------*/
+/* deleteControlPoint                                                       */
+/*                                                                          */
+/*   Description: deletes a given control point and rearranges the          */
+/*                remaining control points and elements                     */
+/*                                                                          */
+/*     Arguments: cp - control point number that is to be 'deleted'         */
+/*                                                                          */
+/*       Returns: the new number of control points                          */
+/*                                                                          */
+/* This function takes the given control point, controlPoints[cp], and      */
+/* shifts all the control points up to controlPoints[C-1], where C is the   */
+/* last control point, 'down'. The last control point is then deleted by    */
+/* decrementing the contolPoints array size. Thus, the actual control point */
+/* that gets deleted is the last one.                                       */
+/*                                                                          */
+/* For example, suppose that the shape currently has five control points    */
+/* around the circumference, i.e. contolPoints[2] to controlPoints[6].      */
+/* Positioning controlPoints[3] over controlPoints[4] (or vice versa)       */
+/* causes this function to do the following:-                               */
+/*                                                                          */
+/*  - move controlPoints[4] to where controlPoints[5] is                    */
+/*  - move controlPoints[5] to where controlPoints[6] is                    */
+/*  - delete controlPoints[6] by decrementing controlPoints.length          */
+/*                                                                          */
+/* Additionally, the element associated with the deleted control point has  */
+/* to be deleted. In the above example, the following also happens:-        */
+/*                                                                          */
+/*  - set pathAttributes & contour of elements[2] to those of elements[3]   */
+/*  - set pathAttributes & contour of elements[3] to those of elements[4]   */
+/*  - delete elements[4] by deleting existing nodes and decrementing        */
+/*    elements.length                                                       */
+/*                                                                          */
+/* The new controlPoints.length is then returned.                           */
+/*--------------------------------------------------------------------------*/
+function deleteControlPoint(cp)
+{
+	var cpLen = smartShape.elem.controlPoints.length;
+	var cp0, cp1;
+	var i, e;
+
+	// if NOT deleting last control point...
+	// NB: deleting last CP achieved by dec'ing elements & CP lengths
+	if (cp<cpLen-1)
+	{
+		// shift all but last control point, as well as path attributes and contours
+		for (i=cp,e=cp-3; i<cpLen-1; i++,e++)
+		{
+			cp0 = smartShape.elem.controlPoints[i];
+			cp1 = smartShape.elem.controlPoints[i+1];
+
+			cp0.x    = cp1.x;
+			cp0.y    = cp1.y;
+			cp0.name = "Q";
+
+			smartShape.elem.elements[e].blendMode      = smartShape.elem.elements[e+1].blendMode;
+			smartShape.elem.elements[e].effectList     = smartShape.elem.elements[e+1].effectList;
+			smartShape.elem.elements[e].opacity        = smartShape.elem.elements[e+1].opacity;
+			smartShape.elem.elements[e].pathAttributes = smartShape.elem.elements[e+1].pathAttributes;
+			smartShape.elem.elements[e].contours[0]    = smartShape.elem.elements[e+1].contours[0];
+		}
+	}
+
+	// remove the last element from the array
+	smartShape.elem.elements.length--;
+
+	// remove last control point and return the new number of control points
+	return (--smartShape.elem.controlPoints.length);
+}
+
+/*--------------------------------------------------------------------------*/
+/* swapControlPoint                                                         */
+/*                                                                          */
+/*   Description: swaps position of two control points                      */
+/*                                                                          */
+/*     Arguments: a - first control point number                            */
+/*                b - second control point number                           */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*--------------------------------------------------------------------------*/
+function swapControlPoints(a, b)
+{
+	var cpa = smartShape.elem.controlPoints[a];
+	var cpb = smartShape.elem.controlPoints[b];
+
+	var x = cpa.x;
+	var y = cpa.y;
+
+	cpa.x = cpb.x;
+	cpa.y = cpb.y;
+
+	cpb.x = x;
+	cpb.y = y;
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

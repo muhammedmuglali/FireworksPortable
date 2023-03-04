@@ -1,0 +1,117 @@
+﻿
+var kTitle;
+var kFont = "Arial";
+var isMacintosh = System.osName[0] == "M"; // either M or W
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Save Time Stamp.jsf");
+kTitle = __tooltips["kTitle"];		
+var tmp  = (Files.getLanguageDirectory()).split("/");
+var lang = tmp[tmp.length-1];
+
+
+/*==========================================================================*/
+/* Constants                                                                */
+/*==========================================================================*/
+var kFontSize = 12;
+var kTextWidth = 200; //doesn't really matter - we are auto-sizing
+var gEventStr = "onFwDocumentSave";	//Do NOT localize
+
+/*==========================================================================*/
+/* main switch                                                              */
+/*==========================================================================*/
+switch(smartShape.operation) {
+
+	case "BeginDragInsert":
+	case "InsertSmartShapeAt":
+		var p = smartShape.currentMousePos;
+		InsertSmartShapeAt(p.x, p.y);
+		smartShape.elem.RegisterForEvent(gEventStr);
+		break;
+
+	case gEventStr:
+		SetTimeStamp();
+		break;
+}
+
+/*==========================================================================*/
+/* functions                                                                */
+/*==========================================================================*/
+function GetDate() {
+	var time = new Date()
+
+            switch(lang)
+
+            {
+
+                        // Japanese
+
+                        case "ja.lproj":
+
+                        case "Japanese":
+
+                                    return((1900 + time.getYear()) + "/" + (1 + time.getMonth()) + "/" + time.getDate());
+
+                                    break;
+
+                        case "en.lproj":
+
+                        case "English":
+
+                                    return((1 + time.getMonth()) + "/" + time.getDate() + "/" + (1900 + time.getYear()));
+
+                                    break;
+
+                        default:
+
+                                    return((1900 + time.getYear()) + "-" + (1 + time.getMonth()) + "-" + time.getDate());
+
+                                    break;
+
+            }
+
+}
+
+function GetTime() {
+	var time = new Date()
+	var hour = time.getHours()
+	var minute = time.getMinutes()
+	var second = time.getSeconds()
+	var temp = "" + ((hour > 12) ? hour - 12 : hour)
+	if (hour == 0)
+		temp = "12";
+	temp += ((minute < 10) ? ":0" : ":") + minute
+	temp += ((second < 10) ? ":0" : ":") + second
+	temp += (hour >= 12) ? " PM" : " AM"
+	return temp
+} 
+
+function InsertSmartShapeAt(x, y)
+{
+	smartShape.elem.elements[0] = new Text;
+	smartShape.elem.elements[0].textRuns = { initialAttrs:{ alignment:"center", antiAliasSharpness:192, antiAliasStrength:64, baselineShift:0, bold:false, face:kFont, fillColor:"#000000", horizontalScale:1, italic:false, leading:1, leadingMode:"percentage", overSample:8, paragraphIndent:0, paragraphSpacingAfter:0, paragraphSpacingBefore:0, rangeKerning:0, size:kFontSize+"pt", underline:false }, textRuns:[ { changedAttrs:{  }, characters:" " } ] };
+	smartShape.elem.elements[0].autoExpand = true;
+	smartShape.elem.elements[0].orientation = "horizontal left to right";
+	smartShape.elem.elements[0].rawLeft = x - kTextWidth / 2;
+	smartShape.elem.elements[0].rawWidth = kTextWidth;
+	smartShape.elem.elements[0].rawTop = y - kFontSize / 2;
+
+	smartShape.elem.elements[1] = new Text;
+	smartShape.elem.elements[1].textRuns = { initialAttrs:{ alignment:"center", antiAliasSharpness:192, antiAliasStrength:64, baselineShift:0, bold:false, face:kFont, fillColor:"#000000", horizontalScale:1, italic:false, leading:1, leadingMode:"percentage", overSample:8, paragraphIndent:0, paragraphSpacingAfter:0, paragraphSpacingBefore:0, rangeKerning:0, size:kFontSize+"pt", underline:false }, textRuns:[ { changedAttrs:{  }, characters:kTitle } ] };
+	smartShape.elem.elements[1].autoExpand = true;
+	smartShape.elem.elements[1].orientation = "horizontal left to right";
+	smartShape.elem.elements[1].rawLeft = x - kTextWidth / 2;
+	smartShape.elem.elements[1].rawWidth = kTextWidth;
+	smartShape.elem.elements[1].rawTop = y - kFontSize * 3 / 2;
+	
+	SetTimeStamp();
+}
+
+function SetTimeStamp()
+{
+	// Make the string
+	var stampStr = GetDate() + "\r" + GetTime();
+	// extract the old attributes, so if they get changed, we don't overwrite them
+	var oldAttrs = smartShape.elem.elements[0].textRuns.initialAttrs;
+	// set the attributes and the string
+	smartShape.elem.elements[0].textRuns = { initialAttrs:oldAttrs, textRuns:[ { changedAttrs:{  }, characters:stampStr } ] };
+}
+

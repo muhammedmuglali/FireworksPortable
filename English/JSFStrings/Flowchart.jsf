@@ -1,0 +1,32 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["alternateproces"] = "Alternate Process";
+__tooltips["card"] = "Card";
+__tooltips["collate"] = "Collate";
+__tooltips["connector"] = "Connector";
+__tooltips["data"] = "Data";
+__tooltips["decision"] = "Decision";
+__tooltips["delay"] = "Delay";
+__tooltips["directaccess"] = "Direct Access Storage";
+__tooltips["display"] = "Display";
+__tooltips["document"] = "Document";
+__tooltips["extract"] = "Extract";
+__tooltips["internalstorage"] = "Internal Storage";
+__tooltips["magneticdisk"] = "Magnetic Disk";
+__tooltips["manualinput"] = "Manual Input";
+__tooltips["manualoperation"] = "Manual Operation";
+__tooltips["merge"] = "Merge";
+__tooltips["multidocument"] = "Multidocument";
+__tooltips["offpageconnector"] = "Off-page Connector";
+__tooltips["or"] = "Or";
+__tooltips["predefinedprocess"] = "Predefined Process";
+__tooltips["preparation"] = "Preparation";
+__tooltips["process"] = "Process";
+__tooltips["punchedtape"] = "Punched Tape";
+__tooltips["seqaccess"] = "Sequential Access Storage";
+__tooltips["sort"] = "Sort";
+__tooltips["storeddata"] = "Stored Data";
+__tooltips["summingjunction"] = "Summing Junction";
+__tooltips["terminator"] = "Terminator";

@@ -1,0 +1,771 @@
+// Fireworks MX Dreamweaver MX Library HTML & JavaScript for sliced output.
+// Version 4.0 23JUL2000
+
+
+// To export HTML without comments change the value of variable doComments to "false".
+var doComments = fw.getPref("HTMLCommentsOn");
+
+// change FW's global state to export text using the correct encoding for the document
+var newHtmlEncoding = exportDoc.htmlEncoding;
+var oldHtmlEncoding = fw.textOutputEncoding;
+fw.textOutputEncoding = newHtmlEncoding;
+
+// determine type of output (xhmtl/html)
+var newXhtmlFormat = exportDoc.xhtmlFormat;
+var oldXhtmlFormat = fw.xhtmlOutput;
+fw.xhtmlOutput = newXhtmlFormat;
+
+var doHeader = false;
+// When doComments is set to "true" the WRITE_HTML_COMMENT and WRITE_JS_COMMENT functions
+// include HTML and JavaScript comments in the exported file.
+function WRITE_HTML_COMMENT(str) {
+	if (doComments) WRITE_HTML("<!--"+str+"-->\n");
+}
+
+function WRITE_JS_COMMENT(str) {
+	if (doComments) WRITE_HTML("/* "+str+" */\n");
+}
+
+// Declare variables for processing Behaviors.	
+var kActionStatusMessage = 1;
+var kActionSwapImage = 2;
+var kActionButtonDown = 4;
+var kActionSwapImageRestore = 5;
+var kActionButtonHighlight = 6; 
+var kActionButtonRestore = 7;
+
+
+var kEventMouseOver = 0;
+var kEventOnClick = 1;
+var kEventMouseOut = 2;
+var kEventOnLoad = 3;
+
+var hasStatusMessage = false;
+var hasSwap = false;
+var hasDown = false;
+var hasRestore = false;
+
+// Write HTML target and date created.
+var d = new Date();
+WRITE_HTML_COMMENT("Fireworks MX Dreamweaver LBI target.  Created ", d);
+
+
+if (!fw.xhtmlOutput){
+	// HTML FORMAT
+	WRITE_HTML("<meta http-equiv=\"Content-Type\" content=\"text/html;"); 
+	if (fw.textOutputEncoding == "utf-8"){
+		WRITE_HTML(" charset=", fw.textOutputEncoding);	
+	}
+	WRITE_HTML("\">\n");
+} else {
+	// XHTML FORMAT
+	WRITE_HTML("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=", fw.textOutputEncoding, "\" />\n"); 
+}
+
+// Function cellName determines the name for the image in a particular table cel
+// cellName is based off of the slice name if one was specified. Otherwise the
+// Base file name from the export dialog is used.
+function CellName(curSlices, row, col) {
+	var curSlice = curSlices[row][col];
+	var cellName = "";
+	if (curSlice && curSlice.getFrameFileName(0)) {
+		cellName = curSlice.getFrameFileName(0).toString();
+		// remove illegal characters
+		cellName = cellName.replace(/\W/g, "");
+		// if it starts with a number, add N to the front.
+		if (cellName == "") cellName = "n" + exportDoc.imagename + "_" + (row+1) + "_" + (col+1);
+		if (cellName.search(/\d/) == 0) {
+			cellName = "n"+cellName;
+		}
+	}
+	if (cellName!="") return(cellName);	 
+
+	var prefix;
+	if (!curSlices) return("nullCellName");
+	if (curSlices.id == 0) {
+		prefix = "";
+	} else {
+		prefix = curSlices.id+"_";
+	}
+	var suffix="";
+	if (curSlices.numRows > 1 || curSlices.numColumns > 1) {
+		suffix = "_" + (row+1) + "_" + (col+1);
+	}
+	cellName = "n" + prefix + exportDoc.imagename + suffix;
+	return(cellName);
+}
+
+// Determine and process Behaviors in the document.
+function ProcessEvent(theCurBehaviors, targetEvent) {
+	// Declare variable for processing Behaviors.
+	var javaScript = "";
+	var stat = false;
+	var eraseStatOnMouseOut = false;
+	var swapImage = "";
+	var nbHighlight = "";
+	var nbHighlightPreload = false;
+	var nbDown = "";
+	var nbDownPreload = false;
+	var swap = "";
+	var swapRestore = false;
+	var buttonRestore = false;
+	
+	// Translate Behaviors into JavaScript.
+	for (var i=0; i<theCurBehaviors.numberOfBehaviors; i++) {
+		curBehavior = theCurBehaviors[i];
+		
+		if (curBehavior.ignoreFlag) continue;
+		// Check for erase on mouse out status messages.
+		if (curBehavior.action == kActionStatusMessage) {
+			if (curBehavior.restoreOnMouseout) eraseStatOnMouseOut=true;
+		}
+		
+		if (curBehavior.event != targetEvent) continue;
+		
+		if (curBehavior.action == kActionStatusMessage) {
+			var statMsg = curBehavior.statusText;
+			var curStat = "";
+			curStat = "MM_displayStatusMsg('" + statMsg + "');";
+			javaScript += curStat;
+			stat = true;
+			continue;
+		}
+		if (curBehavior.action == kActionSwapImageRestore) {
+			swapRestore = true;
+			continue;
+		}
+		
+		if (curBehavior.action == kActionButtonRestore) {
+			buttonRestore = true;
+			continue;
+		}
+		
+		var swapRow = curBehavior.targetRowNum;
+		var swapCol = curBehavior.targetColumnNum;
+		var swapFrame = curBehavior.targetFrameNum; 
+		var swapTable = curBehavior.targetTable;
+		var fileName;
+		if (!swapTable) {
+			/* Not a swap behavior, so continue. */
+			continue;
+		}
+
+		if (curBehavior.hasHref) {
+			fileName = curBehavior.href;
+		} else {
+			fileName = swapTable.imagesDirPath + swapTable[swapRow][swapCol].getFrameFileName(swapFrame) + swapTable[swapRow][swapCol].imageSuffix;
+		}
+
+
+		var cellName = CellName(swapTable, swapRow,swapCol);
+		
+		// Translate button Behaviors into JavaScript.
+		if (curBehavior.action == kActionButtonDown) {
+			//MM_nbGroup(event, groupName, imgName, downSrc...preloadMarker)
+			nbDown += "'" + cellName + "','" + fileName + "',";
+			if (curBehavior.preload) nbDownPreload = true;
+			continue;
+		}
+		// Translate button Behaviors into JavaScript.
+		if (curBehavior.action == kActionButtonHighlight) {
+			var highlightName = "";
+			if (curBehavior.downHighlight) {
+				if (curBehavior.hasDhHref) {
+					highlightName = curBehavior.dhHref;
+				} else {
+					var f = curBehavior.dhTargetFrameNum;
+					highlightName = swapTable.imagesDirPath + swapTable[swapRow][swapCol].getFrameFileName(f) + swapTable[swapRow][swapCol].imageSuffix
+				}
+			}			
+			nbHighlight += "'" + cellName + "','" + fileName + "','" + highlightName +"',";
+			if (curBehavior.preload) nbHighlightPreload = true;
+			continue;
+		}
+		// Translate Swap Image Behaviors into JavaScript.
+		if (curBehavior.action == kActionSwapImage) {
+			swap += "'" +cellName +"','','" + fileName + "',";
+			continue;
+		}		
+	}
+ 	if (nbDown != "") {
+		if (targetEvent == kEventOnLoad) {
+			javaScript += "MM_nbSetInitDown('navbar1'," + nbDown
+		} else {
+			javaScript += "MM_nbGroup('down','navbar1'," + nbDown
+		}
+		if (nbDownPreload) {
+			javaScript += "1);";
+		} else {
+			javaScript += "0);";
+		}
+	}
+ 	if (nbHighlight != "") {
+		javaScript += "MM_nbGroup('over'," + nbHighlight
+		if (nbHighlightPreload) {
+			javaScript += "1);";
+		} else {
+			javaScript += "0);";
+		}
+	}
+	if (swap != "") {
+		javaScript += "MM_swapImage(" + swap + "1);";
+	}
+	if (swapRestore) {
+		javaScript += "MM_swapImgRestore();";
+	}
+	if (buttonRestore) {
+		javaScript += "MM_nbGroup('out');";
+	}
+	// Erase status bar message onMouseOut.
+	if (eraseStatOnMouseOut && targetEvent == kEventMouseOut) {
+		javaScript += "MM_displayStatusMsg(' ');" ;
+		stat = true;
+	}
+	
+	if (stat) javaScript += "return document.MM_returnValue";
+	return(javaScript);
+}
+
+// Determine and process Behaviors in the document.
+function ProcessBehavior(theCurBehaviors) {
+	
+	javaOver = ProcessEvent(theCurBehaviors, kEventMouseOver);
+	javaOut = ProcessEvent(theCurBehaviors, kEventMouseOut);
+	javaClick = ProcessEvent(theCurBehaviors, kEventOnClick);
+	if (javaOver != "" || javaOut != "" || javaClick != "") {
+		return(true);
+	}
+	return(false);
+}
+
+function DoFile(curBeh) {
+	var swapRow = curBeh.targetRowNum;
+	var swapCol = curBeh.targetColumnNum;
+	var swapFrame = curBeh.targetFrameNum; 
+	var swapTable = curBeh.targetTable;
+	if (!swapTable) return;
+	var fileName = swapTable[swapRow][swapCol].getFrameFileName(0);
+}
+
+
+// Examine all behaviors to determine what actions are present. 
+// Determine which files to pre-cache.
+var FWLoadInit = "";
+function DoFileAndPreload(curSlices) {
+	for (var curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (var curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			if (curSlices[curRow][curCol].skipCell) continue;
+			var nestedTable = curSlices[curRow][curCol].nestedTableSlices;
+			if (nestedTable) {
+				DoFileAndPreload(nestedTable);
+				continue;
+			}
+			if (curSlices[curRow][curCol].behaviors.numberOfBehaviors > 0) {
+				var behaviors = curSlices[curRow][curCol].behaviors;
+				for (var i=0; i<behaviors.numberOfBehaviors; i++) {
+					var curBehavior = behaviors[i];
+					if (curBehavior.action == kActionSwapImage) {
+						DoFile(curBehavior);
+						hasSwap = true;
+					}
+					if (curBehavior.action == kActionButtonDown) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionButtonHighlight) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionButtonRestore) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionSwapImageRestore) {
+						hasRestore = true;
+					}
+					if (curBehavior.action == kActionStatusMessage) {
+						hasStatusMessage = true;
+					}
+				}
+				var init = ProcessEvent(behaviors, kEventOnLoad) ;
+				if (init != "") {
+					FWLoadInit += init;
+				}
+			}
+			var imagemap = curSlices[curRow][curCol].imagemap;
+			for (var j=0; j < imagemap.numberOfURLs; j++) {
+				var curImagemap = imagemap[j];
+				var behaviors = curImagemap.behaviors;
+				for (var i=0; i<behaviors.numberOfBehaviors; i++) {
+					var curBehavior = behaviors[i];
+					if (curBehavior.action == kActionSwapImage) {
+						DoFile(curBehavior);
+						hasSwap = true;
+					}
+					if (curBehavior.action == kActionButtonDown) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionButtonHighlight) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionButtonRestore) {
+						DoFile(curBehavior);
+						hasDown = true;
+					}
+					if (curBehavior.action == kActionSwapImageRestore) {
+						hasRestore = true;
+					}
+					if (curBehavior.action == kActionStatusMessage) {
+						hasStatusMessage = true;
+					}
+				}
+				var init = ProcessEvent(behaviors, kEventOnLoad) ;
+				if (init != "") {
+					FWLoadInit += init;
+				}
+			}
+		}
+	}
+}
+
+DoFileAndPreload(slices);
+	
+var firstTable = true;
+
+function WriteTable(curSlices, indent) {
+	var needTable = curSlices.numRows > 1 || curSlices.numColumns > 1;
+	
+	var curCol;
+	var curRow;
+	var downIndex = 0;
+	if (needTable) {
+		if (firstTable) {
+			WRITE_HTML("<table align=\"", exportDoc.tableAlignment, "\" ");
+
+			// If the Fireworks document's canvas is not transparent and the Include undefined curSlices checkbox
+			// is off, give the table a background color based on the FIreworks document's canvas color.
+			if (!exportDoc.backgroundIsTransparent && curSlices.doSkipUndefined) {
+				WRITE_HTML("bgcolor=\"#", exportDoc.backgroundColor, "\"");
+			} 
+
+			WRITE_HTML("border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"");
+			if (exportDoc.tablePctWidth) {
+				WRITE_HTML(exportDoc.tablePctWidth, "%\">\n");
+			} else {
+				WRITE_HTML(curSlices.width, "\">\n");
+			}
+			firstTable = false;
+		}
+
+		/* This is the magic comment for html update. */
+		if (indent == "") {
+			//<--- fwtable fwsrc="mydoc" fwbase="basename" --->
+			var comment = "<!-- fwtable fwsrc=\"" + exportDoc.docSaveName + "\" fwbase=\"" + exportDoc.filename + "\"" + " -->\n";
+			WRITE_HTML(comment);
+		}
+
+
+		
+	// If shims have been specified, write shim row.	
+		if (curSlices.doShimEdges) {
+			WRITE_HTML(indent+"  <tr>\n");
+			WRITE_HTML_COMMENT(" Shim row, height 1. ");
+			for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+				WRITE_HTML(indent+"   <td><img src=\"", curSlices.shimPath, "\" width=\"", 
+					curSlices[0][curCol].cellWidth, "\" height=\"1\" border=\"0\"></td>\n"); 
+			}
+			WRITE_HTML(indent+"   <td><img src=\"", curSlices.shimPath, "\" width=\"1", 
+				"\" height=\"1\" border=\"0\"></td>\n"); 
+			WRITE_HTML(indent+"  </tr>\n");
+		}
+	}
+	// Write table rows.
+	for (curRow = 0; curRow < curSlices.numRows; curRow++) {
+		if (needTable) {
+			WRITE_HTML(indent+"  <tr>");
+			WRITE_HTML_COMMENT(" row "+(curRow+1)+" ");
+			if (!doComments) WRITE_HTML("\n");
+		}
+		for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			if (curSlice.skipCell) continue; 
+
+			if (needTable) {
+				// Write rowspan and colspan if necessary. Ex: rowspan="1" colspan="3"
+				WRITE_HTML(indent+"   <td");
+				if (curSlice.rowSpan > 1) {
+					WRITE_HTML(" rowspan=\"", curSlice.rowSpan,"\"");
+				}
+				if (curSlice.columnSpan>1) {
+					WRITE_HTML(" colspan=\"", curSlice.columnSpan, "\"");
+				}
+			}
+
+			var nestedTable = curSlice.nestedTableSlices;
+			if (nestedTable) {
+				if (needTable && !curSlice.tdTagText) { 
+					WRITE_HTML(">");
+				} else {
+					WRITE_HTML(" " + curSlice.tdTagText + ">");
+				}
+				// Now we need to write out our table tag
+				WRITE_HTML("<table align=\"", curSlice.tableAlign, "\" ");
+				
+				// If the Fireworks document's canvas is not transparent and the Include undefined curSlices checkbox
+				// is off, give the table a background color based on the Fireworks document's canvas color.
+				if (!exportDoc.backgroundIsTransparent && curSlices.doSkipUndefined) {
+					WRITE_HTML("bgcolor=\"#", exportDoc.backgroundColor, "\" ");
+				}
+				
+				WRITE_HTML("border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"", nestedTable.width, "\">\n");
+
+				WriteTable(nestedTable, "	"+indent);
+				if (needTable) {
+					WRITE_HTML("</td>");
+				}
+				WRITE_HTML("\n");
+				continue;
+			}
+
+			// Write HTML text from curSlices set to "Text (No Image)"
+			var emptyCell = false;
+			var doBgColor = false;
+			var bgColor = "";
+			if (fw.getDocumentDOM().inLaunchAndEdit == false) {
+				if (fw.getPref("HTMLEmptyCellUsesCanvasColor")) {
+					doBgColor = !exportDoc.backgroundIsTransparent;
+					bgColor = "#"+exportDoc.backgroundColor;
+				} else {
+					bgColor = fw.getPref("HTMLEmptyCellColor");
+					doBgColor = (bgColor != "");
+				}
+			}
+			if (!curSlice.hasImage) {
+				// no image, just dump out html text.
+				if (curSlice.htmlText) {
+					if (!curSlice.tdTagText) {
+						if (needTable) {
+							WRITE_HTML(' valign="top"');
+							if (needTable && doBgColor) {
+								WRITE_HTML(" bgcolor=\""+bgColor+"\"");
+							}
+							WRITE_HTML(">");
+						}						
+					} else {
+						if (needTable) WRITE_HTML(" " + curSlice.tdTagText + ">");
+					}
+					
+					// We're gonna do this with a real ghetto method.  We're just gonna look for a < and a > within the
+					// html text.  If we find both, we'll assume its a tag and the user doesn't need any additional tags.
+					// mat - 2001 Sep 12
+					var count = 0;
+					var open = false;
+					var close = false;
+					for(count; count < curSlice.htmlText.length; ++count) {
+						if(curSlice.htmlText.charAt(count) == "<") open = true;
+						else if(curSlice.htmlText.charAt(count) == ">") close = true;
+
+						if(open && close) break;
+					}
+
+					if (open && close) {
+						WRITE_HTML(curSlice.htmlText);
+					} else {
+						WRITE_HTML("<p>");
+						WRITE_HTML(curSlice.htmlText);
+						WRITE_HTML("</p>");
+					}
+					if (needTable) WRITE_HTML("</td>\n");
+					continue;
+				} else {
+					emptyCell = true;
+				}
+			}
+			if (curSlice.isUndefined && curSlices.doSkipUndefined) emptyCell = true;
+			if (emptyCell) {
+				if (needTable) {
+					var kCellNone = 1; var kCellShim = 2; var kCellNbsp = 3;
+					if (!curSlice.tdTagText) {
+						if (doBgColor) WRITE_HTML(" bgcolor=\""+bgColor+"\"");
+						WRITE_HTML(">");
+					} else {
+						WRITE_HTML(" " + curSlice.tdTagText + ">");
+					}
+					var mt = fw.getPref("HTMLEmptyCellContents");
+					if (mt == kCellNbsp) WRITE_HTML("&nbsp;");	
+					if (mt == kCellShim) WRITE_HTML("<img src=\"", curSlices.shimPath, 
+								"\" width=\"", curSlice.width, "\" height=\"", 
+								curSlice.height, "\" border=\"0\">"); 
+					WRITE_HTML("</td>\n");
+				}
+				continue;
+			}
+			if (needTable) {
+				if (!curSlice.tdTagText) {
+					WRITE_HTML(">");
+				} else {
+					WRITE_HTML(" " + curSlice.tdTagText + ">");
+				}
+			}
+
+			// Write link if slice has URL attached.
+			var href = "href=\"javascript:;\"";
+			var hasHref = curSlice.hasHref;
+			var abortHref = false;
+			if (curSlice.hasHref) {
+				href = "href=\"";
+				href += curSlice.href;
+				href += "\"";
+				if (curSlice.hasTargetText) {
+					href += " target=\"";
+					href += curSlice.targetText;
+					href += "\"";
+				}
+				
+				// If exporting demo HTML, ignore the URL and replace with none.
+				if (curSlices.doDemoHTML && curSlice.getFrameFileName(2)) {					
+					hasHref = false;
+					href = "href= \"javascript:;\"";
+				}
+			}
+
+			var cellName = CellName(curSlices, curRow, curCol);
+			var anchorTagOpen = false;
+
+			// If the slice has image map hotspots and has a url attached to it,
+			// ignore the url here and move it into the image map.
+			if (curSlice.hasImage && curSlice.hasImagemap) {
+				abortHref = true;  // we will put the href in the imagemaps.
+			}
+
+			// Write rollover and swap image events.
+			if (!abortHref) {
+				var behaviors = curSlice.behaviors;
+				var gotJavascript = ProcessBehavior(behaviors);
+
+				if ( gotJavascript || curSlice.hasHref) {
+  					WRITE_HTML("<a ");
+					anchorTagOpen = true;
+					WRITE_HTML(href);
+
+					if (javaOut != "") {
+						WRITE_HTML(" onMouseOut=\"", javaOut, "\" ");
+					}
+					if (javaOver != "") {
+						WRITE_HTML(" onMouseOver=\"", javaOver, "\" ");
+					}
+					if (javaClick != "") {
+						WRITE_HTML(" onClick=\"", javaClick, "\" ");
+					}
+					WRITE_HTML(">");
+				}
+			}
+
+			// Place image.
+			if (curSlice.hasImage) {
+				var imageName = curSlice.getFrameFileName(0); 
+				var altText = "";
+				if (curSlice.hasAltText) {
+					altText = curSlice.altText;
+				} else {
+					altText = exportDoc.altText;
+				}
+				
+				// Assemble info for image tag.
+				// Ex: <img name="n_03_02" src="File_03_02.gif" width="79" height="71" border="0"
+				WRITE_HTML("<img name=\"", cellName, "\" src=\"",
+					curSlices.imagesDirPath, imageName, curSlice.imageSuffix, "\" width=\"",
+					curSlice.width,"\" height=\"", curSlice.height, "\" border=\"0\"");
+				
+				// Write image map name.
+				// Ex: usemap="#base_r1_c2"
+				if (curSlice.hasImagemap) {	 
+					WRITE_HTML(" usemap=\"#m_", imageName, "\""); 
+				}
+				
+				// Write alt text.
+				if (altText != "") {
+					WRITE_HTML(" alt=\"", altText, "\"");
+				}
+				WRITE_HTML(">");	
+			}
+
+			if (anchorTagOpen) {
+				WRITE_HTML("</a>");	
+			}
+			if (needTable) WRITE_HTML("</td>\n");	
+		}
+		
+		if (needTable) {
+			// Place shim in rightmost column of table.
+			if (curSlices.doShimEdges) {
+				/* Write the 1 pixel transparent shim. */
+				WRITE_HTML("   <td><img src=\"",
+					curSlices.shimPath, "\" width=\"1\" height=\"", 
+					curSlices[curRow][0].cellHeight, "\" border=\"0\"></td>\n"); 
+			}
+			WRITE_HTML(indent+"  </tr>\n");
+		}
+	}		
+	if (needTable) {
+		// Close table.
+		if (indent!="") WRITE_HTML(indent+"</table>");
+	}
+}
+
+function WriteImagemaps(curSlices, indent) {
+	// Traverse all curSlices and generate any image maps needed.
+	for (var curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (var curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			if (curSlice.skipCell) continue; 
+			var nestedTable = curSlice.nestedTableSlices;
+			if (nestedTable) {
+				WriteImagemaps(nestedTable, "	"+indent);
+				continue;
+			}
+			if (curSlice.hasImagemap) {
+				
+				// Write the image map.
+				WRITE_HTML(indent+"<map name=\"m_", curSlice.getFrameFileName(0), "\">\n");
+
+				var i = 0;
+				var imagemap = curSlice.imagemap;
+				while (i < imagemap.numberOfURLs) {
+					var curImagemap = imagemap[i];
+
+					var behaviors = curImagemap.behaviors;
+
+					if (behaviors.numberOfBehaviors==0) {
+						var behaviors = curSlice.behaviors;
+					}
+ 					javaOver = "";
+					javaOut = "";
+					javaClick = "";
+					var gotJavascript = ProcessBehavior(behaviors);
+	
+					// Write the area tag with shape definitions.
+					WRITE_HTML(indent+"<area shape=\"");
+					WRITE_HTML(curImagemap.shape); // Shapes are rect poly and circle
+					WRITE_HTML("\" coords=\"");
+					for (var j=0; j<curImagemap.numCoords; j++) {
+						if (j>0) WRITE_HTML(",");
+						// polygon has n coords.
+						// rect has 2 coords, topLeft, and botomRight.
+						// circle has one coord, center; plus radius.
+						WRITE_HTML((curImagemap.xCoord(j)-curSlice.left), ",", (curImagemap.yCoord(j)-curSlice.top)); 
+					}
+					if (curImagemap.shape == "circle") {
+						// Write the radius for circle hotspots.
+						WRITE_HTML(", ", curImagemap.radius);
+					}
+					WRITE_HTML("\"");
+					var href = " href=\"javascript:;\"";
+					if (curImagemap.hasHref) {
+						href = " href=\"";
+						href += curImagemap.href;
+						href += "\"";
+						if (curImagemap.hasTargetText) {
+							href += " target=\"";
+							href += curImagemap.targetText;
+							href += "\"";
+						}
+					}
+
+					WRITE_HTML(href);
+					
+					// Write alt text for hotspot.
+					var altText = "";
+					if (curImagemap.hasAltText) {
+						altText = curImagemap.altText;
+					} else {
+						altText = exportDoc.altText;
+					}
+
+					if (altText!="") {
+						WRITE_HTML(" title=\"", altText, "\"");
+						WRITE_HTML(" alt=\"", altText, "\"");
+					}
+
+					// Write rollover and swap image behaviors.
+					if (javaOut != "") {
+						WRITE_HTML(" onMouseOut=\"", javaOut, "\" ");
+					}
+					if (javaOver != "") {
+						WRITE_HTML(" onMouseOver=\"", javaOver, "\" ");
+					}
+					if (javaClick != "") {
+						WRITE_HTML(" onClick=\"", javaClick, "\" ");
+					}
+
+					WRITE_HTML(" >\n");
+					i++;
+				} 
+				var behaviors = curSlices[curRow][curCol].behaviors;
+ 				javaOver = "";
+				javaOut = "";
+				javaClick = "";
+				var gotJavascript = ProcessBehavior(behaviors);	
+
+				var link = "";
+				if (curSlice.hasHref) {
+					link = curSlice.href;
+				} 
+
+				// If the current slice had a URL attached, it was moved and written here.
+				if (gotJavascript || link != "") {
+					WRITE_HTML(indent+"<area shape=\"rect\" coords=\"0,0, ", curSlice.width, ",", curSlice.height, "\" ");
+					var href="javascript:;";
+					if (link!="") {
+						href = link;
+					}
+					WRITE_HTML("href=\"", href, "\"");
+
+					if (curSlice.hasTargetText) {
+						WRITE_HTML("\n  target=\"", curSlices[curRow][curCol].targetText, "\"");
+					}
+					if (javaOut != "") {
+						WRITE_HTML(" onMouseOut=\"", javaOut, "\" ");
+					}
+					if (javaOver != "") {
+						WRITE_HTML(" onMouseOver=\"", javaOver, "\" ");
+					}
+					if (javaClick != "") {
+						WRITE_HTML(" onClick=\"", javaClick, "\" ");
+					}
+					var altText = "";
+					if (curSlice.hasAltText) {
+						altText = curSlice.altText;
+					} else {
+						altText = exportDoc.altText;
+					}
+					if (altText!="") {
+						WRITE_HTML(" title=\"", altText, "\"");
+						WRITE_HTML(" alt=\"", altText, "\"");
+					}
+					WRITE_HTML(">\n");
+				}	
+
+				WRITE_HTML(indent+"</map>\n")
+			}
+		}
+	}
+}
+
+WriteTable(slices, "");
+WriteImagemaps(slices, "");
+
+var needTable = slices.numRows > 1 || slices.numColumns > 1;
+if (needTable) {
+	WRITE_HTML("</table>\n");
+}
+
+// reset FW's global text output encoding
+fw.textOutputEncoding = oldHtmlEncoding;
+
+fw.xhtmlOutput = oldXhtmlFormat;
+
+var retval = "ok";
+retval;

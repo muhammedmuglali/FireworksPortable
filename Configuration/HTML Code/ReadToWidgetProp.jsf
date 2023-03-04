@@ -1,0 +1,58 @@
+function fwalert( alertText )
+{
+	//alert( alertText );
+}
+
+fwalert("Starting Read Script");
+
+//Get the property String
+var encodedString = Widget.propString;
+
+fwalert( "encodedString = " + encodedString );
+
+
+
+if( encodedString )
+{
+	var objSep = "&;&";
+	var fieldSep = "&|&";
+
+
+	var curValues = encodedString.split( objSep );
+	var arrLength = curValues.length;
+
+	var elemCurValues = new Array( arrLength );
+
+	//encode each of the values
+	for( index = 0 ; index < arrLength ; index++)
+	{
+
+		try
+		{
+			var propArr = curValues[index].split( fieldSep );
+			
+			elemCurValues[index] = new Object(); 
+
+			//we assume there are three elements in the propArr, one for propName,propValue and propType
+
+			elemCurValues[index].name	= propArr[0];
+			elemCurValues[index].value	= propArr[1];
+			elemCurValues[index].type	= propArr[2];
+
+		}catch(expn)
+		{
+			//Do nothing with the expn.
+		}
+
+	}
+
+	//assign the array back to cutom data of the element
+	Widget.elem.customData["currentValues"] = elemCurValues;
+
+	fwalert("CurrentValues = " + elemCurValues );
+
+}else
+{
+	Widget.elem.customData["currentValues"] = null;
+}
+

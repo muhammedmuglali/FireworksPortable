@@ -1,0 +1,10 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["inner"]    = "Inner Polygon";
+__tooltips["scale"]    = "Scale/Rotate";
+__tooltips["sides"]    = "Sides";
+__tooltips["altopt"]   = "Alt/Opt-drag to split";
+__tooltips["sections"] = "Sections";
+__tooltips["reset"]    = "Reset Inner Polygon";

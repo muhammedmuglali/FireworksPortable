@@ -1,0 +1,508 @@
+﻿/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+/*============================================================================*/
+/*                                 Star tool                                  */
+/*============================================================================*/
+/*
+
+The Star tool allows the users to create star-type shapes.
+
+The default star has the following:-
+
+- One control point in the centre of the circle.
+  (smartShape.elem.controlPoints[0])
+  This control point cannot be moved. Clicking this control point resets
+  moves the control points for the inner corners (see below) to the centre
+  of the star, thereby creating 'spokes'.
+
+- Two control points at the top of the star.
+  (smartShape.elem.controlPoints[1] & smartShape.elem.controlPoints[4])
+  These control points control the outer corner.
+  Shift-dragging this control point allows you to move the control point
+  for roundness.
+
+- Two control points for the inner corner.
+  (smartShape.elem.controlPoints[2] & smartShape.elem.controlPoints[5])
+  Shift-dragging this control point allows you to move the control point
+  for roundness.
+
+- One control point to the left of the star.
+  (smartShape.elem.controlPoints[3])
+  This control point controls the number of corners.
+*/
+
+
+/*============================================================================*/
+/*                             Default functions                              */
+/*============================================================================*/
+var MAX_NODES = 50;
+var MIN_NODES = 3;
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+		InsertSmartShapeAt(true);
+		break;
+
+	case "EndDragInsert":
+		EndDragInsert();
+		break;
+
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt(false);
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	case "RedrawSmartShape":
+		RedrawSmartShape();
+		break;
+}
+
+function InsertSmartShapeAt(dragIns)
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Star.jsf");
+	var t    = __tooltips;
+    var alrtmsg = __alertMessage;
+
+	smartShape.elem.customData["tooltips"] = t;
+    smartShape.elem.customData["alrtmsg"] = alrtmsg;
+    
+	var k = new Object();
+	k.maxNodes = MAX_NODES;	     // max number of points/corners
+	k.minNodes = MIN_NODES;		// min number of points/corners
+
+	smartShape.elem.customData["constants"] = k;
+
+	var cmp = smartShape.currentMousePos;
+	var R   = 100;
+	var N   = 5;
+	var c   = {x:cmp.x+R, y:cmp.y+R};
+	var r   = R/2;
+
+	var c0, c1, c2, c3, c4, c5;
+
+	// add 6 control points
+	smartShape.elem.controlPoints.length = 6;
+
+	c0                   = smartShape.elem.controlPoints[0];
+	c0.x                 = c.x;
+	c0.y                 = c.y - R;
+	c0.toolTip           = t.radius0;
+	c0.name              = "";
+
+	c1                   = smartShape.elem.controlPoints[1];
+	c1.toolTip           = t.radius1;
+	c1.name              = "";
+
+	c2                   = smartShape.elem.controlPoints[2];
+	c2.name              = "";
+	c2.toolTip           = t.roundness1;
+	c2.toolTipTracksDrag = true;
+
+	c3                   = smartShape.elem.controlPoints[3];
+	c3.name              = "";
+	c3.toolTip           = t.roundness2;
+	c3.toolTipTracksDrag = true;
+
+	// control point for num of corners/sides
+	c4                   = smartShape.elem.controlPoints[4];
+	c4.x                 = c.x - R;
+	c4.y                 = (c.y+R) - (2*R*3/k.maxNodes);
+	c4.name              = "5";
+	c4.toolTip           = t.points + ": 5";
+	c4.toolTipTracksDrag = true;
+
+	c5                   = smartShape.elem.controlPoints[5];
+	c5.x                 = c.x;
+	c5.y                 = c.y;
+	c5.name              = "";
+	c5.visible           = false;
+
+	// allocate space for the shape
+	smartShape.elem.elements[0] = new Path;
+	smartShape.elem.elements[0].contours[0] = new Contour;
+	smartShape.elem.elements[0].contours[0].nodes.length = 0;
+
+	// create a default star with five points
+	createStar(R, R, r, r, N);
+
+	smartShape.elem.customData["shapeName"] = "star";
+	smartShape.elem.customData["radius0"]   = R;
+	smartShape.elem.customData["radius1"]   = r;
+	smartShape.elem.customData["round0"]    = R;
+	smartShape.elem.customData["round1"]    = r;
+	smartShape.elem.customData["nodes"]     = N;
+	   
+	if (dragIns)
+	{
+		smartShape.constrainDragInsertAspect = true;
+
+		var c_     = {x:c.x-R ,y:c.y-R};
+		var	params = smartShape.GetDefaultMoveParms();
+		var i, n;
+
+		for (i=0; i<N*2; i++)
+		{
+			n = smartShape.elem.elements[0].contours[0].nodes[i];
+			params.deltaXtoX = (n.x-c_.x)/(2*R);
+			params.deltaYtoY = (n.y-c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(params);
+		}
+
+		for (i=0; i<smartShape.elem.controlPoints.length; i++)
+		{
+			n = smartShape.elem.controlPoints[i];
+			params.deltaXtoX = (n.x-c_.x)/(2*R);
+			params.deltaYtoY = (n.y-c_.y)/(2*R);
+			n.RegisterInsertBBoxMove(params);
+		}
+
+		smartShape.elem.elements[1] = new Path;
+		smartShape.elem.elements[1].contours[0] = new Contour;
+		smartShape.elem.elements[1].contours[0].nodes.length = 0;
+		addPathPoint(smartShape.elem.elements[1].contours[0], c.x, c.y);
+		params.deltaXtoX = 1/2;
+		params.deltaYtoY = 1/2;
+		smartShape.elem.elements[1].contours[0].nodes[0].RegisterInsertBBoxMove(params);
+	}
+}
+
+function EndDragInsert()
+{
+	var c0 = smartShape.elem.elements[0].contours[0];
+	var c1 = smartShape.elem.elements[1].contours[0];
+	var R  = Math.abs(Math.round(dist(c1.nodes[0].x, c1.nodes[0].y, c0.nodes[0].x, c0.nodes[0].y)));
+	var r  = Math.abs(Math.round(dist(c1.nodes[0].x, c1.nodes[0].y, c0.nodes[1].x, c0.nodes[1].y)));
+
+	smartShape.elem.customData["radius0"] = R;
+	smartShape.elem.customData["radius1"] = r;
+	smartShape.elem.customData["round0"]  = R;
+	smartShape.elem.customData["round1"]  = r;
+
+	smartShape.elem.elements.length = 1;
+}
+
+function BeginDragControlPoint()
+{
+	var cpIdx  = smartShape.currentControlPointIndex;
+	var c0     = smartShape.elem.controlPoints[0];
+	var c1     = smartShape.elem.controlPoints[1];
+	var c2     = smartShape.elem.controlPoints[2];
+	var c3     = smartShape.elem.controlPoints[3];
+	var c4     = smartShape.elem.controlPoints[4];
+	var c5     = smartShape.elem.controlPoints[5];
+	var R      = dist(c5.x, c5.y, c0.x, c0.y);
+	var r      = dist(c5.x, c5.y, c1.x, c1.y);
+	var R_     = dist(c5.x, c5.y, c2.x, c2.y);
+	var r_     = dist(c5.x, c5.y, c3.x, c3.y);
+	var N      = parseInt(c4.name);
+	var params = smartShape.GetDefaultMoveParms();
+	var i;
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 1:
+			params.rotate    = false;
+			params.minRadius = 1;
+
+			smartShape.elem.controlPoints[cpIdx  ].RegisterPolygonMove({x:c5.x, y:c5.y}, params);
+			smartShape.elem.controlPoints[cpIdx+2].RegisterPolygonMove({x:c5.x, y:c5.y}, params);
+
+			if ( (Math.round(R)==Math.round(R_)) && (Math.round(r)==Math.round(r_)) )
+			{
+				for (i=cpIdx; i<(2*N); i+=2)
+					smartShape.elem.elements[0].contours[0].nodes[i].RegisterPolygonMove({x:c5.x, y:c5.y}, params);
+			}
+
+			break;
+
+		case 2:
+		case 3:
+			params.rotate    = false;
+			params.minRadius = 1;
+
+			smartShape.elem.controlPoints[cpIdx].RegisterPolygonMove({x:c5.x, y:c5.y}, params);
+
+			break;
+	}
+}
+
+function DragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+
+	if (cpIdx==4)
+	{
+		var t  = smartShape.elem.customData["tooltips"];
+		var k  = smartShape.elem.customData["constants"];
+		var c0 = smartShape.elem.controlPoints[0];
+		var c1 = smartShape.elem.controlPoints[1];
+		var c2 = smartShape.elem.controlPoints[2];
+		var c3 = smartShape.elem.controlPoints[3];
+		var c4 = smartShape.elem.controlPoints[4];
+		var c5 = smartShape.elem.controlPoints[5];
+		var R  = dist(c5.x, c5.y, c0.x, c0.y);
+		var r  = dist(c5.x, c5.y, c1.x, c1.y);
+		var R_ = dist(c5.x, c5.y, c2.x, c2.y);
+		var r_ = dist(c5.x, c5.y, c3.x, c3.y);
+		var cm = smartShape.currentMousePos;
+		var N, N_;
+
+		cp = smartShape.elem.controlPoints[cpIdx];
+
+		// follow mouse movement
+		cp.y = cm.y;
+
+		// moves between min & max
+		if (cp.y < c5.y-R)
+		{
+			cp.y = c5.y - R;
+			N    = k.maxNodes;
+		}
+		else if (cp.y > c5.y+R)
+		{
+			cp.y = c5.y + R;
+			N    = k.minNodes;
+		}
+		else
+		{
+			N = parseInt((k.maxNodes-k.minNodes)*(c5.y+R-c4.y)/(2*R)) + k.minNodes;
+		}
+
+		N_ = parseInt(cp.name);
+
+		if (N_ != N)
+		{
+			cp.name    = N;
+			cp.toolTip = t.points + ": " + N;
+
+			createStar(R, R_, r, r_, N);
+		}
+	}
+}
+
+function EndDragControlPoint()
+{
+	var k     = smartShape.elem.customData["constants"];
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var c5    = smartShape.elem.controlPoints[5];
+	var R     = dist(c5.x, c5.y, c0.x, c0.y);
+	var r     = dist(c5.x, c5.y, c1.x, c1.y);
+	var R_    = dist(c5.x, c5.y, c2.x, c2.y);
+	var r_    = dist(c5.x, c5.y, c3.x, c3.y);
+	var N     = parseInt(c4.name);
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+			createStar(R, R_, r, r_, N);
+
+		case 4:
+			c4.x = c5.x - ((R>r)?R:r);
+			c4.y = (c5.y+((R>r)?R:r)) - (2*((R>r)?R:r))*(N-k.minNodes)/(k.maxNodes-k.minNodes);
+			break;
+	}
+
+	smartShape.elem.customData["radius0"] = R;
+	smartShape.elem.customData["radius1"] = r;
+	smartShape.elem.customData["round0"]  = R_;
+	smartShape.elem.customData["round1"]  = r_;
+	smartShape.elem.customData["nodes"]   = N;
+}
+
+function RedrawSmartShape()
+{
+    
+    var t  = smartShape.elem.customData["tooltips"];
+    var alrtmsg = smartShape.elem.customData["alrtmsg"];
+	var k  = smartShape.elem.customData["constants"];
+	var c4 = smartShape.elem.controlPoints[4];
+	var c5 = smartShape.elem.controlPoints[5];
+	var R  = parseFloat(smartShape.elem.customData["radius0"]);
+	var r  = parseFloat(smartShape.elem.customData["radius1"]);
+	var R_ = parseFloat(smartShape.elem.customData["round0"]);
+	var r_ = parseFloat(smartShape.elem.customData["round1"]);
+	var N  = parseInt(smartShape.elem.customData["nodes"]);
+    
+    if(N < MIN_NODES)
+    {
+       N = MIN_NODES;
+       smartShape.elem.customData["nodes"] = MIN_NODES;
+       alert(alrtmsg.minmsg);
+       
+	}
+    if(N > MAX_NODES)
+    {
+       N = MAX_NODES;
+       smartShape.elem.customData["nodes"]  = MAX_NODES;
+       alert(alrtmsg.maxmsg);
+       
+    }
+    
+    
+    createStar(R, R_, r, r_, N);
+
+	c4.x       = c5.x - ((R>r)?R:r);
+	c4.y       = (c5.y+((R>r)?R:r)) - (2*((R>r)?R:r))*(N-k.minNodes)/(k.maxNodes-k.minNodes);
+	c4.name    = N;
+	c4.toolTip = t.points + ": " + N;
+}
+
+/*============================================================================*/
+/*                           User defined functions                           */
+/*============================================================================*/
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+/*--------------------------------------------------------------------------*/
+/* createStar                                                               */
+/*                                                                          */
+/*   Description: swaps position of two control points                      */
+/*                                                                          */
+/*     Arguments: R  - outer radius                                         */
+/*                R_ - roundness of outer points                            */
+/*                r  - inner radius                                         */
+/*                r_ - roundness of inner points                            */
+/*                N  - number of points                                     */
+/*                                                                          */
+/*       Returns: none                                                      */
+/*--------------------------------------------------------------------------*/
+function createStar(R, R_, r, r_, N)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var c4 = smartShape.elem.controlPoints[4];
+	var c5 = smartShape.elem.controlPoints[5];
+
+	var a_ = evalAngle(c0.x-c5.x, c0.y-c5.y);
+	var da = (2*Math.PI)/(2*N);
+	var a, i, x, y, x_, y_, px, py, sx, sy, rr;
+	var contour;
+
+	var maxHandleSize = 3000;
+
+	// remove existing nodes
+	contour = smartShape.elem.elements[0].contours[0];
+	contour.nodes.length = 0;
+
+	for (i=0; i<(2*N); i++,a_+=da)
+	{
+		a = (a_>Math.PI)? a_-(2*Math.PI) : a_;
+
+		if (Math.round(((i&1)?r:R)) == Math.round(((i&1)?r_:R_)))
+		{
+			x = c5.x + ((i&1)?r:R) * Math.cos(a);
+			y = c5.y + ((i&1)?r:R) * Math.sin(a);
+
+			addPathPoint(contour, x, y);
+		}
+		else
+		{
+			x_ = c5.x + ((i&1)?r_:R_) * Math.cos(a);
+			y_ = c5.y + ((i&1)?r_:R_) * Math.sin(a);
+
+			if (i&1)
+				if (N>3)
+					rr = (r_-r) * R * Math.sin(da)/(R * Math.cos(da) - r);
+				else
+					rr = maxHandleSize;
+			else
+				rr = r * Math.sin(da) * (R-R_)/(R - r * Math.cos(da));
+
+			if (rr>maxHandleSize) rr = maxHandleSize;
+
+			px = x_ + rr * Math.sin(a);
+			py = y_ - rr * Math.cos(a);
+			sx = x_ - rr * Math.sin(a);
+			sy = y_ + rr * Math.cos(a);
+
+			addPathPointBez(contour, x_, y_, px, py, sx, sy);
+		}
+
+		if (i==1)
+		{
+			x = c5.x + r * Math.cos(a);
+			y = c5.y + r * Math.sin(a);
+			c1.x = x;
+			c1.y = y;
+		}
+		if (i==2)
+		{
+			x = c5.x + R_ * Math.cos(a);
+			y = c5.y + R_ * Math.sin(a);
+			c2.x = x;
+			c2.y = y;
+		}
+		if (i==3)
+		{
+			x = c5.x + r_ * Math.cos(a);
+			y = c5.y + r_ * Math.sin(a);
+			c3.x = x;
+			c3.y = y;
+		}
+
+	}
+	contour.isClosed = true;
+}
+
+/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/

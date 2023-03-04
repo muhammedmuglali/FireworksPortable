@@ -1,0 +1,55 @@
+function setDefaultValues()
+{
+	var values = new Array();
+
+	values.push({ name:"Text", type:"text", value:"Tab" });
+	values.push({ name:"Text Color", type:"color", value:"#000000" });
+	values.push({ name:"Font Family", type:"font", value:"Verdana" });
+	values.push({ name:"Font Size", type:"number", value:"10" });
+	values.push({ name:"State", type:"ComboBox", value:"Normal,Normal,Over,Selected"});
+
+
+	Widget.elem.customData["currentValues"] = values;
+}
+
+function applyCurrentValues()
+{
+	var values = Widget.elem.customData["currentValues"];
+
+
+	Widget.GetObjectByName("label").textChars = values[0].value;
+	Widget.GetObjectByName("label").font = values[2].value;
+	Widget.GetObjectByName("label").fontsize = values[3].value;
+	Widget.GetObjectByName("label").pathAttributes.fillColor = values[1].value;
+
+	var state = values[4].value.split(",")[0];
+	
+	Widget.GetObjectByName("normal").visible = (state=="Normal");
+	Widget.GetObjectByName("over").visible = (state=="Over");
+	
+	
+
+	if (state=="Selected"){
+	Widget.GetObjectByName("selected").visible = (state=="Selected");
+	Widget.GetObjectByName("label2").visible = "true";
+	Widget.GetObjectByName("label").visible = "false";
+	Widget.GetObjectByName("label2").textChars = values[0].value;
+	Widget.GetObjectByName("label2").pathAttributes.fillColor = values[1].value;
+	Widget.GetObjectByName("label2").font = values[2].value;
+	Widget.GetObjectByName("label2").fontsize = values[3].value;}
+	else{
+	Widget.GetObjectByName("selected").visible = "false";
+	Widget.GetObjectByName("label2").visible = "false";
+	Widget.GetObjectByName("label").visible = "true";
+	}
+
+
+
+
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}

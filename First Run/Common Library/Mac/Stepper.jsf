@@ -1,0 +1,37 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	var currValues = new Array();
+
+	currValues.push({ name:"State",    type:"ComboBox", value:"Normal,Normal,Press Up,Press Down" });
+	currValues.push({ name:"enabled",  type:"Boolean",  value:"true"                              });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var vals     = Widget.elem.customData["currentValues"];
+	var state    = vals[0].value.split(",")[0].toString();
+	var enabled  = (vals[1].value.toString()=="true");
+
+	Widget.GetObjectByName("normal").visible   = ( enabled && (state=="Normal"    ));
+	Widget.GetObjectByName("pressed").visible  = ( enabled && (state=="Press Up"  ));
+	Widget.GetObjectByName("pressed_").visible = ( enabled && (state=="Press Down"));
+	Widget.GetObjectByName("disabled").visible = (!enabled);
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

@@ -1,0 +1,6 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["alrtmsg1"] = "Please select one Text object.";
+__tooltips["alrtmsg2"] = "Error: unable to locate selected element within the document.";

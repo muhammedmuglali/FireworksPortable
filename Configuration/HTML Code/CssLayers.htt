@@ -1,0 +1,3858 @@
+﻿/*******************************************************************/
+/*                                                                 */
+/*                      ADOBE CONFIDENTIAL                         */
+/*                   _ _ _ _ _ _ _ _ _ _ _ _ _                     */
+/*                                                                 */
+/* Copyright 2008 Adobe Systems Incorporated                  */
+/* All Rights Reserved.                                            */
+/*                                                                 */
+/* NOTICE:  All information contained herein is, and remains the   */
+/* property of Adobe Systems Incorporated and its suppliers, if    */
+/* any.  The intellectual and technical concepts contained         */
+/* herein are proprietary to Adobe Systems Incorporated and its    */
+/* suppliers and may be covered by U.S. and Foreign Patents,       */
+/* patents in process, and are protected by trade secret or        */
+/* copyright law.  Dissemination of this information or            */
+/* reproduction of this material is strictly forbidden unless      */
+/* prior written permission is obtained from Adobe Systems         */
+/* Incorporated.                                                   */
+/*                                                                 */
+/*******************************************************************/
+
+// fwonlyblock
+var tags = /^\<(a|blockquote|div|h1|h2|h3|h4|h5|h6|label|p|span)/;
+var tags2 = /^\<(a|blockquote|div|h1|h2|h3|h4|h5|h6|label|p|span)\>/;
+var charset = "@charset \"utf-8\";\n\n";
+var pMargin = 1.1;
+var enableRowWrap = false;
+var docWidth=exportDoc.width;
+var imagePath=slices.imagesDirPath;
+var backgroundColor=CONVERT_COLOUR(exportDoc.backgroundColor);
+var doComments = fw.getPref("HTMLCommentsOn");
+var slicelist=new Array();
+var csslinklist=new Array();
+var csspatternlist=new Array();
+var allDocList=new Array();
+var fname = exportDoc.docSaveName;
+var i = fname.indexOf(".");
+var pageTitle = fname.substring(0, i);
+var externalCSS = exportDoc.externalCSS;
+var externalCSSFileName = exportDoc.externalCSSFileName;
+var abort = false;
+var overlapString;
+fw.textOutputEncoding = exportDoc.htmlEncoding ;			// fix for non-english encoding
+
+// plusversion
+var hasFormElements = false;
+// -plusversion
+
+// check for the fireworks bug that saves file as jpg
+var fileNameBug=false;
+var oldname="";
+var newname="";
+if(exportDoc.htmlOutputPath.indexOf(".jpg") != -1 || exportDoc.htmlOutputPath.indexOf(".gif") != -1)
+{
+	oldname = exportDoc.htmlOutputPath;
+	i= oldname.indexOf(".");
+	t=oldname.substring(0, i);
+	newname = t + ".html";
+	
+	exportDoc.htmlOutputPath = newname;
+	
+	fileNameBug=true;
+}	
+// -fwonlyblock
+
+
+var useCssFile = false;
+var mode = "page";
+var showpart=false;
+var showcomments=false;
+
+// Pre-Process Section ======================================================================= 
+var content_str = "";
+var style_str = "";
+
+//
+var imageSlices = new Array();
+var patternSlices = new Array();
+var patternParents = new Array();
+
+var originalZindex=1;
+var obj = null;
+
+var divindent=0;
+
+// Strings for localization
+function getString(variable,value)
+{	
+	var localString = new Object();
+	var lang = fw.getFWLaunchLanguage();
+	switch (lang)
+	{
+		case "pt_BR":
+			localString.overlap = "Os limites " + value + " dos objetos estão superpostos; alternando para o modo de posicionamento absoluto";
+			localString.filename = "O Fireworks não pôde renomear o arquivo exportado anteriormente. Como solução alternativa, localize o arquivo exportado e renomeie-o de " + value.substr(value.lastIndexOf("/") + 1) + " para " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");
+			localString.fontWarning = "Aviso: " + value +" é uma fonte HTML fora do padrão que pode ser exibida de forma diferente em outros computadores ou dispositivos.\n\nÉ recomendável:\n\nExportar o texto como imagem cobrindo-o com uma fatia\n\tOU\nUsar uma fonte padrão, como:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva ou Trebuchet MS\n\nContinuar?";
+			localString.and = "e";
+			break;
+
+		case "cs_CZ":
+			localString.overlap = "Hranice objektů " + value + " se překrývají, probíhá přepnutí do režimu absolutního pozicování";
+			localString.filename = "Fireworks nemůže přejmenovat dříve exportovaný soubor. Vyhledejte proto exportovaný soubor ručně a přejmenujte ho ze " + value.substr(value.lastIndexOf("/") + 1) + " na " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");
+			localString.fontWarning = "Výstraha: " + value +" není standardní písmo HTML, a může se proto na jiných počítačích či zařízeních zobrazovat odlišně.\n\nDoporučujeme jednu z následujících možností:\n\nPřekryjte text řezem a exportujte ho jako obrázek\n\tNEBO\nPoužijte standardní písmo, např.:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva nebo Trebuchet MS\n\nChcete přesto pokračovat?";
+			localString.and = "a";
+			break;
+
+		case "nl_NL":       
+			localString.overlap = "De " + value + "-grenzen van objecten overlappen elkaar; er wordt overgeschakeld naar de modus voor absolute positionering";
+			localString.filename = "De naam van het geëxporteerde bestand kan niet worden gewijzigd in Fireworks. U wordt daarom aangeraden het geëxporteerde bestand te zoeken en de naam te wijzigen van " + value.substr(value.lastIndexOf("/") + 1) + " in " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Waarschuwing: " + value +" is geen standaard HTML-lettertype en kan anders worden weergegeven op andere computers of apparaten.\n\nU kunt daarom het beste het volgende doen:\n\nDe tekst exporteren als een afbeelding door deze af te dekken met een segment\n\tOF\nEen standaardlettertype gebruiken zoals\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva of Trebuchet MS\n\nWilt u toch doorgaan?";
+			localString.and = "en";
+			break;
+
+		case "fr_FR":	
+		case "fr_CA":    	
+			localString.overlap = "Les limites des objets " + value + " se chevauchent, passage en mode position absolue";
+			localString.filename = "Fireworks n'a pas pu renommer le fichier que vous avez précédemment importé. Vous devez donc localiser le fichier " + value.substr(value.lastIndexOf("/") + 1) + " et le renommer " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Attention : " + value +" est une police HTML non-standard, qui risque de s'afficher différemment sur d'autres ordinateurs ou périphériques.\n\nIl est donc recommandé soit :\n\nd'exporter le texte en tant qu'image en le couvrant d'une tranche\n\tSOIT\nd'utiliser une police standard comme :\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva ou Trebuchet MS\n\nContinuer quand même ?";
+			localString.and = "et";
+			break;
+
+		case "de_DE":    
+			localString.overlap = "Objekte " + value + " Grenzen überlappen, Wechsel in den absoluten Positionierungsmodus";
+			localString.filename = "Fireworks konnte die vorher exportierte Datei nicht umbenennen. Um dieses Problem zu umgehen, navigieren Sie zur exportierten Datei und benennen Sie sie von " + value.substr(value.lastIndexOf("/") + 1) + " in " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Warnung: " + value +" ist keine standardmäßige HTML-Schriftart und wird auf anderen Computern oder Geräten möglicherweise anders angezeigt.\n\nEine der folgenden Möglichkeiten wird empfohlen:\n\nExportieren des Texts als Bild durch Überlagern mit einem Segment\n\tODER\nVerwenden einer Standardschriftart wie:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva oder Trebuchet MS\n\nTrotzdem fortfahren?";
+			localString.and = "und";
+			break;
+
+		case "it_IT":    
+			localString.overlap = "I bordi " + value + " degli oggetti si sovrappongono, passaggio alla modalità di posizionamento assoluto";
+			localString.filename = "Impossibile rinominare il file precedentemente esportato. Individuare il file esportato e rinominarlo da " + value.substr(value.lastIndexOf("/") + 1) + " a " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Avviso: " + value +" non è un font standard HTML e potrebbe essere visualizzato in modo diverso su altri computer o dispositivi.\n\nSi consiglia di effettuare una delle seguenti operazioni:\n\nEsportare il testo come immagine coprendolo con una porzione\n\tOPPURE\nUsare un font standard come:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva o Trebuchet MS\n\nContinuare comunque?";
+			localString.and = "e";
+			break;
+
+		case "ja_JP":    
+			localString.overlap = "オブジェクト " + value +  " の境界が重なっています。絶対位置指定モードに切り替えます。";
+			localString.filename = "以前書き出したファイルの名前を変更できませんでした。解決策として、書き出したファイルを見つけて、ファイル名を " + value.substr(value.lastIndexOf("/") + 1) + " から " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "警告： " + value +" は HTML 用の標準フォントではありません。他のコンピュータやデバイスでは外観が変わる可能性があります。\n\n以下の解決策に従うことをお勧めします。\n\nテキスト上にスライスを配置し、画像として書き出す。\n\tまたは\n以下のような標準フォントを使用する。\n\tArial、Times New Roman、Courier New、Osaka、\n\tヒラギノ角ゴPro、メイリオ または MS Pゴシック\n\n続行しますか?";
+			localString.and = "および";
+			break;
+
+		case "ko_KR":  
+			localString.overlap = "객체 " + value + " 경계 겹침, 절대 위치 모드로 전환하십시오.";
+			localString.filename = "Fireworks는 사전 내보낸 파일의 이름을 변경할 수 없습니다.한가지 해결방법으로서 내보낸 파일을 찾은 후  이름 " + value.substr(value.lastIndexOf("/") + 1) + "을 " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html") + "로 변경하십시오";	
+			localString.fontWarning = "경고: " + value +"는 표준 HTML글꼴이 아니므로，다른 컴퓨터나 장치에서 다르게 표시될 수 있습니다.\n\n다음 방법중 하나를 사용하십시오.\n\n슬라이스를 사용하여 텍스트를 덮어 씀으로서,텍스트를 이미지로 내보내기\n\t또는\n표준 글꼴 사용，예를 들면：\n\tArial、Times New Roman、Courier New、Georgia、\n\tVerdana、Geneva 또는 Trebuchet MS\n\n그래도 계속하시겠습니까？";
+			localString.and = "및";
+			break;
+
+		case "pl_PL": 
+			localString.overlap = "Krawędzie " + value + " obiektów nachodzą na siebie, przełączanie na tryb pozycjonowania absolutnego";
+			localString.filename = "Program Fireworks nie mógł zmienić nazwy wyeksportowanego wcześniej pliku. Jako rozwiązanie odszukaj wyeksportowany plik i zmień jego nazwę z " + value.substr(value.lastIndexOf("/") + 1) + " na " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");
+			localString.fontWarning = "Ostrzeżenie: " + value +" jest niestandardową czcionką HTML, której wygląd może być różny w zależności od komputera lub urządzenia.\n\nZaleca się:\n\nWyeksportowanie tekstu jako obrazu poprzez nakrycie go plasterkiem\n\tLUB\nUżycie czcionki standardowej, jak np:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva or Trebuchet MS\n\nCzy mimo wszystko kontynuować?";
+			localString.and = "i";
+			break;
+
+		case "ru_RU":
+			localString.overlap = "Границы объектов " + value + " перекрываются при переключении в режим абсолютного позиционирования";
+			localString.filename = "Программа Fireworks не может переименовать файл, экспортированный ранее. В качестве обходного пути переименуйте экспортируемый файл " + value.substr(value.lastIndexOf("/") + 1) + " как " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html") + ".";
+			localString.fontWarning = "Предупреждение: " + value +" не является стандартным шрифтом HTML, поэтому его отображение может отличаться на других компьютерах и устройствах.\n\nРекомендуется:\n\nЭкспортировать текст как изображение, наложив на него фрагмент,\n\tИЛИ\nиспользовать стандартный шрифт, например:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva или Trebuchet MS.\n\nПродолжить?";
+			localString.and = "и";
+			break;
+
+		case "zh_CN":	
+			localString.overlap = "对象" + value + "边界重叠，请切换到绝对定位模式";
+			localString.filename = "Fireworks 无法重命名以前导出的文件。作为一种解决方法，请查找导出的文件，并将其从" + value.substr(value.lastIndexOf("/") + 1) + "重名为" + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "警告: " + value +"不是标准 HTML 字体，该字体可能会在其它计算机或设备上显示不同。\n\n建议使用以下任一方法：\n\n通过使用切片来覆盖文本，以将文本导出为图像\n\t或\n使用标准字体，例如：\n\tArial、Times New Roman、Courier New、Georgia、\n\tVerdana、Geneva 或 Trebuchet MS\n\n是否仍要继续？";
+			localString.and = "与";
+			break;
+
+		case "zh_TW":	
+			localString.overlap = "物件" + value + "邊界重疊，請切換到絕對定位模式";
+			localString.filename = "Fireworks 無法重新命名之前匯出的檔案。作為一種因應措施，請尋找匯出的檔案，並將它從" + value.substr(value.lastIndexOf("/") + 1) + "重新命名為" + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "警告: " + value +"不是標準 HTML 字體，該字體可能會在其他電腦或裝置上顯示不同。\n\n建議使用以下任一方法:\n\n透過分割覆蓋文字，以將文字匯出為影像\n\t或\n使用標準字體，例如:\n\tArial、Times New Roman、Courier New、Georgia、\n\tVerdana、Geneva 或 Trebuchet MS\n\n是否仍要繼續?";
+			localString.and = "與";
+			break;
+
+		case "es_ES":   
+		case "es_MX":  
+			localString.overlap = "Los límites de los objetos " + value + " se solapan, cambiando al modo de posicionamiento absoluto";
+			localString.filename = "Fireworks no ha podido cambiar el nombre del archivo que ha exportado anteriormente. De forma provisional, busque el archivo exportado y cámbiele el nombre de " + value.substr(value.lastIndexOf("/") + 1) + " a " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Aviso: " + value +" no es una fuente HTML estándar y puede aparecer de forma diferente en otros ordenadores y dispositivos.\n\nSe recomienda:\n\nExportar el texto como una imagen y cubriéndolo con una división\n\tO\nUtilizar una fuente estándar como:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva o Trebuchet MS\n\n¿Desea continuar de todas formas?";
+			localString.and = "y";
+			break;
+
+		case "sv_SE": 
+			localString.overlap = "Gränserna för objekt " + value + " överlappar varandra, växlar till absolut placeringsläge";
+			localString.filename = "Det gick inte att ändra namn på den fil du har exporterat. Du kan komma runt det här problemet genom att leta rätt på den exporterade filen och ändra namn på den från " + value.substr(value.lastIndexOf("/") + 1) + " till " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");
+			localString.fontWarning = "Varning: " + value +" är ett icke-standard-HTML-teckensnitt, vilket eventuellt kan visas på olika sätt på olika datorer och enheter.\n\nDu bör antingen:\n\nexportera texten som en bild genom att täcka den med ett segment\n\teller\nanvända ett standardteckensnitt, t.ex. något av följande:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva, Trebuchet MS\n\nVill du fortsätta ändå?";
+			localString.and = "och";
+			break;
+
+		case "tr_TR": 
+			localString.overlap = "Nesnelerin " + value + " sınırları üst üste binmiş, mutlak konumlandırma moduna geçiliyor";
+			localString.filename = "Fireworks daha önce dışa aktardığınız dosyayı yeniden adlandıramıyor. Geçici bir çözüm olarak, dışa aktarılan dosyayı konumlandırın ve adını " + value.substr(value.lastIndexOf("/") + 1) + " değerinden " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html") + " değerine değiştirin";
+			localString.fontWarning = "Uyarı: " + value +" başka bilgisayar veya aygıtlarda farklı gözükebilen standart dışı bir HTML fontudur.\n\nŞunlar önerilir: Metni dilimle kaplayan bir görüntü olarak dışa aktarın \n\tYA DA\nŞu standart fontları kullanın:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva veya Trebuchet MS\n\nYine de devam etmek istiyor musunuz?";
+			localString.and = "ve";
+			break;
+
+		case "uk_UA":       
+			localString.overlap = "Objects " + value + " boundaries overlap, switching to absolute positioning mode";
+			localString.filename = "Fireworks could not rename the file that you had exported earlier. As a workaround, locate the exported file and rename it from " + value.substr(value.lastIndexOf("/") + 1) + " to " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Warning: " + value +" is a non-standard HTML font, which may appear differently on other computers or devices.\n\nIt is recommened to either:\n\nExport the text as an image by covering it with a slice\n\tOR\nUse a standard font such as:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva or Trebuchet MS\n\nContinue Anyway?";
+			localString.and = "and";
+			break;
+
+		default: 
+			localString.overlap = "Objects " + value + " boundaries overlap, switching to absolute positioning mode";
+			localString.filename = "Fireworks could not rename the file that you had exported earlier. As a workaround, locate the exported file and rename it from " + value.substr(value.lastIndexOf("/") + 1) + " to " + value.substr(value.lastIndexOf("/") + 1).replace(/.\w+$/,".html");	
+			localString.fontWarning = "Warning: " + value +" is a non-standard HTML font, which may appear differently on other computers or devices.\n\nIt is recommened to either:\n\nExport the text as an image by covering it with a slice\n\tOR\nUse a standard font such as:\n\tArial, Times New Roman, Courier New, Georgia,\n\tVerdana, Geneva or Trebuchet MS\n\nContinue Anyway?";
+			localString.and = "and";
+			break;
+	}
+	return localString[variable];
+}
+
+
+
+function CONVERT_COLOUR(colour) {
+	colour = colour.toLowerCase();
+	colour = colour.replace("#","");
+	if ((colour.charAt(0) == colour.charAt(1)) && (colour.charAt(2) == colour.charAt(3)) && (colour.charAt(4) == colour.charAt(5))) {
+		var colourTemp = colour.charAt(0);
+		colourTemp += colour.charAt(2);
+		colourTemp += colour.charAt(4);
+		colour = colourTemp;
+	}
+	colour = "#" + colour;
+	return colour;
+}
+
+
+// When doComments is set to "true" the WRITE_HTML_COMMENT function
+// includes HTML comments in the exported file.
+function WRITE_HTML_COMMENT(str) {
+	if (doComments) WRITE_HTML("<!--"+str+"-->\n");
+}
+ 
+function WRITE_HTML_CONTENT() {
+	var n = arguments.length;
+	for (var i=0; i<n; i++) {
+		content_str += arguments[i];
+	}
+}
+
+// fwonlyblock
+function JS_DATA()
+{
+	if(mode == "data")
+	{
+		// write data for external processing
+		var n = arguments.length;
+		for (var i=0; i<n; i++) {
+			content_str += arguments[i];
+		}
+	}else{
+		// evaluate for internal processing
+		var n = arguments.length;
+		for (var i=0; i<n; i++) {
+			var arg = arguments[i].replace(/\n/g,"");
+			arg = arg.replace(/\"/g,"\\\"");
+			if(arg.length > 1)
+			{
+				if(mode == "showeval")
+				{
+					var str = "eval(\""+arg+"\");\n";
+					content_str += str;
+				}else{
+				//	eval(arg);
+				}
+				
+			}
+		}
+	}
+}
+function WRITE_HTML_STYLE(str) {
+	style_str += str;
+}
+function WRITE_HTML_CONTENT_COMMENT(str) {
+	if (doComments){
+		content_str += "<!--"+str+"-->\n";
+	}
+}
+
+// Function LayerName determines the name of the current layer.
+function LayerName(str) {
+	var newName = str.toString().replace(/_/g, "");
+	newName = newName.replace(/ /g, "");
+	if (newName == "") newName = "EmptyName";
+	if (!newName) newName = "EmptyName";
+	if (newName.search(/\d/) == 0) {
+		newName = "L"+newName;
+	}
+	return(newName);
+}
+
+// Function CellName determines the name for the image in a particular table cell.
+// Cellname is based off of the slice name if one was specified. Otherwise the
+// Base file name from the export dialog is used.
+function CellName(str, row, col) {
+	var cellName = str.toString();
+	// remove illegal characters
+	cellName = cellName.replace(/\W/g, "");
+	// if it starts with a number, add N to the front.
+	if (cellName == "") {
+		cellName = "N" + exportDoc.imagename + "_" + (row+1) + "_" + (col+1);
+		// remove illegal characters
+		cellName = cellName.replace(/\W/g, "");
+	}
+	if (cellName.search(/\d/) == 0) {
+		cellName = "N"+cellName;
+	}
+	return(cellName);
+}
+
+// find the centre point of a rectangle
+function centrePoint(left,top,width,height)
+{
+	var o = new Object();
+	o.x=left+(width/2);
+	o.y=top+(height/2);
+	return o;
+}
+
+// find a rectangle that specifed point is within
+function findRectangleForPoint(x, y)
+{	
+	try {
+		// search all layers
+		var obb = fw.getDocumentDOM().layers;
+		for(var i in obb)
+		{
+			var o = obb[i].elems;
+			if(o != undefined)
+			{
+				for(var j in o)
+				{
+				
+					if(String(o[j]).indexOf('RectanglePrimitive') != -1)
+					{						
+						if(x < o[j].left) continue;
+						if(y < o[j].top) continue;
+						if(x > (o[j].left+o[j].width)) continue;
+						if(y > (o[j].top+o[j].height)) continue;
+	
+						return o[j];
+					}
+				}
+			}  
+		}
+	}catch(err)
+	{
+		error("findRectangleForPoint() "+err.description);			
+	}
+	return null;
+}
+
+// traverses the document tree
+function WalkDocElementTree(obb, indent, list)
+{
+	try {
+		var currentlist=list;
+		var c=0;
+		
+		for (var word in obb)
+		{
+			// examine node
+			var regex=/(object) ([a-zA-Z0-9_]+)/;
+			var str=String(obb[word]);
+			var matches=str.match(regex);
+			if(("[object Text]"==str) && (undefined == (obb[word].textRuns.textRuns)))
+			{	
+				continue;
+			}
+			if(matches.length >= 3)
+			{
+				if(matches[1] == "object")
+				{						
+					if(matches[2] == "FrameNLayerIntersection")
+					{
+						try {
+							if(indent==0)
+							{
+								currentlist = getListName(obb[word].name);					
+							}
+						
+							// traverse sub-objects
+							WalkDocElementTree(obb[c].elemsandsublayers, indent+1, currentlist);
+						}catch(e)
+						{
+							alert("layer exception "+e.message);
+						}
+					}
+					else if(matches[2] == "Layer" && obb[word].frames[fw.getDocumentDOM().currentFrameNum].visible == true)
+					{						
+						try
+						{
+							if(indent==0)
+							{
+								currentlist = getListName(obb[word].name);					
+							}
+
+							// traverse sub-objects
+							WalkDocElementTree(obb[c].elems, indent+1, currentlist);
+						}catch(e)
+						{
+							alert("layer exception "+e.message);
+						}
+					}else if(matches[2] == "Group")
+					{
+						try {
+							if(indent==0)
+							{
+								currentlist = getListName(obb[word].name);
+							}
+
+							// traverse sub-objects
+							WalkDocElementTree(obb[c].elements, indent+1, currentlist);
+						}catch(e)
+						{
+							alert("group exception "+e.message);
+						}
+					}else if(matches[2] == "CompoundShape")
+					{
+						try {
+							var res = new Array();
+							if(indent==0)
+							{
+								currentlist = getListName(obb[word].name);					
+							}
+							res.push(obb[c].resultantPath); 
+							WalkDocElementTree(res, indent+1, currentlist);
+							//writeObjectValues(obb[c].resultantPath, indent);
+
+						}catch(e)
+						{
+							alert("compound shape exception "+e.message);
+						}
+					}else{
+					
+						
+						if(currentlist != "slicelist")
+						{						
+							if(matches[2] == "Text")
+							{
+								if(mode == "data")
+									JS_DATA("obj = new Object();\t\t// "+obb[word]+" "+obb[word].textChars.substring(0,24)+"\n");
+								else
+									obj = new Object();
+							}else{
+								if(mode == "data")
+									JS_DATA("obj = new Object();\t\t// "+obb[word]+" "+obb[word].name+"\n");
+								else
+									obj = new Object();
+							}
+							
+							
+							if(mode == "data")
+								JS_DATA("obj['oType'] = \""+matches[2]+"\";\n");
+							else
+								obj['oType'] = matches[2];
+							
+							if(matches[2] == "Text")
+							{
+								try {
+									writeObjectValuesForText(obb[word], indent, obb[word].name);
+								}catch(e)
+								{
+									alert("text exception "+e.message);
+								}	
+							}else if(matches[2] == "Instance")
+							{
+								
+								try {
+									
+									// plusversion
+									var fobj = obb[word].customData.currentValues;
+								
+									switch(obb[word].customData.type)
+									{
+									
+										case "GroupBox":
+											// no attributes
+											writedata("isForm",true);
+											writedata("fType","'GroupBox'");
+										break;
+										case "Form_SmartCSS":
+										
+											writedata("isForm",true);
+											writedata("fType","'Form'");
+											scanWrite(fobj, "action");
+											scanWriteOption(fobj, "method");
+											scanWrite(fobj, "onsubmit");
+											scanWrite(fobj, "onreset");
+											hasFormElements = true;
+										
+										break;
+									
+										case "Button":
+										case "CheckBox":
+										case "ComboBox":
+										case "TextArea":
+										case "TextField":
+										case "RadioButton":
+											hasFormElements = true;
+											writedata("fType",obb[word].customData.type);									
+											writedata("isForm",true);
+											GrabFwDictValues(fobj);								
+										break;
+									
+										default:
+											switch(obb[word].customData.type)
+											{
+												case "link":
+												case "h1":
+												case "h2":
+												case "h3":
+												case "h4":
+												case "h5":
+												case "h6":
+												case "div":
+												case "paragraph":
+												case "li":
+													writedata("fType",obb[word].customData.type);	
+													writedata("isForm",false);	
+													writedata("isCommonLibrary",true);	
+																			
+													GrabFwDictValues(fobj);								
+												break;										
+											
+											}
+										break;
+																
+									}
+								}catch(e)
+								{
+									alert("instance exception "+e.message);
+								}
+								writeObjectValues(obb[word], indent);
+								
+								// -plusversion
+								
+							}else
+							{
+								writeObjectValues(obb[word], indent);
+							}
+							// get color info etc
+							if(obb[word].pathAttributes)
+							{
+								
+								writeObjectValues(obb[word].pathAttributes, indent);
+							
+								var pa = obb[word].pathAttributes;
+								if(pa.fill)
+								{
+									// have a fill color
+									
+								}
+								if(pa.brush)
+								{
+									// we have an outline
+									var col = pa.brushColor;
+									var thick = pa.brush.diameter;
+									var category=pa.brush.category;
+									var brushname = pa.brush.name;
+									var brushplacement = pa.brushPlacement;
+									if(mode == "data")
+									{
+										JS_DATA(" obj['brushDiameter'] = \""+thick+"\";\n");
+										JS_DATA(" obj['brushCategory'] = \""+category+"\";\n");
+										JS_DATA(" obj['brushName'] = \""+brushname+"\";\n");
+										JS_DATA(" obj['brushPlacement'] = \""+brushplacement+"\";\n");
+									}else{
+										obj['brushDiameter'] = thick;
+										obj['brushCategory'] = category;
+										obj['brushName'] = brushname;
+										obj['brushPlacement'] = brushplacement;
+									}
+									if(category == "bc_Dashed")
+									{
+										if(mode == "data")
+										{
+											JS_DATA(" obj['numDashes'] = \""+pa.brush['numDashes']+"\";\n");
+											JS_DATA(" obj['dashOnSize1'] = \""+pa.brush['dashOnSize1']+"\";\n");
+											JS_DATA(" obj['dashOffSize1'] = \""+pa.brush['dashOffSize1']+"\";\n");
+											JS_DATA(" obj['dashOnSize2'] = \""+pa.brush['dashOnSize2']+"\";\n");
+											JS_DATA(" obj['dashOffSize2'] = \""+pa.brush['dashOffSize2']+"\";\n");
+											JS_DATA(" obj['dashOnSize3'] = \""+pa.brush['dashOnSize3']+"\";\n");
+											JS_DATA(" obj['dashOffSize3'] = \""+pa.brush['dashOffSize3']+"\";\n");
+										}else{
+											obj['numDashes'] = pa.brush['numDashes'];
+											obj['dashOnSize1'] = pa.brush['dashOnSize1'];
+											obj['dashOffSize1'] = pa.brush['dashOffSize1'];
+											obj['dashOnSize2'] = pa.brush['dashOnSize2'];
+											obj['dashOffSize2'] = pa.brush['dashOffSize2'];
+										    obj['dashOnSize3'] = pa.brush['dashOnSize3'];
+									        obj['dashOffSize3'] = pa.brush['dashOffSize3'];
+										}
+									}
+								}
+							}
+							if(mode == "data")
+								JS_DATA(currentlist+".push(obj);\n\n");
+							else
+								this[currentlist].push(obj);
+						}
+					}
+				}
+			}
+			
+			c++;
+		}
+	}catch(err)
+	{
+		error("WalkDocElementTree() "+err.description);			
+	}
+}
+
+function writedata(key, value)
+{
+	if(mode == "data")
+	{
+		JS_DATA(" obj['"+key+"'] = "+value+";\n");
+	}else{
+		if(key == "State")
+		{
+			var tempArr = value.split(",");
+			obj[key] = tempArr[0];
+		}
+		else	obj[key]=value;
+	}
+}
+
+// plusversion
+function scanFwDictForValue(dict, key)
+{
+	var len = dict.length;
+	
+	var name = "";
+	var value = "";
+	
+	for(x=0; x< len; x++)
+	{
+		var o = dict[x];
+		
+		for(var i in o)
+		{			
+			var v=o[i];
+			
+			if(i=="name")
+				name=v;
+			if(i=="value")
+				value=v;
+			
+			if(name == key && value != "")
+				return value;
+			
+			if(name != "" && value != "")
+			{
+				name = "";
+				value = "";
+			}				
+		}
+	}	
+	return "";
+}
+
+function GrabFwDictValues(dict)
+{
+	var len = dict.length;
+	
+	var name = "";
+	var value = "";
+	var type = "";
+	
+	for(x=0; x< len; x++)
+	{
+		var o = dict[x];
+		
+		for(var i in o)
+		{			
+			var v=o[i];
+			
+			if(i=="name")
+				name=v;
+			if(i=="value")
+				value=v;
+			if(i=="type")
+				type=v;
+			if(name != "" && value != "" && type != "")
+			{
+				if(type == "Boolean")
+					writedata(name,value);
+				else
+					writedata(name,value);
+				
+				name = value = type = "";
+			}	
+		}
+	}	
+	
+}
+// search dict for value then write out
+function scanWrite(fobj, name)
+{
+	var val = scanFwDictForValue(fobj, name);
+	writedata(name,val);
+}	
+// search dict for value,pick the selected item, then write out
+function scanWriteOption(fobj, name)
+{
+	var val = scanFwDictForValue(fobj, name);
+	var comma=val.indexOf(",");
+	val=val.substring(0,comma)+'"';
+	writedata(name,val);
+}	
+
+
+// -plusversion
+function parseSlices()
+{
+	try 
+	{
+		// process the slices
+		var cRow;
+		var cCol;
+		for (cRow = 0; cRow < slices.numRows; cRow++) {
+			for (cCol = 0; cCol < slices.numColumns; cCol++) {
+	
+				curSlice = slices[cRow][cCol];			// produces a SliceInfo object
+
+				if (!curSlice) continue;
+				if (!curSlice.hasImage || curSlice.skipCell || curSlice.isUndefined) continue;
+
+    
+				var imageName = curSlice.getFrameFileName(0);
+				imageName = unescape(imageName);
+				
+				try{
+			
+				if (curSlice.hasImage) {
+				
+					if(mode == "data")
+					{
+						JS_DATA("  obj = new Object();\t\t// "+curSlice+" "+curSlice.name+"\n");
+						JS_DATA("  obj['baseName'] = \""+imageName+"\";\n");
+						JS_DATA("  obj['oType'] = \"SliceInfo\";\n");
+					}else{
+						obj = new Object();
+						obj['baseName'] = imageName;
+						obj['oType'] = "SliceInfo";
+					}
+					writeObjectValues(curSlice, 2);
+				
+					var str = imageName.toLowerCase();
+					if(str.indexOf("csslink") != -1) 
+					{
+						if(mode == "data")
+							JS_DATA("csslinklist.push(obj);\n\n");
+						else
+							csslinklist.push(obj);
+						
+					}else if(str.toLowerCase().indexOf("csspattern") != -1)
+					{
+						if(mode == "data")
+							JS_DATA("csspatternlist.push(obj);\n\n");
+						else
+							csspatternlist.push(obj);
+					
+					}else if(curSlice.isBackground != undefined)
+					{
+						// new CS4 slice type
+						if(curSlice.isBackground && curSlice.backgroundRepeat != 'no-repeat')
+						{
+							// tis pattern
+							if(mode == "data")
+								JS_DATA("csspatternlist.push(obj);\n\n");
+							else
+								csspatternlist.push(obj);
+						}else{
+							// tis normal slice
+							if(mode == "data")
+								JS_DATA("slicelist.push(obj);\n\n");
+							else	
+								slicelist.push(obj);						
+						}
+					}else{
+						if(mode == "data")
+							JS_DATA("slicelist.push(obj);\n\n");
+						else	
+							slicelist.push(obj);
+						
+					}
+				
+			
+				}
+				
+				}catch(e)
+				{
+					alert("individual slice exception "+"["+cRow+","+cCol+"]");
+				}
+			}
+		}
+	}catch(e)
+	{
+		alert("slices exception "+e.message);
+	}
+}
+
+function writeObjectValues(o, indent)
+{
+	var i;
+	if(!o)
+	{
+		alert("writeObjectValues, object is undefined");
+	}
+	try {
+		for (i in o)
+		{
+			try 
+			{
+				// ignore smart shape code
+				if(i == "smartShapeCode")
+					continue;
+				// ignore detailed info
+				if(i == "javascriptString")
+					continue;
+				// ignore elems, will pick them up elsewhere
+				if(i == "elems")
+					continue;
+				// ignore pathOperation - We are not going to compute the resultant path
+				if(i == "pathOperation")
+					continue;	
+					
+				if(typeof(o[i]) == "string" || String(o[i]).indexOf("[object") != -1)
+				{
+					if(mode == "data")
+						JS_DATA("obj['"+i+"'] = \""+o[i]+"\";\n");
+					else
+						obj[i] = o[i];
+				}else{
+					if(mode == "data")
+						JS_DATA("obj['"+i+"'] = "+o[i]+";\n");
+					else
+						obj[i] = o[i];
+				}
+			}catch(e)
+			{
+				alert("inner writeObjectValues exception "+i);
+			}
+		}
+
+		if(mode == "data")
+			JS_DATA("obj['originalZindex'] = "+originalZindex+";\n");
+		else
+			obj['originalZindex'] = originalZindex;
+		
+		originalZindex++;
+	}catch(e)
+	{
+		alert("writeObjectValues exception "+i);
+	}
+}
+//writeObjectValuesForText - digs a little deeper to get text attributes
+function writeObjectValuesForText(o, indent, oname)
+{
+	try {
+		// use inital attributes from text-runs
+		if(mode == "data")
+		{
+			JS_DATA("obj['bold'] = "+o.textRuns.initialAttrs.bold+";\n");
+			JS_DATA("obj['italic'] = "+o.textRuns.initialAttrs.italic+";\n");
+			JS_DATA("obj['underline'] = "+o.textRuns.initialAttrs.underline+";\n");
+			JS_DATA("obj['leading'] = "+o.textRuns.initialAttrs.leading+";\n");
+			JS_DATA("obj['leadingMode'] = \""+o.textRuns.initialAttrs.leadingMode+"\";\n");
+			JS_DATA("obj['rangeKerning'] = "+o.textRuns.initialAttrs.rangeKerning+";\n");
+			JS_DATA("obj['paragraphSpacingBefore'] = "+o.textRuns.initialAttrs.paragraphSpacingBefore+";\n");
+			JS_DATA("obj['paragraphSpacingAfter'] = "+o.textRuns.initialAttrs.paragraphSpacingAfter+";\n");
+			JS_DATA("obj['autoExpand'] = "+o.autoExpand+";\n");
+		}else{
+			obj['bold'] = o.textRuns.initialAttrs.bold;
+			obj['italic'] = o.textRuns.initialAttrs.italic;
+			obj['underline'] = o.textRuns.initialAttrs.underline;
+			obj['leading'] = o.textRuns.initialAttrs.leading;
+			obj['leadingMode'] = o.textRuns.initialAttrs.leadingMode;
+			obj['rangeKerning'] = o.textRuns.initialAttrs.rangeKerning;
+			obj['paragraphSpacingBefore'] = o.textRuns.initialAttrs.paragraphSpacingBefore;
+			obj['paragraphSpacingAfter'] = o.textRuns.initialAttrs.paragraphSpacingAfter;
+			obj['autoExpand'] = o.autoExpand;
+		}
+	}catch(e)
+	{
+		alert("Text attribute exception");		
+	}
+	
+	for (var i in o)
+	{
+		// ignore smart shape code
+		if(i == "smartShapeCode")
+			continue;
+		// ignore detailed info
+		if(i == "javascriptString")
+			continue;
+		// ignore elems, will pick them up elsewhere
+		if(i == "elems")
+			continue;	
+		// ignore pathOperation - We are not going to compute the resultant path
+		if(i == "pathOperation")
+			continue;
+		var value = o[i];
+		
+		
+		// 
+		if(i == "textChars")
+		{		
+			// write original text, before modification
+			if(mode == "data")
+				JS_DATA("obj['textCharsOrig'] = \""+value+"\";\n");
+			else
+				obj['textCharsOrig'] = value;
+			
+				
+			value = value.replace(/\u00A3/g,"&pound;");
+			value = value.replace(/\u0024/g,"&#36;");
+			value = value.replace(/\u20AC/g,"&euro;");
+			value = value.replace(/\u00A2/g,"&cent;");
+			value = value.replace(/\u00A5/g,"&yen;");
+			value = value.replace(/\u00A9/g,"&copy;");
+			value = value.replace(/\u00AE/g,"&reg;");
+			value = value.replace(/\u2122/g,"&trade;");
+			value = value.replace(/\u00B7/g,"&middot;");
+			value = value.replace(/\u2022/g,"&bull;");
+			value = value.replace(/\u00BA/g,"&ordm;");
+			value = value.replace(/\u00AB/g,"&laquo;");
+			value = value.replace(/\u00BB/g,"&raquo;");
+			value = value.replace(/\u2018/g,"&lsquo;");
+			value = value.replace(/\u201C/g,"&ldquo;");
+			value = value.replace(/\u2019/g,"&rsquo;");
+			value = value.replace(/\u201D/g,"&rdquo;");
+			value = value.replace(/\u2026/g,"&hellip;");
+			value = value.replace(/\u2014/g,"&mdash;");
+			value = value.replace(/</g,"&lt;");
+			value = value.replace(/>/g,"&gt;");	
+			
+			var name = oname;
+			var tagType = "p";
+			
+			if (name != null) {
+				if (name.match(tags2)) {
+					tagType = name.match(tags2)[1];
+				}
+				else {
+					tagType = "p";
+				}
+			}
+			
+			if (tagType == "p") {
+				value = value.replace(/(\u000D\u000D)/g,"</p><p>");
+				value = value.replace(/(\u000D)/g,"<br />");
+				value = value.replace(/(\u0003)/g,"<br />");
+				var ptag = "<p>";
+				var pind = value.lastIndexOf(ptag);
+				if (pind != -1) {
+					var before = value.substring(0, pind);
+					var after = value.substring(pind+ptag.length);
+					var value = before + "<p class=\"lastNode\">" + after;
+				}
+			}
+			else {
+				value = value.replace(/(\r\n|\r|\n)/g,"<br />");
+			}
+		}
+			
+		if(typeof(value) == "string" || String(value).indexOf("[object") != -1)
+		{
+			if(mode == "data")
+				JS_DATA("obj['"+i+"'] = \""+value+"\";\n");
+			else
+				obj[i] = value;
+		}else{
+			if(	i == "bold" ||	i == "underline" ||	i == "italic")
+			{
+				// ignore node value
+			}else{
+				if(mode == "data")
+					JS_DATA("obj['"+i+"'] = "+value+";\n");
+				else
+					obj[i] = value;
+			}
+		}
+	}
+
+	if(mode == "data")
+		JS_DATA("obj['originalZindex'] = "+originalZindex+";\n");
+	else
+		obj['originalZindex'] = originalZindex;
+	
+	originalZindex++;
+}
+
+function getListName(name)
+{
+	if(name.indexOf("Web Layer") != -1)
+	{		
+		return "slicelist";
+	}else{
+		return "allDocList";
+	}
+	
+}
+
+// given a slice, find a rectangle that the center point sits within
+function searchSliceParentRectangle(obj)
+{
+	var center = centrePoint(obj.left,obj.top,obj.width,obj.height);
+	var o=findRectangleForPoint(center.x, center.y);
+	return o;
+}
+
+function preProcessDom()
+{	
+	//var obb = fw.getDocumentDOM().topLayers;
+	var myLayers = fw.getDocumentDOM().frames[fw.getDocumentDOM().currentFrameNum].layers;
+	var obb = new Array();
+	for( var x = 0 ; x < myLayers.length; x++)
+	{
+		if(fw.getDocumentDOM().getParentLayerNum(x) == -1 && myLayers[x].visible == true)
+			obb.push(myLayers[x]);
+ 	}
+	WalkDocElementTree(obb, 0, true, false,null);	
+	parseSlices();
+}
+
+try {
+	preProcessDom();
+}catch(e)
+{
+	alert("Pre process exception "+e.message);
+}
+
+// -fwonlyblock
+
+// Rectangle
+// extract font attribue from rect object and produce css code
+function cssFromRectangleObject(obj)
+{
+	var css = "";
+	
+	try {
+		var bordercolor;
+		
+		if(obj['brushColor'] != undefined)
+		{
+			bordercolor= CONVERT_COLOUR(obj['brushColor']);
+		}else if(obj['Border color'] != undefined)
+		{
+			bordercolor = CONVERT_COLOUR(obj['Border color']);
+		}
+		
+	
+		if(obj.oType == "Rectangle3Slice")
+	    {
+		
+	        var o = obj['sliceMid'];
+	        css = css + "\tbackground-image: url("+(imagePath+o.baseName+o.imageSuffix).toString().replace(/ /g,"%20") +");\n\tbackground-repeat: repeat;\n";
+	   
+	 	}else if(obj.oType.indexOf("Rectangle") != -1 )
+	    {
+	        if(obj["hasPatternFill"])
+	        {
+				if(obj["backgroundInfoObj"] != undefined)
+				{
+					// use css info from new CS4 slice type
+					var bobj = obj["backgroundInfoObj"];
+					css = css + "\tbackground-color: "+CONVERT_COLOUR(obj['fillColor'])+";\n";
+					css = css + "\tbackground-attachment: "+bobj['backgroundAttachment']+";\n";
+					css = css + "\tbackground-image: url("+obj.patternFillUrl.replace(/ /g,"%20")+");\n";
+					var bposx = bobj['backgroundHorizontalPositionVal'];
+					var bposy = bobj['backgroundVerticalPositionVal'];
+					if(bposx == -1) 
+						bposx = bobj['backgroundHorizontalPosition'];	// no numeric value, use string 'center'
+					if(bposy == -1) 
+						bposy = bobj['backgroundVerticalPosition'];  // no numeric value, use string 'center'
+																
+					css = css + "\tbackground-position: "+bposx+" "+bposy+";\n";
+					css = css + "\tbackground-repeat: "+bobj['backgroundRepeat']+";\n";
+								
+				}else{
+	            	css = css + "\tbackground-image: url("+obj.patternFillUrl.replace(/ /g,"%20") +");\n\tbackground-repeat: repeat;\n";
+				}
+	        }else{
+	            
+	            if(obj["fill"])
+	            {
+	                css = css + "\tbackground-color: "+CONVERT_COLOUR(obj['fillColor'])+";\n";
+	            }
+	        }
+			
+			var tweaksize=0;
+			var isLine=false;
+	        if(obj['brush'])
+	        {
+				if(obj.width <= 1)
+		        {
+		            // vertical line
+		            css = css + "\tborder-left: "+obj['brushDiameter']+"px "+lineStyle(obj)+" "+bordercolor+";\n";
+					css = css + "\theight: "+obj['height']+"px;\n";
+					isLine=true;
+	
+		        }else if(obj.height <= 1)
+		        {
+		            // horizontal line
+		            css = css + "\tborder-bottom: "+obj['brushDiameter']+"px "+lineStyle(obj)+" "+bordercolor+";\n";
+					isLine=true;
+		        }else{
+					// rect
+	            	css = css + "\tborder: "+obj['brushDiameter']+"px "+lineStyle(obj)+" "+bordercolor+";\n";
+				}
+				// Div dimensions need to be tweaked for rectangle
+				if (isLine == true) {
+					tweaksize = 0;
+				}
+				else {
+					if (obj['brushDiameter'] == 1) {
+						if (obj['brushPlacement'] == "outside") {
+							tweaksize = 0;
+						}
+						else {
+							tweaksize = obj['brushDiameter']*2;
+						}
+					}
+					else {
+						if (obj['brushPlacement'] == "center") {
+							tweaksize = obj['brushDiameter'];
+							if (obj['brushDiameter']%2 != 0) {
+								tweaksize--;
+							}
+						}
+						else if (obj['brushPlacement'] == "inside") {
+							tweaksize = obj['brushDiameter']*2;
+						}
+					}
+				}			
+	        }
+	
+			css += "\twidth: "+Math.max((obj.width-tweaksize),1); 
+		    css += "px;\n"; // literal or number (% or px)
+		
+			if(!isLine)
+			{
+				var tweakBottomPad=0;
+				if(!obj["hasPatternFill"])
+					tweakBottomPad=1;
+					
+					
+				if(obj['paddingTop'] != undefined)
+					css += "\tpadding-top: "+obj['paddingTop']+"px;\n";
+				if(obj['paddingBottom'] != undefined)
+				{
+					css += "\theight: "+(obj.height-tweakBottomPad); 
+		    			css += "px;\n"; // literal or number (% or px)
+					//css += "\tpadding-bottom: "+(obj['paddingBottom']+tweakBottomPad)+"px;\n";
+				}
+					
+		   	}else{
+				////css += "\t_font-size: 0px;\n"; removed for w3c validation
+			
+			}
+	    } 
+	
+		
+		// use css trick to ensure min height across browsers
+		
+		if ((obj.oType != "Rectangle3Slice")) {
+			var heightCss = null;
+			if ((obj['height'] != undefined) && (obj['height'] > 6)) {
+				heightCss = "\theight: auto;\n"
+				heightCss += "\tmin-height: "+Math.max((obj.height-tweaksize),1)+"px;\n";
+			}
+			else if (obj['height'] <= 6) {
+				css += "\theight: "+Math.max((obj.height-tweaksize),1)+"px;\n";
+				css += "\toverflow: hidden;\n";
+			}
+		}
+		
+		
+		
+    }catch(err)
+	{
+		error("cssFromRectangleObject() "+err.description);			
+	}
+    return [css, heightCss];
+}
+function lineStyle(obj)
+{
+	if(obj['Border style'] != undefined)
+	{
+		// cs4 div symbol
+		return firstOpt(obj['Border style']);	
+	}
+	
+    if(obj['brushCategory'] == "bc_Dashed")
+    {
+        switch(obj['brushName'])
+        {
+            case 'bn_Dotted':
+                return 'dotted';
+            break;
+            default:
+                return 'dashed';
+            break;
+        }
+        
+    }else{
+        return 'solid';
+    }
+}
+
+// Text
+// extract font attribue from text object and produce css code
+function cssFromTextObject(obj)
+{
+    var css="";
+
+    try {
+	
+	    var font = fw.getPlatformNameForPSFont(obj["font"]); 
+	    var fontsize = obj["fontsize"]*10;
+	    var alignment = obj['alignment'];
+	    var bold = obj['bold'];
+	    var underline = obj['underline'];
+	    var italic = obj['italic'];
+	    
+	    css  = css + "\tfont-family: "+mapFontFamily(font).replace(/ - /g, ", ")+";\n\tfont-size: "+fontsize+"%;\n";
+	
+		if(abort)
+			return;
+	
+	    if(italic || (fw.getStyleNameForPSFont(obj["font"]).search(/Italic/i)!= -1))
+	        css = css + "\tfont-style: italic;\n";
+	    if(bold || (fw.getStyleNameForPSFont(obj["font"]).search(/Bold/i)!= -1))
+	        css = css + "\tfont-weight: bold;\n";
+		css = css + "\ttext-align: "+alignment+";\n";
+		if(underline)
+		{
+	        css = css + "\ttext-decoration: underline;\n"; 
+	    }else if(obj.hasLink && obj.urlText)
+	    {
+			css = css + "\ttext-decoration: none;\n"; 
+		}
+	    
+	    if(obj['fillColor'])
+	        css = css + "\tcolor: "+CONVERT_COLOUR(obj['fillColor'])+";\n";
+	        
+	    // line height
+	    if(obj["leadingMode"] == "percentage")
+	    {
+	        var leading = obj["leading"] * 100;
+	        css = css + "\tline-height: "+(Math.round(leading*100)/100)+"%;\n";
+	        
+	    }else if(obj["leadingMode"] == "exact")
+	    {
+	        var leading = obj["leading"];
+	        css = css + "\tline-height: "+leading+"px;\n";
+	    }
+	    // apply padding to match how FW looks
+		css = css + "\tpadding-bottom: 2px;\n";
+		css = css + "\tpadding-top: 1px;\n";
+    }catch(err)
+	{
+		error("cssFromTextObject() "+err.description);			
+	}
+    return css;
+}
+
+
+
+
+
+var shownFontWarning=false;
+
+// map fonts to popular font famillies
+function mapFontFamily(font)
+{
+	var f=font.toLowerCase();
+	
+	if(!checkInFontList(f) && !shownFontWarning)
+	{
+		
+		var ans = confirm(getString("fontWarning",font));		
+
+		if(!ans)
+		{
+			abort=true;
+			return;
+		}
+					
+		shownFontWarning = true;
+	}
+	
+    switch(f)
+    {
+		case "arial":
+		case "helvetica":
+		case "sans-serif":
+	        return "Arial, Helvetica, sans-serif";
+		case "times new roman":
+		case "times":
+		case "serif":
+			 return "Times New Roman, Times, serif";
+		case "georgia":
+			return "Georgia, Times New Roman, Times, serif";
+		case "verdana":
+			return "Verdana, Arial, Helvetica, sans-serif";		
+        case "geneva":
+            return "Geneva, Arial, Helvetica, sans-serif";
+        case "trebuchet ms":
+            return "'Trebuchet MS', Arial, Helvetica, sans-serif";
+     		
+        default:
+            return "'"+font+"', Arial, Helvetica, sans-serif";
+    }
+}
+
+var hasSlices=false;
+var hasPatterns=false;
+var hasLinks=false;
+
+var opencsstxt="<style type=\"text/css\" media=\"all\">\n<!--\n";
+var cssbuf="";
+var htmlbuf="";
+var closecsstxt="-->\n</style>\n";
+
+// some css defaults
+
+if(exportDoc.backgroundURL != undefined)
+{
+	// CS4 options
+	if(exportDoc.backgroundURL.length > 0)
+	{			
+		var backGroundImagePath = exportDoc.backgroundURL;
+		if(fw.platform == "win")
+		{
+			backGroundImagePath = backGroundImagePath.replace("file:///","");
+			backGroundImagePath = backGroundImagePath.replace("|/",":/");
+		}
+		else	backGroundImagePath = backGroundImagePath.replace("file://","");		
+		
+		var relativePath = imagePath + backGroundImagePath.substr(backGroundImagePath.lastIndexOf("/") + 1);
+		
+		var replacePath = exportDoc.htmlOutputPath.substring(0,exportDoc.htmlOutputPath.lastIndexOf("/"));
+		
+		if(fw.platform == "win")
+		{
+			replacePath = replacePath.replace("file:///","");
+			replacePath = replacePath.replace("|/",":/");
+		}
+		else	replacePath = replacePath.replace("file://","");		
+			
+		replacePath += "/" + relativePath;				
+		
+		//alert(backGroundImagePath + "\n" + replacePath + "\n" + relativePath);		
+		
+		try{
+			if(backGroundImagePath != replacePath)
+			{
+				var f = new File(backGroundImagePath);
+				f.copy(replacePath);			
+			}
+		}
+		catch(e)	{alert(e);}
+		
+		cssbuf += charset;
+		
+		cssbuf += "body {\n\tbackground-color: "+backgroundColor+";";
+		if(exportDoc.backgroundAttachment && exportDoc.backgroundAttachment.length > 0)
+			cssbuf += "\n\tbackground-attachment: "+exportDoc.backgroundAttachment+";";
+		cssbuf += "\n\tbackground-image: url("+relativePath.replace(/ /g,"%20")+");";		
+		if(exportDoc.backgroundRepeat && exportDoc.backgroundRepeat.length > 0) 
+			cssbuf += "\n\tbackground-repeat: "+exportDoc.backgroundRepeat+";";	
+		cssbuf += "\n\tfont-size: 62.5%;\n\tmargin: 0;\n\tpadding: 0;";
+		cssbuf += "\n}\n";
+	}else{
+		cssbuf += charset;
+		cssbuf += "body {\n\tbackground-color: "+backgroundColor+";\n\tfont-size: 62.5%;\n\tmargin: 0;\n\tpadding: 0;\n}\n";
+	}
+	
+}else{
+	cssbuf += charset;
+	cssbuf += "body {\n\tbackground-color: "+backgroundColor+";\n\tfont-size: 62.5%;\n\tmargin: 0;\n\tpadding: 0;\n}\n";
+}
+
+cssbuf += "body * {\n\tfont-size: 100%;\n}\n";
+cssbuf += "h1, h2, h3, h4, h5, h6 {\n\tfont-weight: normal;\n}\n";
+cssbuf += "p {\n\tmargin-bottom: "+pMargin+"em;\n\tmargin-top: 0;\n}\n";
+cssbuf += "#main p.lastNode {\n\tmargin-bottom: 0;\n}\n";
+cssbuf += "a:link img, a:visited img {\n\tborder: none;\n}\n";
+cssbuf += "div.clearFloat {\n\tclear: both;\n\tfont-size: 0;\n\theight: 0;\n\tline-height: 0px;\n}\n";
+cssbuf += "li.clearFloat {\n\tclear: both;\n}\n";
+cssbuf += "ul.symbolList {\n\tdisplay: inline;\n\tfloat: left;\n\tlist-style-type: none;\n\tmargin: 0;\n\tpadding: 0;\n}\n";
+cssbuf += ".AbsWrap {\n\tposition: relative;\n\twidth: 100%;\n}\n";
+cssbuf += ".rowWrap {\n\twidth: 100%;\n}\n";
+
+//function isDefined(variable)
+//{
+//	return eval('(typeof('+variable+') != "undefined");');
+//}
+
+function docwrite(str)
+{
+//	if(isDefined('WRITE_HTML'))
+//	{
+		WRITE_HTML(str);
+//	}else{
+//		document.write(str);
+//	}
+}
+
+function docwriteln(str)
+{
+//	if(isDefined('WRITE_HTML'))
+//	{
+		WRITE_HTML(str+"<br />");
+//	}else{
+//     	document.write(str+"<br />");
+//	}
+}
+
+
+// Element Detection
+function detectListContents()
+{
+    if(slicelist.length > 0) hasSlices = true;
+    if(csslinklist.length > 0) hasLinks = true;
+    if(csspatternlist.length > 0) hasPatterns = true;
+        
+}
+
+// allow image slices to absorb elements
+function sliceAbsorb()
+{
+    if(hasSlices)
+    {
+        for(var i in slicelist)
+        {
+            // absorb form global list
+            absorbElementsInList(allDocList,slicelist[i]);
+        }
+    }
+}
+// match a document object to one of the page area lists
+function findAreaListForObject(obj)
+{
+    var p = centrePoint(obj);
+    var x = p.x;
+    var y = p.y;
+        
+    if(hasTop) {
+        if( isPointInBounds(x, y, mbrTop) ) return toplist; }
+    if(hasLeft) {
+        if( isPointInBounds(x, y, mbrLeft) ) return leftlist; }
+    if(hasMid) {
+        if( isPointInBounds(x, y, mbrMid) ) return midlist; }
+    if(hasRight) {
+        if( isPointInBounds(x, y, mbrRight) ) return rightlist; }
+    if(hasBottom) {
+        if( isPointInBounds(x, y, mbrBottom) ) return bottomlist; }
+    
+    // no match found
+    return null;
+    
+}
+// determine if a point is within a bounding rect
+function isPointInBounds(x, y, mbr)
+{
+    if( (x >= mbr.x1) && (x <= mbr.x2) && (y >= mbr.y1) && (y <= mbr.y2) )
+        return true;
+   
+    return false;
+}
+// is a point inside a document elements rect
+function isPointInObjectRect(x, y, obj)
+{
+    if( (x >= obj.left) && 
+            (x <= (obj.left+obj.width)) && 
+            (y >= obj.top) && 
+            (y <= (obj.top+obj.height)) )
+        return true;
+   
+    return false;
+}
+// is a document element inside another document elements rect
+function isRectInObjectRect(inner, outer)
+{
+     if( (inner.left >= outer.left) && 
+            ((inner.left+inner.width) <= (outer.left+outer.width)) && 
+            (inner.top >= outer.top) && 
+            ((inner.top+inner.height) <= (outer.top+outer.height)) )
+        return true;
+   
+    return false;  
+}
+// remove elements in a list that are covered by an objects area
+function absorbElementsInList(list, obj)
+{
+    for(var i in list)
+    {
+        var target = list[i];
+		var ratio = 75.0;
+		
+		if(target.oType == "Text") // text object need less coverage
+			ratio = 25.0;
+
+        if(canConsume(obj, target, ratio, true))  // only 75% to consume
+        {
+            target['consumed']=true;
+            //docwriteln("consumed "+target.oType);
+        }      
+        
+    }
+}
+// find the centre point of a rectangle
+function centrePoint(obj)
+{
+	var o = new Object();
+	o.x=obj.left+(obj.width/2);
+	o.y=obj.top+(obj.height/2);
+	return o;
+}
+
+
+
+// decide if one object can be considered to approximately cover another object
+function canConsume(src, target, amount, centreMustHit)
+{
+	// check if text must explicity not be consumed
+	if(target.name != null)
+	{
+		if(target.name.indexOf("_csstext") != -1)
+			return false;
+	}
+    // if target centerpoint is not inside src, then its not inside/over properly
+    if(centreMustHit)
+    {
+        var p=centrePoint(target);
+        if( !isPointInObjectRect(p.x, p.y, src) )
+            return false;
+    }
+    // if totally inside
+    if(isRectInObjectRect(target, src))
+        return true;
+        
+    // get area of larger object
+    var s_area = Math.max(src.width*src.height, target.width*target.height);
+    
+    // get area of intersection
+    var x1 = Math.max(src.left,target.left);
+    var y1 = Math.max(src.top,target.top);
+    var x2 = Math.min(src.right,target.right);
+    var y2 = Math.min(src.bottom,target.bottom);
+    var w = x2-x1;
+    var h = y2-y1;
+    
+    var i_area = w*h;
+    var diff = (100.0/s_area)*i_area;
+    
+    // if covered over amount% then consume
+    if(diff >= amount)
+        return true;
+    
+    return false;
+}
+
+function detectCompatibilliy()
+{
+	for(var i in allDocList)
+	{
+		for(var j in allDocList)
+		{
+			var a = allDocList[i];
+			var b = allDocList[j];
+			
+			if(a != b)
+			{	
+				if(isBoundaryOverlap(a,b))
+				{
+					var aname = a.baseName?a.baseName:(a.name?a.name:a.oType);
+					var bname = b.baseName?b.baseName:(b.name?b.name:b.oType);
+					aname = aname == "Rectangle3Slice"?"Rounded Rectangle":aname;
+					bname = bname == "Rectangle3Slice"?"Rounded Rectangle":bname;
+					
+					overlapString = '"' + aname + '" ' + getString("and","null")  + ' "' + bname + '"';
+					
+					return false;
+				}
+			}			
+		}
+	}
+	return true;
+}
+
+// remove comsumed objects and other objects were are not interested in
+function simplify()
+{
+    simplifyList(allDocList);
+}
+
+// remove specific elements from a list
+function simplifyList(list)
+{
+    var removal = new Array();
+    var c=0;
+    for(var i in list)
+    {
+        var obj = list[i];
+		
+		// remove consumed objects
+        if(obj.consumed)
+        {
+            removal.push(c);    
+        }
+		// remove hidden objects 
+		if(obj.visible == false)
+		{
+			removal.push(c); 
+		}
+		// remove object types not handled
+		switch(obj.oType)
+		{
+			// these we want to retain
+			case "RectanglePrimitive":
+			case "RectangleAbs":
+			case "Rectangle3Slice":
+			case "Text":
+			case "Path":
+				break;
+			/*
+			case "SliceInfo":
+				if(obj.isBackground != undefined)
+				{
+					// CS4 background type
+					if(obj.isBackground)
+					{
+						hasPatterns = true;
+						csspatternlist.push(obj);
+					}
+				}
+				break;
+			*/
+			// plusversion
+			
+			case "Instance":
+				if(obj.fType != undefined)
+				{
+					switch(obj.fType)
+					{
+						case "Button":					
+						case "CheckBox":			
+						case "ComboBox":			
+						case "RadioButton":	
+						case "TextArea":
+						case "TextField":			
+						case "link":
+						case "h1":
+						case "h2":
+						case "h3":
+						case "h4":
+						case "h5":
+						case "h6":
+						case "paragraph":
+						case "div":
+						case "li":
+							break;
+					}
+					
+					
+					break; // keep this object
+				}
+			
+		
+				
+			
+			// -plusversion
+			
+			
+			// discard the rest
+			default:
+				removal.push(c);  
+				break;
+		}
+
+        c++;
+    }
+    var lastidx=-1;
+    while(removal.length > 0)
+    {
+        var idx = removal.pop();
+        if(idx != lastidx)
+            list.splice(idx,1);
+        lastidx=idx;
+    }
+}
+
+
+
+// resolve multiple object rects to the most identical
+//  -they must be ontop of each other before this test
+function findBestMatchRect(obj, list)
+{
+    var bestitem = null;
+    var bestdelta = 999999999;
+    
+    for(var i in list)
+    {
+        var o = list[i];
+        var delta = Math.abs(o.width-obj.width)+Math.abs(o.height-obj.height);
+        if(delta < bestdelta)
+        {
+            bestdelta=delta;
+            bestitem = o;
+        }
+    }
+    
+    return bestitem;
+}
+// find text that links slices refer to and mark them as having a hyperlink
+function tagTextLinks()
+{
+    for(var i in csslinklist)
+    {
+        var linkobj = csslinklist[i];
+        //var list = findAreaListForObject(linkobj);
+        var list = allDocList;
+        var matches = new Array();
+        var p = centrePoint(linkobj);
+        for(var j in list)
+        {
+            var o = list[j];
+            if(o.oType == "Text")
+            {
+                if( isPointInObjectRect(p.x, p.y, o) )
+				{
+				    matches.push(o);
+				}
+            }
+        }
+        // check for single or multiple matches
+        if(matches.length == 1)
+        {
+			matches[0]['hasLink']=true;
+            matches[0]['urlText'] = linkobj['href'];
+			matches[0]['altText'] = linkobj['altText'];
+            
+        }else if(matches.length > 1)
+        {
+			var best = findBestMatchRect(linkobj, matches);
+            best['hasLink']=true;
+            best['urlText'] = linkobj['href'];
+			best['altText'] = linkobj['altText'];
+        }
+    }
+    
+    // dont need this list anymore
+    csslinklist = null;
+}
+function tagPatternFills()
+{
+    for(var i in csspatternlist)
+    {
+        var pobj = csspatternlist[i];
+        //var list = findAreaListForObject(pobj);
+        var list = allDocList;
+        var matches = new Array();
+        var p = centrePoint(pobj);
+        for(var j in list)
+        {
+            var o = list[j];
+            if(o.oType == "RectanglePrimitive")
+            {
+                if( isPointInObjectRect(p.x, p.y, o) )
+                {
+                     matches.push(o);
+                }
+            }
+		}
+        // check for single or multiple matches
+        if(matches.length != 0)
+        {
+            var best;
+            if(matches.length == 1)
+            {
+                best = matches[0];
+            }else if(matches.length > 1)
+            {
+                best = findBestMatchRect(pobj, matches);
+            }
+            best['hasPatternFill']=true;
+            best['patternFillUrl'] = imagePath + pobj['baseName'] + pobj['imageSuffix'];
+            
+			// CS4 slice type
+			if(pobj.isBackground != undefined)
+			{
+				if(pobj.isBackground)
+				{
+					// store reference to object with background info
+					best['backgroundInfoObj'] = pobj;
+				}
+			}
+
+            // if the target rectangle dont have a name, take the name from the image
+            if(best['name'] == null)
+            {
+                best['name'] = pobj['baseName'];
+            }
+        }
+    
+    }
+    
+    // dont need this list anymore
+    csspatternlist = null;
+}
+
+// bring slices into appropriate list
+function mergeSlicesIntoLists()
+{
+	for(var i in slicelist)
+    {
+        var o = slicelist[i];
+            
+        // push into global new list
+        allDocList.push(o);
+		
+    }
+}
+function createCombinedList()
+{
+    var i;
+    for(i in toplist) allDocList.push(toplist[i]);
+    for(i in leftlist) allDocList.push(leftlist[i]);
+    for(i in midlist) allDocList.push(midlist[i]);
+    for(i in rightlist) allDocList.push(rightlist[i]);
+    for(i in bottomlist) allDocList.push(bottomlist[i]);
+    
+}
+// look for rectangles with
+function detect3Slice()
+{
+	var sliceremove = new Array();
+
+    islist = allDocList.sort(vsort);
+    for(var i in islist)
+    {
+        var r = allDocList[i];
+        
+        if(r.oType == 'RectanglePrimitive' || r.oType == 'Path')
+        {
+            var topmatches = new Array();
+            var bottommatches = new Array();
+            var midmatches = new Array();
+            
+            
+            var c=0;
+            for(var k in slicelist)
+            {
+                var s = slicelist[k];
+              
+                if(coversTop(r,s))
+                {
+					topmatches.push(s);
+                }
+                if(coversBottom(r,s))
+                {
+					bottommatches.push(s);
+                }
+                if(intersectsAcrossMid(r, s))
+                {
+					midmatches.push(s);
+                }   
+                c++;
+            }
+			
+			var patternRemove = false;
+			for(var k in csspatternlist)
+            {
+                var s = csspatternlist[k];
+              
+                if(coversTop(r,s))
+                {
+                    topmatches.push(s);
+                }
+                if(coversBottom(r,s))
+                {
+                    bottommatches.push(s);
+                }
+                if(intersectsAcrossMid(r, s))
+                {
+                    midmatches.push(s);
+                }   
+                c++;
+            }
+
+
+            // did we match all three?
+            if(topmatches.length >= 1 && bottommatches.length >= 1 && midmatches.length >= 1)
+            {
+				r.oType = 'Rectangle3Slice';
+            
+                // for now, just use the first match
+                var left = topmatches[0].left;
+                var right = topmatches[0].right;
+                var top = topmatches[0].top;
+                var bottom = bottommatches[0].bottom;
+                r.left = left;
+                r.right = right;
+                r.width = (right-left)+1;
+                r.top = top;
+                r.bottom = bottom;
+                r.height = bottom - top;
+				
+				// refactor this back in later
+                r['topAdj'] = topmatches[0].bottom;
+
+                // keep ref to the slices
+                r['sliceTop'] = topmatches[0];
+                r['sliceMid'] = midmatches[0];
+                r['sliceBottom'] = bottommatches[0];
+
+				// delete from main slice list
+				//sliceremove.push(topmatches[0]);
+				//sliceremove.push(midmatches[0]);
+				//sliceremove.push(bottommatches[0]);
+
+				listRemoveItem(slicelist, topmatches[0]);
+				listRemoveItem(slicelist, midmatches[0]);
+				listRemoveItem(slicelist, bottommatches[0]);
+				listRemoveItem(csspatternlist, topmatches[0]);
+				listRemoveItem(csspatternlist, midmatches[0]);
+				listRemoveItem(csspatternlist, bottommatches[0]);
+				
+				// remove slices from the slice list - do here
+				//listRemove(slicelist, sliceremove)
+				/*
+			    sliceremove.sort(numericSort);
+			    var lastidx=-1;
+			    while(sliceremove.length > 0)
+			    {
+			        var idx = sliceremove.pop();
+			        if(lastidx!=idx)
+			            slicelist.splice(idx,1);
+			        lastidx=idx;
+			    }
+				*/
+
+            }
+        }   
+    }
+
+}
+
+function listRemoveItem(list,item)
+{
+	var idx=0;
+	for(var i in list)
+	{
+		var o = list[i];
+		if(o === item)
+		{
+			list = list.splice(idx,1);
+			break;
+		}
+		idx++;
+	}
+	
+	
+	/*
+	items.sort(numericSort);
+    var lastidx=-1;
+    while(items.length > 0)
+    {
+        var idx = items.pop();
+        if(lastidx!=idx)
+            list.splice(idx,1);
+        lastidx=idx;
+    }
+*/	
+}
+function numericSort(a,b)
+{
+    return Number(a)-Number(b);
+}   
+// find out if slice cuts across mid section of rect
+function intersectsAcrossMid(r, s)
+{
+	if(coversTop(r, s)) return false;
+	if(coversBottom(r, s)) return false;
+	
+    if(s.left > r.left) return false;
+    if(s.top < r.top) return false;
+    if((s.left+s.width) < (r.left+r.width)) return false;
+    if((s.top) > (r.top+r.height)) return false;
+    if((s.top+s.height) > (r.top+r.height)) return false;
+    
+    return true;
+}
+// does slice form top part of 3-slice for given rect
+function coversTop(r, s)
+{
+    if( (s.top <= r.top) && (s.left <= r.left) && 
+        (s.right >= r.right) && (s.bottom >= r.top) &&
+        (s.bottom <= r.bottom) )
+    {
+        return true;
+    }
+    return false;
+}
+function coversBottom(r, s)
+{
+    /*if((s.top >= r.top) && (s.top <= r.bottom) &&
+        (s.bottom >= r.bottom) &&
+        (s.left <= r.left) && (s.right >= r.right) )
+    {
+        return true;
+       
+    }*/
+
+	if((s.top <= r.bottom) && (s.bottom >= r.bottom) &&
+        (s.left <= r.left) &&
+        (s.right >= r.right))
+    {
+        return true;
+       
+    }
+    return false; 
+}
+
+// tweak the objects so easier to parse
+function modifyObjects()
+{
+	for(var i in allDocList)
+    {
+		
+        var r = allDocList[i];
+        
+		var pname = (r.name != null)?r.name:r.baseName;
+		
+		// FW seems to round down for display but preserve fraction on position, 
+		// lets match that behaviour
+				
+		r.left=Math.floor(r.left);
+		r.top=Math.floor(r.top);
+		r.width=Math.floor(r.width);
+		r.height=Math.floor(r.height);
+		
+		// vert and hriz lines can come in as 0px, give them a minimum size
+        if(r['width'] < 1)
+        {
+            r['width']=1;
+        }
+        if(r['height'] < 1)
+        {
+            r['height']=1;
+        }
+		// add right and bottom actual position, to save work later
+		r['right'] = r.left+r.width-1;
+        r['bottom'] = r.top+r.height-1;
+      
+		// all non vir/horiz line shapes become rectangle
+		if(r['oType'] == "Path")
+		{
+			// crossgrade the path to a rectangle
+			r.oType = "RectanglePrimitive";			
+		}
+		// plusversion
+		if(r['oType'] == "Instance")
+		{
+			// convert div symbol to rect
+			if(r['fType'] == "div"){
+				r['oType'] = "RectanglePrimitive"; 	// convert
+			}
+			
+			switch(r['fType'])
+			{
+				case "link":
+					r['oType'] = "Text";
+					r['hasLink']=true;
+		            r['urlText'] = r['Href'];
+					r['altText'] = "";
+					r['textChars']=r['Text'];
+					
+					break;
+				case "h1":					
+				case "h2":					
+				case "h3":					
+				case "h4":					
+				case "h5":					
+				case "h6":
+				case "li":
+					r['isHtag'] = true;
+					r['oType'] = "Text";
+					r['textChars']=r['Text'];
+					break;
+				case "paragraph":
+					r['oType'] = "Text";
+					break;
+				break;
+			}
+		}
+		// -plusversion
+		
+		// create some default padding for rectangles
+		if(r['oType'] == "RectanglePrimitive")
+		{
+			// update padding
+			if(r['paddingBottom'] == undefined)
+			{
+				// apply default padding
+			
+				if(r.height>8)
+				{
+					// use a top padding of 4 by default
+					r['paddingTop']=0; 
+					
+					// use bottom padding to give height if its empty
+					r['paddingBottom']=r.height;
+				}else if(r.height>1)
+				{
+					// share half the padding on small spaces
+					r['paddingTop'] = r.height >> 1;
+					r['paddingBottom'] = r.height >> 1;
+					if(r.height & 1)
+						r['paddingBottom'] = r['paddingBottom'] + 1;
+				}
+			}
+		}
+		
+    }
+    for(var j in slicelist)
+    {
+        var s = slicelist[j];
+        s['right'] = s['left'] + s['width'] - 1;
+        s['bottom'] = s['top'] + s['height'] - 1;
+     }
+
+}
+
+var allDocGroups = new Array();
+
+function goForIt2()
+{
+	
+    var w=docWidth;
+
+    outerdiv(w);
+
+    doblock(allDocList, 0, 0 , w, 0, 0, 0, 'left', 1);
+
+    cdiv();
+	//WRITE_HTML('cdiv(); OK');
+
+}
+var z=0;
+function doblock(list, left, top, right, marginLeft, marginTop, marginRight, floatme, lastInRow)
+{
+	z++;
+    // split into rows
+    var rows=new Array();
+  
+    structureRows(list,rows,left,top,right);
+	
+	for(var r in rows)
+    {   
+		var rr = rows[r];
+		
+		descendChildren(rows[r].elems);
+    	
+        // split into columns
+        var cols=new Array();
+        structureCols(rows[r], cols, rows[r].left, rows[r].top, rows[r].right, rows[r].height);
+        
+        if( cols.length == 1)                       // 1 col in 1 row = 1 obj
+        {   
+            // render object
+            var o = cols[0];
+			var obj = o.elems[0];
+			
+			
+        
+            doElement(obj, (obj.left-left), (obj.top-cols[0].top), obj.width, obj.height, marginRight, floatme, false);
+            
+			if(abort)
+				return;
+				
+            // do object children
+            if(obj['children'] != undefined)
+            {
+				var topadj = obj.top;
+				if (obj.oType == 'Rectangle3Slice')
+				{
+					// the inners of this 3slice rect need to adjust to the size of the top graphic
+					topadj = obj.topAdj+1;
+				}
+				
+				// do cdildren, adjust offset as a div border takes upspace
+                doblock(obj['children'], obj.left+1, topadj , obj.right+1, marginLeft, marginTop, 0, 'left', true);    
+
+				if(abort)
+					return;
+            }
+			if(obj['abschildren'] != undefined)
+            {
+                doblock(obj['abschildren'], obj.left, obj.top , obj.right, marginLeft, marginTop, 0, floatme, true);   
+ 				
+				if(abort)
+					return;
+            }
+            
+            closeElement(obj);
+			
+			if(lastInRow)
+			{			
+				cleardiv();
+			}
+			
+        }else{
+			
+			// decide what floats left or right
+			var hasFloatRight = floatCols(cols, left, right);
+			
+			// pass this down
+			ofCols = cols.length;
+			
+		//	WRITE_HTML_CONTENT(ofCols);
+			
+            // wrap row div
+			if(enableRowWrap)
+            	wrapdiv();
+		
+			for(var c in cols)
+            {
+                // insert left floated element in left to right order 
+                var o = cols[c];
+
+				if(o.floatme != 'right')
+				{	
+					// check if column can be broken down into rows
+					var wrapCols = checkListForMultiElems(cols[c]);
+
+					if(wrapCols) odiv("colwrap"+String(z++), cols[c].width, 0, 0, 'left'); 	
+
+					var ml = o.marginLeft?o.marginLeft: 0;
+                	var mt = o.marginTop?o.marginTop: 0;
+                	var mr = o.marginRight?o.marginRight: 0;
+
+					var lastInRow=(c==cols.length-1);
+
+                	doblock(o, o.left, o.top , o.right, ml, mt, mr, o.floatme, lastInRow);
+
+					if(wrapCols) cdiv();
+            	}
+            }
+
+			// clear after every row (for now)
+			//cleardiv();
+
+			if(hasFloatRight)
+			{
+				// insert right floatd elements in reverse
+				var c;
+				for(c=cols.length-1; c>=0; c--)
+	            {
+					
+					var o = cols[c];
+		
+					if(o.floatme == 'right')
+					{		
+						// check if column can be broken down into rows
+						var wrapCols = checkListForMultiElems(cols[c]);
+						
+						if(wrapCols) odiv("colwrap"+String(z++), cols[c].width, 0, 0, 'right'); 
+	                
+	                	var ml = o.marginLeft?o.marginLeft: 0;
+		                var mt = o.marginTop?o.marginTop: 0;
+		                var mr = o.marginRight?o.marginRight: 0;
+						if (mr == 1)
+							mr = 0;
+						
+						var lastInRow=(c==0);
+						
+		                doblock(o, o.left, o.top , o.right, ml, mt, mr, o.floatme, lastInRow);
+		
+						if(wrapCols) cdiv();
+					}
+	            }
+			}
+			
+			
+
+			//cleardiv();
+            if(enableRowWrap)
+            	cdiv();
+        }    
+    }
+	z--;
+}
+
+
+
+function error(str)
+{
+	WRITE_HTML(str + "<br />");
+}
+function floatCols(cols, rowleft, rowright)
+{
+	try
+	{
+		// track the biggest gap
+		var bgap=0;
+	
+		// include gap from left side of row
+		var lastright=rowleft;
+	
+		// scan through gaps
+		var gaparr = new Array();
+	
+		for(var c in cols)
+	    {
+			var obj = cols[c];
+			var g=new Object();
+			g['left']=Math.max(obj.left, 0);
+			g['right']=obj.minleft;
+			lastright=obj.maxright;
+			gaparr.push(g);
+		
+		}
+		// include gap to right of row side
+		if(lastright < rowright)
+		{
+			var g=new Object();
+			g['left']=lastright;
+			g['right']=rowright;
+			gaparr.push(g);
+		}
+	
+		// select biggest gap
+		var gapleft;
+		var gapright;
+		var bestwidth=0;
+		var lastobj=null;
+		for(var l in gaparr)
+	    {
+			var obj=gaparr[l];
+			var w = obj.right-obj.left;
+			if(w>bestwidth)
+			{
+				bestwidth = w;
+				gapleft=obj.left;
+				gapright=obj.right;			
+			}
+			lastobj=obj;
+		}
+
+		var hasFloatRight=false;
+		// float left or right
+		var i=0;
+		for(var c in cols)
+	    {
+			var obj = cols[c];
+			if(bestwidth < 20)
+			{
+				// very confined spaces (<20px max gap), always float left
+				obj.floatme = 'left';
+			}else{
+			
+				if(obj.maxright <= gapleft)
+				{
+					obj.floatme = 'left';
+				}else if(obj.minleft >= gapright)
+				{
+					obj.floatme = 'right';
+					hasFloatRight=true;
+				}
+			}
+			// set position
+			if(obj.floatme == 'right')
+			{
+				if(i<cols.length-1)
+				{
+					var obj2 = cols[i+1];
+					obj['marginRight'] = obj2.minleft-obj.maxright;
+				}else{
+					obj['marginRight'] = rowright-obj.maxright;
+				}
+			}
+
+			i++;
+		}
+	
+	}catch(err)
+	{
+		error("FloatCols() "+err.description);			
+	}
+
+	return hasFloatRight;
+}
+function closeElement(obj)
+{	
+	WRITE_HTML_CONTENT(unIndent());
+	
+    switch(obj.oType)
+    {
+        case 'Text':
+			var tagType = getTextTagType(obj);// p,h1,h2....
+			if (obj.hasLink && obj.urlText) {
+				WRITE_HTML_CONTENT("</a>\n");
+			}
+			else if (tagType == "p") {
+				tagType = (obj.name != null)?obj.name:obj.baseName;
+				if (typeof(tagType) == "undefined") {
+					tagType = "p";
+				}
+				else {
+					var name = tagType;
+					if (name.match(tags)) {
+						tagType = name.match(tags)[1];
+					}
+					else {
+						tagType = "p";
+					}
+					name = name.replace(/\</, "");
+				}
+				if (tagType == "p") {
+	            	WRITE_HTML_CONTENT("\t</"+tagType+">\n"+printIndent()+"</div>\n");
+				}
+				else {
+					WRITE_HTML_CONTENT("\t</"+tagType+">\n"+printIndent()+"\n");
+				}
+			}
+			else if (tagType == "li") {
+				// Do Nothing
+			}
+			else {
+				WRITE_HTML_CONTENT("</"+tagType+">\n");
+			}
+        break;
+		case 'SliceInfo':
+			if(obj.hasHref == false)
+	        {
+				if(obj.isBackground)
+					WRITE_HTML_CONTENT("</div>\n");
+				// foreground slice will insert an image	
+				
+			}else{
+				//WRITE_HTML_CONTENT("</img>\n");
+				WRITE_HTML_CONTENT(unIndent());
+				WRITE_HTML_CONTENT("</a>\n");
+			}
+		break;
+        case 'Rectangle3Slice':
+			drawBoxBottom(obj);
+			WRITE_HTML_CONTENT(printIndent()+"</div>\n");
+        break;
+        case 'RectanglePrimitive':
+            WRITE_HTML_CONTENT("</div>\n");
+        break;
+		case 'RectangleAbs':
+            WRITE_HTML_CONTENT("</div>\n");
+			
+			// an extra close required
+			WRITE_HTML_CONTENT(unIndent());
+			WRITE_HTML_CONTENT("</div>\n");
+        break;
+		case "Instance":
+			// self terminate these tags
+		break;
+		
+		default:
+            WRITE_HTML_CONTENT("</div>\n");
+        break;
+    
+    }
+}
+function checkListForMultiElems(list)
+{
+    for(var i in list)
+    {
+        if(list.elems.length > 1)
+           return true;
+    }
+    return false;
+}
+
+function goForIt()
+{
+    var w=docWidth;
+    structureRows(allDocList,allDocGroups,0,0,w);
+    
+    outerdiv(w);
+    var c=1;
+    for(var i in allDocGroups)
+    {   
+        doRow(allDocGroups[i], c++, w);    
+    }
+        
+}
+
+// html element indentation ----
+function indent()
+{
+	var tabs = printIndent();
+	divindent++;
+	return tabs;
+	
+}
+
+function unIndent()
+{
+	divindent--;
+	var tabs = printIndent();
+	return tabs;
+	
+}
+function printIndent()
+{
+	var tabs=""
+	var x=0;
+	for(x=0; x<divindent; x++)
+	{
+		tabs+="\t";
+	}
+	return tabs;
+}
+//----------
+
+function doElement(obj, left, top, w, h, right, floatme, absolute)
+{	
+    if(obj.oType == undefined)
+    {
+        // a row or column
+        return;
+    }
+
+	var x = left;
+    var y = top;
+	var tweaksize = 0;
+	if (obj.brushDiameter == 1) {
+		if (obj.brushPlacement == "outside") {
+			tweaksize = obj.brushDiameter*2;
+		}
+	}
+	else if (obj.brushDiameter >= 1) {
+		if (obj.brushPlacement == "outside") {
+			tweaksize = obj.brushDiameter;
+		}
+		else if (obj.brushPlacement == "center") {
+			tweaksize = Math.round(obj.brushDiameter/2);
+		}
+	}
+	
+	x = x - tweaksize;
+	y = y - tweaksize;
+		
+	// is it absolute positioned?
+	var position = null;
+	var floated = floatme;
+
+	
+	if(obj.isAbsolute || absolute)
+	{
+		
+		position = 'absolute';
+		floated = null;
+		if(obj.isAbsolute)
+		{
+			// singular downgrade to absolute
+			x = obj.absleft;
+			y = obj.abstop;
+		}
+		obj.isAbsolute = true;
+	}
+	
+    var name = (obj.name != null)?obj.name:obj.baseName;
+
+	
+    if(name == undefined)
+        name  = chooseNameForAnonymousObject(obj);
+    else
+        name = uName(name);
+    
+    //name = name.replace(/[^a-zA-Z0-9_]/g,"_");
+	
+	// plusversion
+	if(obj.oType == "RectanglePrimitive")
+	{
+		if(obj.fType != undefined)
+		{			
+			if(obj.fType=="div")
+			{
+				// a div symbol that was treated as a rectangle
+				 var style = csspos(x, y, null, null, right, null, floated, null, position) + cssFromRectangleObject(obj)[0];
+			     csswrite(name,style,cssFromRectangleObject(obj)[1]);
+			     WRITE_HTML_CONTENT(indent()+"<div id=\""+name+"\">\n");
+				
+			
+				return;
+				
+			}
+		}		
+	}
+	if(obj.oType == "Text")
+	{
+		
+		if(obj.fType != undefined)
+		{
+			if(obj.fType == "link")
+			{
+				// link object
+				csswrite_link_object(name, obj, csspos(x, y, null, null, right, null, floated, null, position), false);
+				WRITE_HTML_CONTENT(indent()+"<a href=\""+obj.urlText+"\" id=\""+name+"\">\n"+printIndent()+obj.textChars+"\n");
+				
+				return;
+			}
+		}
+	}
+	
+	// -plusversion
+	
+    if(obj.oType == "SliceInfo")
+    {
+		if (x < 0) {
+			x = 0;
+		}
+        if(obj.hasHref == false)
+        {	
+					
+            // no link so define image in pure css
+            
+			if(obj.isBackground)
+			{				
+				csswrite(name, csspos(x, y, w, h, right, null, floated, imagePath + obj.baseName + obj.imageSuffix, position) );
+            	WRITE_HTML_CONTENT(indent()+"<div id=\""+name+"\">\n");
+			
+			}else{
+				// cs4 foregroud slice type - inserts <img> tag inline
+				csswrite(name, csspos(x, y, w, h, right, null, floated, null, position) );
+				WRITE_HTML_CONTENT(indent()+"<img src=\""+ imagePath + obj.baseName + obj.imageSuffix +"\" id=\""+name+"\" alt=\""+obj.altText+"\" />\n");
+			}
+        }else{
+			
+			// image has link so need to embed an image object
+            csswrite(name, csspos(x, y, w, h, right, null, floated, null, position) );
+			WRITE_HTML_CONTENT(indent()+"<a href=\""+obj.href+"\">\n");
+            WRITE_HTML_CONTENT(indent()+"<img src=\""+ imagePath + obj.baseName + obj.imageSuffix +"\" id=\""+name+"\" alt=\""+obj.altText+"\" />\n");
+
+        }
+        
+        return;
+    }if(obj.oType == "Text")
+    {
+		var tagType = getTextTagType(obj);// p,h1,h2....
+		if(tagType.indexOf('h') != -1)
+		{
+			// clear width for h tags
+			w=null;			
+		}
+				
+		if (x < 0) {
+			x = 0;	
+		}
+			
+		if(tagType == "p")
+		{
+			var style = cssFromTextObject(obj);
+			if(abort)
+				return;
+				
+			if (name.match(tags)) {
+				tagType = name.match(tags)[1];
+				var regexed = true;
+			}
+			else {
+				tagType = "p";
+			}
+			name = name.replace(/\</, "");
+
+			if ((regexed == true) && (name.length > tagType.length)) {
+				var tempname = name.slice(tagType.length,name.length);
+				tempname = tagType+"_"+tempname;
+				name = tempname;
+			}
+			
+			if (obj.autoExpand == true) {
+				w = null;
+			}
+			
+			style += csspos(x, y, w, null, right, null, floated, null, position);
+			
+			if (obj.hasLink && obj.urlText) {
+	            WRITE_HTML_CONTENT(indent()+"<a href=\""+obj.urlText+"\" class=\""+name+"\">\n"+printIndent()+obj.textChars+"\n");
+			}
+	        else {
+				var textChars = obj.textChars;
+				if (tagType == "p") {
+					margin = (obj.paragraphSpacingBefore+obj.paragraphSpacingAfter)/10;
+					
+					if (margin > 0) {
+						margin += pMargin;
+						margin = (margin*100)/100;
+					}
+					else {
+						margin = null;
+					}
+					csswriteclass(name,style,margin);
+					if ((obj.textChars.indexOf("<p>") != 0) && (obj.textChars.indexOf("<p class=\"lastNode\">") > 0)) {
+						obj.textChars = "<p>" + obj.textChars;
+						
+					}
+					else if ((obj.textChars.indexOf("<p>") != 0) && (obj.textChars.indexOf("<p class=\"lastNode\">") < 0)) {
+						obj.textChars = "<p class=\"lastNode\">" + obj.textChars;
+					}
+					WRITE_HTML_CONTENT(indent()+"<div class=\""+name+"\">\n"+printIndent()+"\n\t"+printIndent()+obj.textChars+"\n");
+				}
+				else if (tagType == "a") {
+					csswriteclass(name,style);		
+					WRITE_HTML_CONTENT(indent()+"\n"+printIndent()+"<"+tagType+" href=\"#\" class=\""+name+"\">\n\t"+printIndent()+obj.textChars+"\n");
+				}
+				else {
+					csswriteclass(name,style);	
+					WRITE_HTML_CONTENT(indent()+"\n"+printIndent()+"<"+tagType+" class=\""+name+"\">\n\t"+printIndent()+obj.textChars+"\n");
+				}
+				tagType = "p";
+			}
+		}
+		else {
+			if(obj.customData.css != undefined)
+			{	
+				// take style from widget
+				var tempStyle = obj.customData.css.split("#");
+				var tempStyle2 = tempStyle[1].split(";",1);
+				var tempStyle3 = tempStyle[1].split(tempStyle2);
+				var style = tempStyle[0] + CONVERT_COLOUR(tempStyle2[0]) + tempStyle3[1];
+				// css for widgets show yen character instead of backslash on mac so correcting it.
+				style = style.replace(/\u00a5n/g,"\n");
+				style = style.replace(/\u00a5t/g,"\t");
+				if (tagType == "li") {
+					style += "\n" + csspos(x, y, null, null, right, null, floated, null, position);
+				}
+				else {
+					style += "\n" + csspos(x, y, w, null, right, null, floated, null, position);
+
+				}
+			}
+			
+			csswrite(name,style);
+
+			if (obj.hasLink && obj.urlText) {
+	            WRITE_HTML_CONTENT(indent()+"<a href=\""+obj.urlText+"\" id=\""+name+"\">\n"+printIndent()+obj.textChars+"\n");
+			}
+	        else {
+	          	if (tagType == "li") {
+					if (obj.customData.mode.toLowerCase() == "normal") {
+						if (obj.customData.isLink == true) {
+					  		csswrite_link_object(name, obj, "", true);
+							WRITE_HTML_CONTENT(indent()+"<"+tagType+" id=\""+name+"\">\n"+printIndent()+"\t<a href=\""+obj.Href+"\">"+obj.textChars.replace(/\u000D/g,"<br />")+"</a>\n"+printIndent()+"</"+tagType+">\n");
+						}
+						else {
+							WRITE_HTML_CONTENT(indent()+"<"+tagType+" id=\""+name+"\">\n\t"+printIndent()+obj.textChars.replace(/\u000D/g,"<br />")+"\n"+printIndent()+"</"+tagType+">\n");
+						}
+					}
+					else if (obj.customData.mode.toLowerCase() == "first") {
+				  		if (obj.customData.isLink == true) {
+					  		csswrite_link_object(name, obj, "", true);
+							WRITE_HTML_CONTENT(indent()+"<ul class=\"symbolList\">\n"+printIndent()+"<"+tagType+" id=\""+name+"\">\n"+printIndent()+"\t<a href=\""+obj.Href+"\">"+obj.textChars.replace(/\u000D/g,"<br />")+"</a>\n"+printIndent()+"</"+tagType+">\n");
+						}
+						else {
+							WRITE_HTML_CONTENT(indent()+"<ul class=\"symbolList\">\n"+printIndent()+"<"+tagType+" id=\""+name+"\">\n\t"+printIndent()+obj.textChars.replace(/\u000D/g,"<br />")+"\n"+printIndent()+"</"+tagType+">\n");
+						}
+					}
+					else if (obj.customData.mode.toLowerCase() == "last") {
+						if (obj.customData.isLink == true) {
+					  		csswrite_link_object(name, obj, "", true);
+							WRITE_HTML_CONTENT(indent()+"<"+tagType+" id=\""+name+"\">\n"+printIndent()+"\t<a href=\""+obj.Href+"\">"+obj.textChars.replace(/\u000D/g,"<br />")+"</a>\n"+printIndent()+"</"+tagType+">\n\t</ul>\n");
+						}
+						else {
+							WRITE_HTML_CONTENT(indent()+"<"+tagType+" id=\""+name+"\">\n\t"+printIndent()+obj.textChars.replace(/\u000D/g,"<br />")+"\n"+printIndent()+"</"+tagType+">\n\t</ul>\n");
+						}
+					}
+					else {
+						if (obj.customData.isLink == true) {
+					  		csswrite_link_object(name, obj, "", true);
+							WRITE_HTML_CONTENT(indent()+"<ul class=\"symbolList\">\n"+printIndent()+"<"+tagType+" id=\""+name+"\">\n"+printIndent()+"\t<a href=\""+obj.Href+"\">"+obj.textChars.replace(/\u000D/g,"<br />")+"</a>\n"+printIndent()+"</"+tagType+">\n\t</ul>\n");
+						}
+						else {
+							WRITE_HTML_CONTENT(indent()+"<ul class=\"symbolList\">\n"+printIndent()+"<"+tagType+" id=\""+name+"\">\n\t"+printIndent()+obj.textChars.replace(/\u000D/g,"<br />")+"\n"+printIndent()+"</"+tagType+">\n\t</ul>\n");
+						}
+					}
+				}
+				else {
+					WRITE_HTML_CONTENT(indent()+"<"+tagType+" id=\""+name+"\">\n"+printIndent()+obj.textChars.replace(/\u000D/g,"<br />")+"\n");
+				}
+			}
+		}
+
+        
+
+        
+    }else if(obj.oType == "Rectangle3Slice")
+    {
+		if (x < 0)
+			x = 0;
+		var style = csspos(x, y, w, null, right, null, floated, null, position) + cssFromRectangleObject(obj)[0]; //"float:left; width: "+w+"px; height: "+h+"px; margin-left: "+x+"px; margin-top: "+y+"px; padding: 0; border: 0;";
+        csswrite(name,style);
+        WRITE_HTML_CONTENT(indent()+"<div id=\""+name+"\">\n");
+    
+        drawBoxTop(obj);
+        
+    }else if(obj.oType == "RectanglePrimitive")
+    {
+		if (x < 0)
+			x = 0;
+		var style = csspos(x, y, null, null, right, null, floated, null, position) + cssFromRectangleObject(obj)[0];
+        csswrite(name,style,cssFromRectangleObject(obj)[1]);
+        WRITE_HTML_CONTENT(indent()+"<div id=\""+name+"\">\n");
+    
+	}else if(obj.oType == "RectangleAbs")
+	{
+		// This is a rectangle that has overlapping children (make a relative position wrapper, children will be relative+absolute positioned)
+      	var style = csspos(x, y, null, null, right, null, floated, null, position) + cssFromRectangleObject(obj)[0];
+       	csswrite(name,style,cssFromRectangleObject(obj)[1]);
+       	WRITE_HTML_CONTENT(indent()+"<div id=\""+name+"\">\n");
+		WRITE_HTML_CONTENT(indent()+"<div id=\"AbsWrap\">\n");
+   	}else if(obj.oType == "Instance")
+	{
+		// plusversion
+		var tmpID = name.replace(/[()\\\/:;\[\]{}\|<>]/g,"_");
+		tmpID = tmpID.replace(/_$/,"");
+		if(obj.isForm)
+		{
+			// Button, CheckBox, ComboBox, RadioButton, TextArea, TextField
+			
+			if(obj.label!=undefined)
+				obj.Label = obj.label;
+			switch(obj.fType)
+			{
+				case "Button":
+					if (obj.Label == undefined)
+						obj.Label = "Label";
+					var bType=firstOpt(obj.Type);
+					WRITE_HTML_CONTENT(indent()+"<input type=\""+bType.toLowerCase()+"\" id=\""+tmpID+"\" value=\"" + obj.Label +"\" />\n");
+					obj.height = "auto"; // lose the height for default
+					break;
+				case "CheckBox":
+					if (obj.Label == undefined)
+						obj.Label = "Label";
+					obj.Label = obj.Label.replace(/\u000D/g,"<br />");
+					var Label = obj.Label.replace(/\<br \/\>/g,"");
+					var chkHtml = "<p id=\""+tmpID+"\"><label><input type=\"checkbox\" name=\"" + name +"\" value=\"" + Label +"\"";
+					if(obj.State == "Disabled" || obj.enabled == false)
+						chkHtml += " disabled=\"disabled\"";
+					if(obj.State.search(/selected/i) != -1 || obj.selected == true)
+						chkHtml += " checked=\"checked\"";					
+					chkHtml += "/>"+obj.Label+"</label></p>\n";						
+					WRITE_HTML_CONTENT(indent()+chkHtml);
+					obj.width = null;
+					obj.height = "auto"; // lose the height for default
+					break;					
+				case "ComboBox":
+					if (obj.Label == undefined)
+						obj.Label = "Label";
+					var cmbHtml = "<select name=\""+tmpID+"\" id=\""+tmpID+"\"";
+					if(obj.State == "Disabled" || obj.enabled == false)
+						cmbHtml += " disabled=\"disabled\"";
+					cmbHtml += "><option>" + obj.Label + "</option></select>\n";
+					WRITE_HTML_CONTENT(indent()+cmbHtml);
+					obj.height = "auto"; // lose the height for default
+					break;
+				case "RadioButton":
+					if (obj.Label == undefined)
+						obj.Label = "Label";
+					obj.Label = obj.Label.replace(/\u000D/g,"<br />");
+					var Label = obj.Label.replace(/\<br \/\>/g,"");
+					var rdbHtml = "<p id=\""+tmpID+"\"><label><input type=\"radio\" name=\"" + name +"\" value=\""+Label+"\"";
+					if(obj.selected == true)
+						rdbHtml += " checked=\"checked\"";
+					rdbHtml += " />"+obj.Label+"</label></p>\n"
+					WRITE_HTML_CONTENT(indent()+rdbHtml);
+					obj.width = null;
+					obj.height = "auto"; // lose the height for default
+					break;
+				case "TextArea":
+					if (obj.Text == undefined)
+						obj.Text = "";
+					WRITE_HTML_CONTENT(indent()+"<textarea name=\""+tmpID+"\" id=\""+tmpID+"\" cols=\"20\" rows=\"5\">"+obj.Text+"</textarea>\n");
+					break;
+				case "TextField":
+					var tfType=firstOpt(obj.Type);
+					if (obj.Text == undefined)
+						obj.Text = "";
+					WRITE_HTML_CONTENT(indent()+"<input type=\""+tfType.toLowerCase()+"\" name=\""+tmpID+"\" id=\""+tmpID+"\" value=\""+obj.Text+"\" />\n");
+					obj.height = "auto"; // lose the height for default
+					break;
+			}
+			
+		}else{
+			// h1..h6, link (div gets converted to rect, so not here)
+			
+		}
+		
+		var style = ""; 
+		if(obj.customData.css != undefined)
+		{	
+			// take style from widget
+			var tempStyle = obj.customData.css.split("#");
+			var tempStyle2 = tempStyle[1].split(";",1);
+			var tempStyle3 = tempStyle[1].split(tempStyle2);
+			var style = tempStyle[0] + CONVERT_COLOUR(tempStyle2[0]) + tempStyle3[1] + "\n";
+		}
+		style += csspos(x, y, obj.width, obj.height, right, null, floated, null, position) + cssFromRectangleObject(obj)[0];
+
+	    csswrite(tmpID,style);
+		
+	
+	  	
+	
+		// -plusversion
+	}
+}
+
+function getTextTagType(obj)
+{
+	var ttype = "p";
+	if(obj['isHtag'])
+	{
+		ttype = obj.customData.type;
+	}
+	
+	return ttype;
+}
+
+// plusversion
+function firstOpt(str)
+{
+	i= str.indexOf(",");
+	if(i==-1)
+		return str;
+	return str.substring(0, i);
+}
+// -plusversion
+function csspos(left, top, width, height, right, bottom, flt, img, position)
+{	
+	var css = "";
+
+	if(position == 'absolute')
+	{
+		css += "\tleft: "+left+"px;\n";
+		css += "\tposition: absolute;\n";
+    	css += "\ttop: "+top+"px;\n";
+    }else{
+		if(flt == 'left') css += "\tmargin-left: "+left+"px;\n";
+	    if(flt == 'right') css += "\tmargin-right: "+right+"px;\n";
+		css += "\tmargin-top: "+top+"px;\n";
+	}
+	if(img) {
+		css += "\tbackground-image: url("+img.replace(/ /g,"%20")+");\n";
+		css += "\toverflow: hidden;\n";		// internet explorer workaround, need to restrict size to what we specified
+	}
+	if(flt) {
+		if(flt=="none")
+		{
+			css += "\tdisplay: block;\n";		// internet explorer double margin/float bug
+			css += "\tfloat: "+flt+";\n";
+		}else{
+			css += "\tdisplay: inline;\n";		// internet explorer double margin/float bug
+			css += "\tfloat: "+flt+";\n";
+		}
+    }
+	if(height) {
+        if(typeof(height) == 'string' && height == 'auto')
+		{
+			css += "\theight: auto;\n";
+		}else{
+			css += "\theight: "+Math.max(height,1);
+			css += (typeof(height) == 'string')?";\n": "px;\n"; // literal or number (% or px)
+		}
+    }
+    if(bottom) 
+    {
+        css += "\tmargin-bottom: "+bottom+"px;\n";
+    }else{
+        css += "\tmargin-bottom: 0;\n";    // firefox adds some bottom margin otherwise
+    }
+	if(width) {
+		if(typeof(width) == 'string' && width == 'auto')
+		{
+			css += "\twidth: auto;\n";
+		}else{
+			css += "\twidth: "+Math.max(width,1); 
+        	css += (typeof(width) == 'string')?";\n": "px;\n"; // literal or number (% or px)
+		}
+    }		
+    return css;
+}
+function csswrite(name, css, minheightcss)
+{	
+	var currName = name;
+	if (name.indexOf("|") == 0) {
+		var secondIndex = name.indexOf("|",1);
+		if (secondIndex > 0) {
+			name = name.slice(secondIndex+1,name.length);
+			if (name.length == 0) {
+				name = currName.replace(/\|/g, "");
+			}
+		}
+	}
+    cssbuf += "#"+name+" {\n"+css+"}\n";
+	if (minheightcss != null) {
+		cssbuf += "html > body #"+name+" {\n"+minheightcss+"}\n";
+	}
+}
+function csswriteclass(name, css, margin)
+{	
+	var currName = name;
+	if (name.indexOf("|") == 0) {
+		var secondIndex = name.indexOf("|",1);
+		if (secondIndex > 0) {
+			name = name.slice(secondIndex+1,name.length);
+			if (name.length == 0) {
+				name = currName.replace(/\|/g, "");
+			}
+			else if (name.length == 1) {
+				name = currName.replace(/\|/g, "");
+			}
+		}
+	}
+	cssbuf += "."+name+" {\n"+css+"}\n";
+	if (margin) {
+		cssbuf += "."+name+" p {\n\tmargin-bottom: "+margin+"em;\n}\n";
+	}
+}
+function csswrite_link_object(name, obj, basecss, li)
+{
+	
+	var css = basecss;
+	
+	var dafont = firstOpt(obj["Font"]).replace(/ - /g, ", ");
+	var fontSize = (obj["Size"]*10) + "%";
+	
+	css = css + "\tcolor: "+CONVERT_COLOUR(obj["Link color"])+";\n";
+	if (li != true) {
+		css = css + "\tfont-family: "+dafont+";\n";
+		css = css + "\tfont-size: "+fontSize+";\n";
+	}
+	css = css + "\tfont-weight: "+firstOpt(obj["Link weight"])+";\n";
+	css = css + "\ttext-decoration: "+firstOpt(obj["Link decoration"])+";\n";
+	
+	if (li == true)
+		cssbuf += "#"+name+" :link, #"+name+" :visited {\n"+css+"}\n";
+	else
+		cssbuf += "#"+name+":link, #"+name+":visited {\n"+css+"}\n";
+	
+	css = "";
+	css = css + "\tcolor: "+CONVERT_COLOUR(obj["Visited color"])+";\n";
+	css = css + "\tfont-weight: "+firstOpt(obj["Visited weight"])+";\n";
+	css = css + "\ttext-decoration: "+firstOpt(obj["Visited decoration"])+";\n";
+
+	if (li == true)
+		cssbuf += "#"+name+" :visited {\n"+css+"}\n";
+	else
+		cssbuf += "#"+name+":visited {\n"+css+"}\n";
+	
+	css = "";
+	css = css + "\tcolor: "+CONVERT_COLOUR(obj["Hover color"])+";\n";
+	css = css + "\tfont-weight: "+firstOpt(obj["Hover weight"])+";\n";
+	css = css + "\ttext-decoration: "+firstOpt(obj["Hover decoration"])+";\n";
+	
+	if (li == true)
+		cssbuf += "#"+name+" :hover, #"+name+" :focus {\n"+css+"}\n";
+	else
+		cssbuf += "#"+name+":hover, #"+name+":focus {\n"+css+"}\n";
+	css = "";
+	css = css + "\tcolor: "+CONVERT_COLOUR(obj["Active color"])+";\n";
+	css = css + "\tfont-weight: "+firstOpt(obj["Active weight"])+";\n";
+	css = css + "\ttext-decoration: "+firstOpt(obj["Active decoration"])+";\n";
+	
+	if (li == true)
+		cssbuf += "#"+name+" :active {\n"+css+"}\n";
+	else
+		cssbuf += "#"+name+":active {\n"+css+"}\n";
+}
+var boxtopcount=0;
+var boxbottomcount=1;
+function drawBoxTop(obj)
+{
+	boxtopcount++;
+    var t = obj['sliceTop'];
+    var name;
+	if (obj['name'] != null) {
+		name = obj['name']+"_top";
+	}
+	else {
+		name = "Box3SliceContainer_top_"+boxtopcount;
+	}
+    csswrite(name, csspos(0, 0, t.width, t.height, null, null, 'left', imagePath+t.baseName+t.imageSuffix) );
+     
+    WRITE_HTML_CONTENT(printIndent()+"<div id=\""+name+"\">\n"+printIndent()+"</div>\n");
+}
+function drawBoxBottom(obj)
+{
+    var b = obj['sliceBottom'];
+    var t = obj['sliceTop'];
+    //var style = "bottom: 0; width: "+b.width+"px; height"+b.height+"px; margin-bottom: 0; background-image: url("+imagePath+b.baseName+b.imageSuffix+"); background-repeat: no-repeat;";    
+    var name;
+	if (obj['name'] != null) {
+		name = obj['name']+"_bottom";
+	}
+	else {
+		name = "Box3SliceContainer_bottom_"+boxtopcount;
+	} 
+
+	var bpad = Math.max(0, obj['paddingBottom']- b.height -t.height);
+	
+	var cs =csspos(0, bpad, b.width, b.height, null, null, 'left', imagePath+b.baseName+b.imageSuffix);
+	
+	// treat any bottom padding of parent rect as top margin on this bottom slice
+	//cs += "\tpadding-top: "+obj['padding-bottom']+"px;\n";
+    
+	csswrite(name, cs);
+    
+    WRITE_HTML_CONTENT("<div id=\""+name+"\">\n"+printIndent()+"</div>\n");
+}
+function outerdiv(width)
+{
+	var margin = "0";
+	
+	if(exportDoc.docAlignment != undefined)
+	{
+		// CS4 document options
+		switch(exportDoc.docAlignment) {
+		  case 'left':
+		    margin = '0 auto 0 0';
+		    break;
+		  case 'right':
+		    margin = '0 0 0 auto';
+		    break;
+		  case 'center':
+		  default:
+		    margin = '0 auto';
+	        }
+		
+	}
+	var cs = "\tmargin: "+margin+";\n\twidth: "+width+"px;\n";
+    csswrite("main", cs);
+	WRITE_HTML_CONTENT(indent()+"<div id=\"main\">\n");
+}
+function odiv(id, width, left, top, floatme)
+{
+	if(!floatme)
+		floatme='left';
+		
+	
+    if(id != "")
+	{
+		var cs = "\tfloat: "+floatme+";\n\tmargin-left: "+left+"px;\n\tmargin-top: "+top+"px;\n\twidth: "+width+"px;\n";
+        csswrite(id, cs);
+		WRITE_HTML_CONTENT(indent()+"<div id=\""+id+"\">\n");
+    
+	}else
+        WRITE_HTML_CONTENT(indent()+"<div style=\"float: "+floatme+"; margin-left: "+left+"px; margin-top: "+top+"px; width: "+width+"px;\">\n");
+}
+// div width width and height
+function odivH(id, width, height, left, top)
+{
+    if(id != "")
+        WRITE_HTML_CONTENT(indent()+"<div id=\""+id+"\" style=\"float: left; height: "+height+"px; margin-left: "+left+"px; margin-top: "+top+"px; width: "+width+"px;\">\n");
+    else
+        WRITE_HTML_CONTENT(indent()+"<div style=\"float: left; height: "+height+"px; margin-left: "+left+"px; margin-top: "+top+"px; width: "+width+"px;\">\n");
+}
+
+function cdiv()
+{
+    WRITE_HTML_CONTENT(unIndent()+"</div>\n");
+}
+
+function wrapdiv()
+{
+    WRITE_HTML_CONTENT(indent()+"<div class=\"rowWrap\" >\n");
+}
+
+function cleardiv()
+{
+    WRITE_HTML_CONTENT(printIndent()+"<div class=\"clearFloat\"></div>\n");
+}
+
+var textanon=1;
+var rectanon=1;
+var threesliceanon=1;
+
+function chooseNameForAnonymousObject(obj)
+{
+    switch(obj.oType)
+    {
+        case 'Text':
+            return deriveNameFromText(obj);
+        break;
+        case 'RectanglePrimitive':
+        case 'RectangleAbs':
+			return uName('Div');
+        break;
+        case 'Rectangle3Slice':
+            return uName('Box3SliceContainer');
+        break;
+    }
+}
+
+// uses the text to pick a name for the div id
+function deriveNameFromText(obj)
+{
+	var matches = obj.textCharsOrig.match(/([^#.,']+)/);	// filter unsuitable chars
+	var ch= matches[1].replace(/^\s+|\s+$/g,"");	//
+	
+	var word='';
+    if(ch.length > 0)
+    {
+        var idx = ch.indexOf(' ');
+        if( idx == -1)
+        {
+            word=ch;
+        }else{
+            word = ch.substring(0,idx);
+        }
+        word = word.replace(/[.]/g,'');
+		word = word.replace(/(\u0003)/g,'');
+        return uName('Txt_'+word);
+        
+    }else{
+        return uName('Txt_empty');
+    }
+}
+var uNames=new Array();
+// ensure unique name
+function uName(str)
+{
+	// tidy name
+	
+	var matches = str.replace(/([#.,>'\/\\\|\~\`\!\@\$\%\^&\*\{\}\:\;\"\\?\[\]]+)/g, "");	// filter unsuitable chars
+	var pname= matches.replace(/^\s+|\s+$/g,"");	// trim
+	
+	pname=pname.replace(/\s+/g,"_");	// replace whitespace
+	if (isNaN(pname) == false) {
+		pname = "FW_"+pname
+	}
+    if(uNames[pname] == undefined)
+    {
+        // add a ref
+        uNames[pname] = 1;
+        return pname;
+    }else{
+        // increment counter and return modified name
+        var c = uNames[pname];
+        c++;
+        uNames[pname] = c;
+        return pname+c; 
+    }
+}
+function structure()
+{
+    structureRows(allDocList,allDocGroups,0,0);
+}
+
+function structureRows(inlist, outlist, left, top, right)
+{
+	if(inlist.length < 1 )
+		return;
+		
+    var rowcount=0;
+    // sort vertically
+    var islist = null;
+    if(inlist.type != undefined)
+    {
+        if(inlist.type == 'row' || inlist.type == 'col')
+            islist = inlist.elems.sort(vsort);
+        else
+            islist = inlist.sort(vsort);
+    }else{
+        islist = inlist.sort(vsort);
+    }
+	
+    // first in list begins the capture group
+    //var my1=islist[0].top;
+    var my1=top;
+    var my2=islist[0].top + islist[0].height;
+    var lastTopMargin=0;
+    var cg = new Array();
+    
+    for(var i in islist)
+    {
+        var o = islist[i];
+        var nyh = o.top+o.height;
+        
+        // is part of same row?
+        if(o.top < my2)
+        {
+            cg.push(o);
+        }else{
+            // new row
+            
+            rowcount++;
+            // save and create new row
+            var newobj = new Object();
+            newobj['type'] = 'row';
+            newobj['elems'] = cg;
+            newobj['left'] = left;
+			newobj['width'] = right-left;
+            newobj['top'] = my1;
+            newobj['height'] = my2 - my1;
+            newobj['marginTop'] = lastTopMargin;
+            newobj['right'] = right;
+            lastTopMargin = o.top - my2;
+            outlist.push(newobj);
+            cg = new Array();
+            cg.push(o);     // push into next row
+            my1=my2;
+            my2=o.top + o.height;
+            continue;    
+        }
+        // extend the row height?       
+        if( nyh > my2)
+            my2 = nyh;
+    }
+    // push remaining row if any outstanding
+    if(cg.length > 0)
+    {
+        var newobj = new Object();
+        newobj['type'] = 'row';
+        newobj['elems'] = cg;
+        newobj['left'] = left;
+		newobj['width'] = right-left;
+        newobj['top'] = my1;
+        newobj['height'] = my2 - my1;
+        newobj['marginTop'] = lastTopMargin;
+        newobj['right'] = right;
+        outlist.push(newobj);
+        rowcount++;
+    }   
+        
+    return rowcount;
+}
+function structureCols(inlist, outlist, left, top, right, height)
+{
+	if(inlist.length < 1 )
+		return;
+		
+    var colcount=0;
+    // sort horizontally
+    var islist = null;
+    if(inlist.type != undefined)
+    {
+        if(inlist.type == 'row' || inlist.type == 'col')
+            islist = inlist.elems.sort(hsort);
+        else
+            islist = inlist.sort(hsort);
+    }else{
+        islist = inlist.sort(hsort);
+    }
+    
+    
+    // first in list begins the capture group
+    var mx1=left;
+    var mx2=islist[0].left + islist[0].width;
+	var minleft = islist[0].left;
+	var maxright = right;
+	var maxright1col = islist[0].right;
+	
+    var lastLeftMargin=0;
+    var cg = new Array();
+    var lastobj=null;
+
+    for(var i in islist)
+    {
+        var o = islist[i];
+        var nyw = o.left+o.width;
+		//maxright=Math.max(maxright, o.right);	
+		
+        // is part of same col?
+        if(o.left < mx2)
+        {
+            cg.push(o);
+			maxright=Math.min(maxright, o.right);	
+			
+			
+        }else{
+            // creates a new col
+			 
+            colcount++;
+            // save and create new col
+            var newobj = new Object();
+            newobj['type'] = 'col';
+            newobj['elems'] = cg;
+            newobj['top'] = top;
+            newobj['left'] = mx1;
+            newobj['width'] = mx2 - mx1;
+            newobj['right'] = mx2;
+			newobj['height'] = height;
+            newobj['marginLeft'] = lastLeftMargin;
+            lastLeftMargin = o.left - mx2;
+			newobj['minleft'] = minleft;
+			newobj['maxright'] = maxright;
+			minleft = o.left;
+			maxright = o.right;
+						
+			if(lastobj != null)
+			{
+				lastobj['marginRight'] = lastLeftMargin;
+			}
+			
+			lastobj=newobj;
+			
+            outlist.push(newobj);
+            cg = new Array();
+            cg.push(o);     // push into next col
+            mx1=mx2;
+            mx2=o.left + o.width;
+
+			minleft = o.left;
+			
+			
+            continue;    
+        }
+        // extend the col width?       
+        if( nyw > mx2)
+            mx2 = nyw;
+    }
+    // push remaining col if any outstanding (this i the last column)
+    if(cg.length > 0)
+    {
+        var newobj = new Object();
+        newobj['type'] = 'col';
+        newobj['elems'] = cg;
+        newobj['top'] = top;
+        newobj['left'] = mx1;
+        newobj['width'] = mx2 - mx1;
+		newobj['height'] = height;
+        newobj['right'] = mx2;
+        newobj['marginLeft'] = lastLeftMargin;
+		newobj['minleft'] = minleft;
+		newobj['maxright'] = maxright;
+		if(lastobj!=null)			
+		{
+			lastobj['marginRight'] = o.left-lastobj['maxright'];
+		}
+		// only define once 
+		if(!newobj['marginRight'])
+		{
+			newobj['marginRight'] = right - o.right;
+		}
+		
+		outlist.push(newobj);
+        colcount++;
+    }   
+
+    return colcount;
+}
+// sort by vertical position
+function vsort(a, b)
+{
+    var y1 = Math.round(a.top);
+    var y2 = Math.round(b.top);
+    if(y1 != y2)
+        return y1-y2;
+    // if same top, resolve using bigger height first
+    return a.height-b.height;
+    
+}
+// sort by horizontal position
+function hsort(a, b)
+{
+    var x1 = Math.round(a.left);
+    var x2 = Math.round(b.left);
+    if(x1 != x2)
+        return x1-x2;
+        
+    // if same left, resolve using bigger width first
+    return a.width-b.width;
+        
+}
+// sort by area
+function areasort(a, b)
+{
+    var x1 = Math.round(a.width*a.height);
+    var x2 = Math.round(b.width*b.height);
+    if(x1 != x2)
+        return x1-x2;
+        
+    // if same size, sort by left
+    x1 = Math.round(a.left);
+    x2 = Math.round(b.left);
+    
+    return x1-x2;
+        
+}
+
+// create parent child relationship
+function descendChildren(list)
+{
+	try 
+	{
+		
+	    var demoted=new Array();
+	    for(var i in list)
+	    {
+	        var o = list[i];
+	        var c=0;
+        
+	        for(var k in list)
+	        {        
+	            var p = list[k];
+            
+	            if(o !== p)
+	            {      
+	                if(o.oType.indexOf("Rectangle") != -1)
+	                {       
+		  				var makechild=false;
+						var makeabschild=false;
+					
+	                    if(isInside(p, o))
+	                    {   
+	                        // create a child that nests properly
+						
+							// check its not already added
+							var alreadyIn=false;
+							if(o['children'] != undefined)
+							{
+								for(var cx in o['children'])
+								{
+									if(o['children'][cx] === p)
+										alreadyIn=true;
+								}
+							}
+						
+							if(!alreadyIn)
+							{
+								var cname = (p.name != null)?p.name:p.baseName;
+								var pname = (o.name != null)?o.name:o.baseName;
+								
+		                        demoted.push(c);
+                        
+								if(o['children'] == undefined) o['children'] = new Array();
+                        
+								// tweak: adjust child to cater for parents border if present
+								if(o['brushDiameter'] > 0)
+								{
+									p.top = p.top - 1;
+									p.bottom = p.bottom - 1;
+								
+								}
+								
+		                        o['children'].push(p);
+		
+		
+								// adjust padding
+								var bDelta = o.bottom-p.bottom;
+																
+								if(bDelta < o['paddingBottom'])
+								{
+									o['paddingBottom'] = bDelta;
+								}
+								
+							}
+					
+       
+	                    }else if(isOverlap(p, o))
+	                    {
+							
+		
+	                        // create a child that cannot nest properly
+	    					var alreadyIn=false;
+							if(o['abschildren'] != undefined)
+							{
+								for(var cx in o['abschildren'])
+								{
+									if(o['abschildren'][cx] === p)
+										alreadyIn=true;
+								}
+							}
+
+							if(!alreadyIn)
+							{
+								var cname = (p.name != null)?p.name:p.baseName;
+								var pname = (o.name != null)?o.name:o.baseName;
+								
+		                    	demoted.push(c);
+		
+								// setup childs absolute position (relative+absolute)
+								p['isAbsolute']=true;
+								p['absleft'] = p['left'] - o['left'];
+								p['abstop'] = p['top'] - o['top'];
+					
+						
+		                        if(o['abschildren'] == undefined) o['abschildren'] = new Array();
+                        
+		                        o['abschildren'].push(p);
+						
+								// mark this rect as it has overlapping children 
+								o.oType="RectangleAbs";
+						
+							}
+	                    }
+	                }
+	            }
+	            c++;
+	        }       
+	    }
+	    demoted.sort(numericSort);
+	    var lastidx=-1;
+	    // remove objects moved as children
+	    while(demoted.length > 0)
+	    {
+	        var idx = demoted.pop();
+	        if(idx != lastidx)          // unique index only
+	            list.splice(idx,1);
+	        lastidx=idx;
+	    }
+	
+	}catch(err)
+	{
+		error(err.description);			
+	}
+}
+// determine if object totally within another object
+function isInside(child, parent)
+{   
+    if((child.left >= parent.left) && (child.top >= parent.top) && 
+        (child.right <= parent.right) && (child.bottom <= parent.bottom) )
+    {       
+	    return true;
+    }
+    return false;
+}
+function isBoundaryOverlap(a, b)
+{
+	
+	if(a.left>b.right) return false;
+	if(b.left>a.right) return false;
+	if(a.bottom<b.top) return false;
+	if(b.bottom<a.top) return false;
+	if(isInside(a, b)) return false;
+	if(isInside(b, a)) return false;
+	
+	return true;
+}
+
+// determine if child object overlaps in a deliberate way (r)
+function isOverlap(child, parent)
+{ 
+    // first check if touching          
+    var cx1 = child.left;
+    var cy1 = child.top;
+    var cx2 = child.right;
+    var cy2 = child.bottom;
+    var px1 = parent.left;
+    var py1 = parent.top;
+    var px2 = parent.right;
+    var py2 = parent.bottom;
+    if(cx2<=px1) return false;
+    if(cy2<=py1) return false;
+    if(cx1>px2) return false;
+    if(cy1>py2) return false;
+    
+	
+
+    // use area differential of booleaned rects to detect overlap
+    var area1=child.width*child.height;
+    var area2=parent.width*parent.height;
+    if(area2 < area1) return false;             // parent < child area
+    
+    var area3=Math.max(area1, area2);
+    var x1 = Math.min(cx1,px1);
+    var y1 = Math.min(cy1,py1);
+    var x2 = Math.max(cx2,px2);
+    var y2 = Math.max(cy2,py2);
+    var area4 = (x2-x1)*(y2-y1);
+    if(area4 > area3)
+	{
+		
+        return true;
+    
+	}
+return false;
+}
+
+
+var fonts = new Array("Arial", "Helvetica", "sans-serif", "Times New Roman", "Times", "serif", "Courier New", "Courier", "monospace",
+						"Georgia","Verdana","Geneva","Trebuchet", "Comic", "Meiryo", "Osaka", "MS PGothic", "Hiragino Kaku Gothic Pro", "ＭＳ Ｐゴシック", "メイリオ", "ヒラギノ角ゴ Pro");
+					
+function checkInFontList(fntname)
+{
+	for(var i in fonts)
+	{
+		var l = fonts[i];
+		l = l.toLowerCase();
+		m = fntname.toLowerCase();
+		
+		if(m.indexOf(l)!=-1)
+			return true;
+	}
+	
+	return false;
+}
+
+// comment both the css and html element
+function comment(str)
+{
+	if(showcomments)
+		WRITE_HTML_CONTENT("<!-- "+str+" -->\n");	
+}
+
+
+// output the text buffers 
+function writeAllOutput()
+{
+	
+	
+	docwrite("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n");
+	docwrite("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
+	docwrite("<head>\n");
+	docwrite("\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset="+fw.textOutputEncoding.toUpperCase()+"\" />\n");
+	docwrite("\t<title>"+pageTitle+"</title>\n");
+	
+	if(externalCSS)
+	{
+		//var cssfile = Files.open(externalCSSFileName, true);
+	    //cssfile.write(cssbuf);
+		WRITE_EXTERNAL_CSS(cssbuf);
+	
+		docwrite("\t<link rel=\"stylesheet\" type=\"text/css\" href=\""+externalCSSFileName+"\" media=\"all\" />\n");
+	}else{
+		docwrite("\t"+opencsstxt+"\n");
+		docwrite("\t"+cssbuf+"\n");
+		docwrite("\t"+closecsstxt+"\n");
+	}
+	docwrite("\t<!--[if IE]>\n"); 
+	docwrite("\t<style type=\"text/css\" media=\"all\">.borderitem {border-style: solid;}</style>\n"); 
+	docwrite("\t<![endif]-->\n");
+	
+	docwrite("</head>\n\n");
+
+	docwrite("<body>\n");
+
+	// plusversion
+	if(hasFormElements)
+	{
+		docwrite("<form action=\"#\" method=\"get\">\n");
+	}
+	// -plusversion
+		
+    docwrite(htmlbuf+"\n");
+}
+
+function showListInComments(title)
+{
+	for(var i in allDocList)
+    {
+        var o = allDocList[i];
+		var pname = (o.name != null)?o.name:o.baseName;
+		comment(pname+"("+o.oType+")");		
+	}
+	comment("");
+	
+}
+try {
+	
+	// if generating the page content
+	if(mode == "page")
+	{
+		modifyObjects();
+		simplify();
+		detectListContents();
+		detect3Slice();
+		sliceAbsorb();
+		simplify();
+		tagTextLinks();
+		tagPatternFills();
+		mergeSlicesIntoLists();
+		
+		if(!detectCompatibilliy())	// detect overlap
+		{
+			alert(getString("overlap",overlapString));
+
+			// render all objects in absolute positioning mode
+			for(var i in allDocList)
+			{
+				var o = allDocList[i];
+				doElement(o, o.left, o.top, o.width, o.height, o.right, false, true);
+				if(abort)
+					break;
+				closeElement(o);
+			}
+			
+		}else{
+			goForIt2();
+		}
+		
+		writeAllOutput();
+	}
+	// End of Stage 2 Section ======================================================================= 
+	// fwonlyblock
+	if(mode == "data")
+	{
+		WRITE_HTML("var docWidth="+exportDoc.width+"\n");
+		WRITE_HTML("var imagePath=\""+slices.imagesDirPath+"\"\n");
+		WRITE_HTML("var backgroundColor=\""+CONVERT_COLOUR(exportDoc.backgroundColor)+"\"\n");
+		WRITE_HTML("var doComments = "+fw.getPref("HTMLCommentsOn")+"\n");
+		WRITE_HTML("var slicelist=new Array();\n");
+		WRITE_HTML("var csslinklist=new Array();\n");
+		WRITE_HTML("var csspatternlist=new Array();\n");
+		WRITE_HTML("var allDocList=new Array();\n");
+		WRITE_HTML("var mode = \"page\";\n");
+		WRITE_HTML("var pageTitle = \""+ pageTitle+"\";\n");
+		WRITE_HTML("var externalCSS = "+externalCSS+";\n");
+		WRITE_HTML("var externalCSSFileName = \""+ externalCSSFileName+"\";\n");
+	
+	}
+	// -fwonlyblock
+
+	WRITE_HTML(content_str);
+
+		
+	if(mode == "page")
+	{
+		// plusversion
+		if(hasFormElements)
+		{
+			docwrite("\n</form>\n");
+		}
+		// -plusversion
+	
+		docwrite("</body>\n");
+		docwrite("</html>\n");
+	}
+
+	if(fileNameBug)
+	{
+		alert(getString("filename",oldname));
+		Files.deleteFileIfExisting(newname);
+		Files.copy(oldname, newname);
+	}
+
+	// export images ok
+	if(abort)
+		"abort";
+	else
+		"ok";
+
+}catch(error)
+{
+	alert(error)
+}
+
+

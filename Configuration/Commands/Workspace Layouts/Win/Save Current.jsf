@@ -1,0 +1,30 @@
+﻿//--not for batch--
+// Copyright (c) 1998, 1999, 2000, 2001, 2002  Macromedia. All rights reserved.
+try{
+fw.checkFwJsVersion(0);
+
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Save Current.jsf");
+var filename = prompt(__tooltips["filename"]);
+
+
+if (filename != null) {
+	// if the user typed a number for the filename, convert it to a string.
+	filename = "" + filename;
+	var newfilename = "";	// we need to "escape" any apostrophe's in the filename
+    for (i in filename) {
+    	var c = filename[i];
+    	if (c == '\'') {
+    		newfilename += '\\';
+    	}
+    	newfilename += c;
+    }
+
+	var jscode = "fw.readPanelStateFromFile(fw.currentScriptDir + '/" + newfilename + ".xml');";
+	var destDir = fw.userJsCommandsDir + "/Workspace Layouts";
+	if (!Files.exists(destDir))
+		Files.createDirectory(destDir);
+	fw.writePanelStateToFile(destDir + "/" + filename + ".xml");
+	fw.saveJsCommand(jscode, destDir + "/" + filename);
+}
+}catch(e){alert(e);}

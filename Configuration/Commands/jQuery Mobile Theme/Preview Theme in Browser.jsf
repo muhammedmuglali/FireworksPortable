@@ -1,0 +1,466 @@
+var extn = "";
+
+function __main()
+{
+	if(fw.documents.length == 0)
+	{
+		fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+		localizedString = __jQuerytooltips;
+		alert(localizedString.active);	
+	}
+	else
+	{
+		extn = "";
+		//Copy the required files to the users directory
+		var appHtmlCodeFolder = fw.appHtmlCodeDir;
+		var userCommandsFolder = fw.userJsCommandsDir;
+		var dom = fw.getDocumentDOM();
+		var currPage = dom.currentPageNum;
+		if(fw.platform == "mac")
+		{
+		  var index_a = 0;
+		  var index_u = 0;
+		  var count_a = 0;
+		  var count_u = 0;
+		 for (var n = 0; n < appHtmlCodeFolder.length; n++)
+			{
+				if (appHtmlCodeFolder[n] == '\/')
+				{
+					count_a++;
+					if (count_a == 4)
+					{
+						index_a = n;
+						break;
+					}
+				}
+			}
+		 n=0;
+		 for (n = 0; n < userCommandsFolder.length; n++)
+			{
+				if (userCommandsFolder[n] == '\/')
+				{
+					count_u++;
+					if (count_u == 4)
+					{
+						index_u = n;
+						break;
+					}
+				}
+			}
+		  userCommandsFolder = userCommandsFolder.substring(index_u);
+		  userCommandsFolder = "file:///" + userCommandsFolder;
+		  
+		  appHtmlCodeFolder = appHtmlCodeFolder.substring(index_a);
+		  appHtmlCodeFolder = "file:///" + appHtmlCodeFolder;
+		}
+
+		var filePath = appHtmlCodeFolder + "/jQuery/preview_browser/";
+		var jqFolderExists = Files.exists( filePath );
+
+		var userPath = userCommandsFolder + "/jQuery";
+		var jQueryfolderExists = Files.exists( userPath);
+		if(false == jQueryfolderExists)
+			Files.createDirectory( userPath);
+		var folderExists = Files.exists( userPath + "/preview_browser/" );
+
+		if((false == folderExists) && (true == jqFolderExists))
+		{
+			__copyFilesToRespectiveFolders(userPath,appHtmlCodeFolder)
+		}
+		folderExists = Files.exists( userPath + "/preview_browser" );
+		if(true == folderExists)
+		{
+			extn = "";
+			fw.logPipEvent("jQuery Mobile Theme", null, "Preview Theme In Browser");		
+			var cssFile = userPath + "/preview_browser/css/MyTheme.css";
+			if (cssFile !=null && cssFile !="")
+			Files.deleteFileIfExisting(cssFile);
+			Files.createFile(cssFile,".css","FW");
+			var fp = Files.open(cssFile,true);
+			fw.textOutputEncoding = "utf-8";
+			
+			//myCSSCode is the string that contains the entire CSS Code
+			swatchArr = "";
+			var myCSScode= "";
+			var dom=fw.getDocumentDOM();
+			fw.runScript(fw.appHtmlCodeDir + "/jQuery/generateCSS.jsf");
+			myCSScode += entireCSS;
+			myCSScode = "@import url(\"icons-18-white.css\");\n" + myCSScode;
+			swatchArr = swatchNameArr;
+			__exportImages(userPath + "/preview_browser/css");		
+			fp.write(myCSScode);
+			fp.close();	
+			extn = "";
+			var HTMLCode = createAndWriteHTML(swatchArr);
+			var previewFile = userPath + "/preview_browser/preview.html";
+			Files.deleteFileIfExisting(previewFile);
+			Files.createFile(previewFile,".html","FW");
+			var fptr = Files.open(previewFile,true);
+			fw.textOutputEncoding = "utf-8";
+			
+			fptr.write(HTMLCode);
+			fptr.close();	
+			
+			myCSScode = "";
+			swatchArr = "";
+			
+			fw.getDocumentDOM().selectNone();
+			dom.changeCurrentPage(currPage);
+			fw.getDocumentDOM().selectNone();
+			$.sleep(3000);
+			fw.launchBrowserTo(previewFile);
+		}
+		
+	}
+}
+
+function __copyFilesToRespectiveFolders(userCommandsPath,appHTMLDir)
+{
+	var userCommandsFolder = userCommandsPath;
+	var fwHtmlCodeFolder = appHTMLDir;
+		//Create the jQuery preview_browser folder
+		Files.createDirectory( userCommandsFolder + "/preview_browser");
+		
+		//Copy HTML file
+		var copyHTMLFile = fwHtmlCodeFolder + "/jQuery/preview_browser/preview.html";
+		var pasteHTMLFile = userCommandsFolder + "/preview_browser/" + "preview.html";
+		Files.copy(copyHTMLFile, pasteHTMLFile);
+		
+		//Copy JS file
+		var jsFileFolder = fwHtmlCodeFolder + "/jQuery/preview_browser/js/";
+		var jsFiles = Files.enumFiles( jsFileFolder );
+		var jsLen = jsFiles.length;
+		var i,jsFileName,jsPastePath;
+		
+		Files.createDirectory( userCommandsFolder + "/preview_browser/js");
+		for (i=0; i<jsLen; i++)
+		{
+			jsFileName = jsFiles[i];
+			jsFileName = jsFileName.substr(jsFileName.lastIndexOf("/")+1);
+			jsPastePath = userCommandsFolder + "/preview_browser/js/" +jsFileName;
+			Files.copy(jsFiles[i], jsPastePath);
+		}
+		
+		//copy CSS files
+		var cssFileFolder = fwHtmlCodeFolder + "/jQuery/preview_browser/css/";
+		var cssFiles = Files.enumFiles( cssFileFolder );
+		var cssLen = cssFiles.length;
+		var j,cssFileName,cssPastePath;
+		
+		Files.createDirectory( userCommandsFolder + "/preview_browser/css");
+		for (j=0; j<cssLen; j++)
+		{
+			cssFileName = cssFiles[j];
+			cssFileName = cssFileName.substr(cssFileName.lastIndexOf("/")+1);
+			cssPastePath = userCommandsFolder + "/preview_browser/css/" +cssFileName;
+			Files.copy(cssFiles[j], cssPastePath);
+		}
+		
+		//Copy images
+		var spritesImagesFolder = fwHtmlCodeFolder + "/jQuery/preview_browser/css/images/";
+		var spriteFiles = Files.enumFiles( spritesImagesFolder );
+		var spritesLen = spriteFiles.length;
+		
+		var k,spritesFileName,cssPastePath;
+		Files.createDirectory( userCommandsFolder + "/preview_browser/css/images");
+		for (k=0; k<spritesLen; k++)
+		{
+			spritesFileName = spriteFiles[k];
+			spritesFileName = spritesFileName.substr(spritesFileName.lastIndexOf("/")+1);
+			imagesPastePath = userCommandsFolder + "/preview_browser/css/images/" +spritesFileName;
+			Files.copy(spriteFiles[k], imagesPastePath);
+		}
+
+}
+
+function createAndWriteHTML(swatchArray)
+{
+var htmlCode = ""
+var swatchNum = swatchArray;
+htmlCode = "\<\!DOCTYPE html\>\n"+ 
+			"<html lang=\"en\"\>\n" +
+			"<head>\n"+
+			"<meta charset=\"utf-8\">\n" +
+			"<title>jQuery Theme Preview</title>\n\n\n" +
+			"<link rel=\"stylesheet\" href=\"css/jquery.ui.all.css\">\n"+
+			"<link rel=\"stylesheet\" href=\"css/MyTheme.css\"/>\n"+
+			"<link rel=\"stylesheet\"  href=\"css/default.css\" />\n"+
+			"<script src=\"js/jquery-1.6.2.js\"></script>\n"+
+			"<script src=\"js/jquery.ui.core.js\"></script>\n"+
+			"<script src=\"js/jquery.ui.widget.js\"></script>\n"+ 
+			"<script src=\"js/jquery.ui.tabs.js\"></script>\n"+
+			"<script src=\"js/jquery-mobile.js\"></script>\n\n"+
+			" <script> \n" +
+			"\t$(function() {\n"+
+			"\t$( \"#tabs\" )\.tabs();\n"+
+			"\t});\n"+
+			" </script>\n\n\n"+
+			"<style type=\"text/css\">\n"+
+			".preview{\n"+
+			"width: 230px;\n"+
+			"float: left;\n"+
+			"border: none;\n"+
+			"margin: 4px 0 4px 8px;\n"+
+			"}\n"+
+			"\.wrapper{\n"+
+			"background: #fff;\n"+
+			"min-height: 500px;\n"+
+			"}\n"+	
+			"#highlight{\n"+
+			"display: none; \n"+
+			"z-index: 20;\n"+
+			"}\n"+
+			".ui-page{\n"+
+			"background: #fff;\n"+
+			"}\n"+
+			".ui-page-corner\n"+
+			"{\n" +
+			"-moz-border-radius: 4px;\n"+
+			"-webkit-border-radius: 4px;\n"+ 
+			"}\n"+
+			".ui-jQuery-tab-corner\n"+
+			"{\n" +
+			"-moz-border-radius: 10px 10px 1px 1px;\n"+
+			"-webkit-border-radius: 10px 10px 1px 1px;\n"+ 
+			"}\n"+
+			"</style>\n"+ 
+			"</head> \n"+
+			"<body> \n"+
+			"<div id=\"tabs\" class=\"ui-page-corner\"> \n"+
+			"<ul class=\"ui-page-corner\"> \n";
+	var slen = swatchNum.length;
+	var x=0;
+	for(x=0;x<slen;x++)
+	{
+		 htmlCode += "<li class= \"ui-jQuery-tab-corner\">\n\t<a href=\"#tabs-"+ x +"\">" + swatchNum[x]+ "</a>\n</li>\n";
+	}
+	htmlCode += "</ul> \n";	
+	for(x=0;x<slen;x++)
+	{
+		 htmlCode += "<div id=\"tabs-"+ x +"\">\n";
+		htmlCode +=  "<div class=\"wrapper\">\n" +
+					 "<div class=\"preview ui-shadow swatch\">\n"+
+					 "<div class=\"ui-header ui-bar-" + swatchNum[x] + "\" data-theme=\"" + swatchNum[x]+ "\" data-form=\"ui-bar-"+  swatchNum[x] + "\" data-role=\"header\" role=\"banner\">"+
+					"<a class=\"ui-btn-left ui-btn ui-btn-icon-notext ui-btn-corner-all ui-shadow ui-btn-up-"+ swatchNum[x] +"\" data-iconpos=\"notext\" data-form=\"ui-btn-up-" + swatchNum[x] + "\" data-theme=\"" + swatchNum[x] +"\" data-role=\"button\" data-icon=\"home\" title=\" Home \">\n"+
+					"<span class=\"ui-btn-inner ui-btn-corner-all\">\n"+
+					"<span class=\"ui-btn-text\"> Home </span>\n"+
+					"<span data-form=\"ui-icon\" class=\"ui-icon ui-icon-home ui-icon-shadow\"></span>\n"+
+					"</span>\n"+
+					"</a>\n"+
+					"<h1 class=\"ui-title\" tabindex=\"0\" role=\"heading\" aria-level=\"1\">"+ swatchNum[x] +"</h1>\n"+
+					"<a class=\"ui-btn-right ui-btn ui-btn-icon-notext ui-btn-corner-all ui-shadow ui-btn-up-"+ swatchNum[x] +"\" data-iconpos=\"notext\" data-form=\"ui-btn-up-"+swatchNum[x]+"\" data-theme=\"" + swatchNum[x]+ "\" data-role=\"button\" data-icon=\"grid\" title=\" Navigation \">\n"+
+					"<span class=\"ui-btn-inner ui-btn-corner-all\">"+
+					"<span class=\"ui-btn-text\"> Navigation </span>\n"+
+					"<span data-form=\"ui-icon\" class=\"ui-icon ui-icon-grid ui-icon-shadow\">\n</span>"+
+					"</span>\n"+
+					"</a>\n"+
+					"</div>\n"+
+					"<div class=\"ui-content ui-body-"+swatchNum[x] + "\" data-theme=\""+ swatchNum[x]+"\" data-form=\"ui-body-"+ swatchNum[x]+"\" data-role=\"content\" role=\"main\">\n"+
+					"<p>\n"+
+					"Sample text and <a class=\"ui-link\" data-form=\"ui-link\" href=\"#\">links</a>."+
+					"</p>\n"+
+					"<ul data-role=\"listview\" data-inset=\"true\" data-theme=\""+ swatchNum[x]+"\" data-dividertheme=\""+ swatchNum[x] +"\">\n"+
+					"<li data-role=\"list-divider\" role=\"heading\" data-form=\"ui-bar-"+ swatchNum[x] +"\">Divider</li>\n"+
+					"<li data-form=\"ui-btn-up-"+ swatchNum[x] +"\"><a href=\"#\">Item</a></li>"+
+					"</ul>\n"+
+					"<div data-role=\"fieldcontain\"> \n"+
+					"<fieldset data-role=\"controlgroup\" data-type=\"horizontal\">\n"+
+					"<input type=\"radio\" name=\"radio-view-a\" id=\"radio-view-a-a\" value=\"list\" checked=\"checked\"/>\n"+
+					"<label for=\"radio-view-a-a\" data-form=\""+ swatchNum[x] +"ui-btn-up-"+ swatchNum[x] +"\">On</label>\n"+
+					"<input type=\"radio\" name=\"radio-view-a\" id=\"radio-view-b-a\" value=\"grid\"  />\n"+
+					"<label for=\"radio-view-b-a\" data-form=\"ui-btn-up-"+ swatchNum[x] +"\">Off</label> \n"+
+					"</fieldset> \n"+
+					"</div>\n"+
+					"<div data-role=\"fieldcontain\">\n"+
+					"<input type=\"range\" name=\"slider\" value=\"0\" min=\"0\" max=\"100\" data-form=\"ui-body-"+ swatchNum[x] +"\" data-theme=\""+swatchNum[x]+"\" />\n"+
+					"</div>\n"+
+					"<button data-icon=\"star\" data-theme=\""+ swatchNum[x] +"\" data-form=\"ui-btn-up-"+swatchNum[x]+"\">Button</button>\n"+
+					"</div>\n"+
+					"</div>\n"+
+					"</div>\n";
+		 htmlCode += "</div>\n";
+		 
+	}
+	htmlCode += "</div>\n" +	 "</body>\n" +"</html> \n";	
+	return htmlCode	;
+
+}
+
+
+function __exportImages(imgFolder)
+{
+	var imageFolder = imgFolder + "/images";
+	// Create Images folder if doesnt Exist. 
+	Files.deleteFileIfExisting(imageFolder);
+	Files.createDirectory(imageFolder);
+	
+	var curPage = fw.getDocumentDOM().currentPageNum;
+	var numbrPages = fw.getDocumentDOM().pagesCount;
+	if((curPage != 0) && (numbrPages > 1))	//Change the current page to first page
+		fw.getDocumentDOM().changeCurrentPage(0);
+		
+	folderExists = Files.exists(imageFolder);
+	var successfulExport = false;
+	if(true == folderExists)
+	{
+		var sliceFrames = fw.getDocumentDOM().frames;
+		var webSliceLayerIndex = sliceFrames[0].topLayers.length;	//Get the number of top layer. This returns ony the top layers and not the sub layers.
+		
+		var topLayer = sliceFrames[0].topLayers[webSliceLayerIndex-1];	
+		var length = webSliceLayerIndex;	//Get the number of layers to get the index of sub layer of web layer.
+		var slices = topLayer.elemsandsublayers;
+		var cntk = slices.length - 1;
+		for(cntk = slices.length - 1 ; cntk >= 0 ; cntk--)
+		{	
+			if(("[object Text]"==(slices[cntk].toString())) && (undefined == (slices[cntk].textRuns.textRuns)))
+			{
+				continue;
+			}
+			else
+			{
+				if(slices[cntk].isLayer)
+				{	
+					if("icons-18-white" == slices[cntk].name)
+					{
+						var layerNum = parseInt(length) + 3 ;	//Index of 18-white icon's layer.
+						fw.getDocumentDOM().selectNone();
+						fw.getDocumentDOM().currentLayerNum = layerNum;
+						fw.getDocumentDOM().selectAllOnLayer(layerNum, false, false);
+						var sliceName = imageFolder+"/" + slices[cntk].name;
+						var suffixToDel = "";
+						var paddingVal = 0;
+						if(slices[cntk].name.search("white") != -1)
+							suffixToDel = "w";
+						else if(slices[cntk].name.search("black") != -1)
+							suffixToDel = "b"
+						if(slices[cntk].name.search("18") != -1)
+						{
+							suffixToDel = "_18"+suffixToDel;
+							paddingVal = 18;
+						}
+						else if(slices[cntk].name.search("36") != -1)	
+						{
+							suffixToDel = "_36"+suffixToDel;
+							paddingVal = 36;
+						}
+						successfulExport = fw.exportCSSSpriteForJQuery(sliceName, "ui-icon-", suffixToDel, paddingVal);
+						fw.getDocumentDOM().selectNone();
+						length++;
+					}
+				}      		
+			}
+		}
+	}
+	fw.getDocumentDOM().selectNone();
+	if(successfulExport)
+	{
+		__replaceStringsInCSSFile(imageFolder);
+		successfulExport = false;
+	}
+}
+	
+function __replaceStringsInCSSFile(folder)
+{
+	var cssFilesFolder = folder;
+	var cssFiles = Files.enumFiles(cssFilesFolder);
+	var fileLength = cssFiles.length;
+	var ind,fp;
+	ind=0;
+	for (ind=0; ind<fileLength; ind++)
+	{
+		fp = cssFiles[ind];
+		fp = Files.getFilename(cssFiles[ind]);
+		if (fp.substr(0,1)=="_")
+		{
+			Files.deleteFileIfExisting(cssFiles[ind]);
+		}
+		else
+		{
+			var index = 0;
+			index = fp.lastIndexOf(".");
+			var fName = fp.substring(0,index);
+			if(fp.toLowerCase() == "icons-18-white.css")
+			{
+				var cssIndividualFile = cssFiles[ind];
+				var cssFilePtr = Files.open(cssIndividualFile,true);
+				css = "";
+				var cssClass = cssFilePtr.readline();
+				while(cssClass != null)	//Read every line of the page. Check on Mac
+				{
+					css += cssClass + "\n";
+					cssClass = cssFilePtr.readline();
+				}
+				cssFilePtr.close();
+				var replacedCSS = __replaceCSS(css, fName ); 
+				if(("" != replacedCSS) || (undefined != replacedCSS) || (null != replacedCSS))
+				{
+					__moveToParentDirectoryAndWriteCSS( cssFiles[ind], replacedCSS);
+				}
+			}
+		}
+	}
+}
+
+function __replaceCSS( css, fName )
+{
+	var spriteCSS = css;
+	var baseClass = "." + fName;
+	var iconDiscColor = CSSGlobalIconDisc;
+	var replacedCSS = css;
+	replacedCSS = replacedCSS.replace(".ui-icon-search",".ui-icon-search,\n.ui-icon-searchfield:after");
+	var classesArray = css.split("\n");
+	spriteBaseClass =  classesArray[0];	//The first array item has the base class
+	replacedCSS = replacedCSS.replace(spriteBaseClass,"");	//Remove the base class
+	spriteBaseClass = spriteBaseClass.substring( spriteBaseClass.indexOf("{")+2,spriteBaseClass.indexOf(")")+1);	//Gives the background with only the URL
+	spriteBaseClass = spriteBaseClass.replace("background","background-image");	//Replace the background property name with background image.
+	spriteBaseClass = spriteBaseClass.replace("url(\"","url(\"images/");
+	var baseClassCSS = ".ui-icon,\n.ui-icon-searchfield:after {\n";
+	//baseClassCSS += "\tbackground: #FFFFFF;\n"; //Including the global icon color
+	baseClassCSS += iconDiscColor ; //including the icon disc color which is obtained from generateCSS
+	baseClassCSS += "\t" + spriteBaseClass +";\n";	//Including the background image class.
+	baseClassCSS += "\tbackground-repeat: no-repeat;\n\t-moz-border-radius: 9px;\n\t-webkit-border-radius: 9px;\n\tborder-radius: 9px;\n}"
+	var isWhite = fName.search("white");
+	if(-1 != isWhite)	//Include the ui-icon-alt for white icons
+	{
+		baseClassCSS += "\n.ui-icon-alt {\nbackground: #fff;\nbackground: rgba(255,255,255,.3);\n";
+		baseClassCSS +=	spriteBaseClass.replace("white","black");
+		baseClassCSS +=	";\nbackground-repeat: no-repeat;\n}";
+	}
+	spriteCSS = baseClassCSS + replacedCSS;
+	return spriteCSS;
+}
+	
+function __moveToParentDirectoryAndWriteCSS( cssFilename, replacedCSS)
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/jQuery.jsf");	//Execute the script to obtain all the localized strings
+	var localizedStringName = __jQuerytooltips;
+	//Since getDirectory gives the folder in which the CSS file is present, use getDirectory twice to get the parent folder of images folder where only the sprite images should be present.
+	var oldCSSFolderName = Files.getDirectory( cssFilename );
+	var newCSSFolderName = Files.getDirectory( oldCSSFolderName );
+	var newCSSfileName = Files.getFilename(cssFilename);
+	Files.deleteFileIfExisting(cssFilename);
+	Files.deleteFileIfExisting(newCSSFolderName + "/" + newCSSfileName);
+	checkPermissionToWrite = Files.createFile(newCSSFolderName + "/" + newCSSfileName,".css","FW");
+	if(checkPermissionToWrite == false)
+	{
+		alert(localizedStringName.filePermission);
+		return;
+	}
+	var	cssNewFilePtr = Files.open(newCSSFolderName + "/" + newCSSfileName,true);
+	cssNewFilePtr.write(replacedCSS);
+	cssNewFilePtr.close();
+}
+	
+try
+{
+	__main();
+} 
+catch(FwErr)
+{
+		
+	if(FwErr == "Exit")
+		alert("exit");
+	else
+		alert([FwErr, FwErr.lineNumber, FwErr.fileName].join("\n"));
+		
+}

@@ -1,0 +1,64 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	Widget.elem.customData["flexClassName"] = "Button";
+
+	var currValues = new Array();
+
+	currValues.push({ name:"State",             type:"ComboBox", value:"Up,Up,Over,Down" });
+	currValues.push({ name:"color",             type:"Color",    value:"#0B333C"         });
+	currValues.push({ name:"disabledColor",     type:"Color",    value:"#AAB3B3"         });
+	currValues.push({ name:"enabled",           type:"Boolean",  value:"true"            });
+	currValues.push({ name:"label",             type:"Text",     value:"Button"          });
+	currValues.push({ name:"textRollOverColor", type:"Color",    value:"#2B333C"         });
+	currValues.push({ name:"textSelectedColor", type:"Color",    value:"#000000"         });
+
+	currValues.push({ name:"MXML", type:"MXML", value:"<mx:Button color='$1' disabledColor='$2' enabled='$3' label='$4' textRollOverColor='$5' textSelectedColor='$6'/>" });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var vals    = Widget.elem.customData["currentValues"];
+	var state   = vals[0].value.split(",")[0];
+	var enabled = vals[3].value;
+	var obj;
+
+	obj = Widget.GetObjectByName("label");
+	if (enabled)
+	{
+		switch (state)
+		{
+			case "Up"  : obj.pathAttributes.fillColor = vals[1].value; break;
+			case "Over": obj.pathAttributes.fillColor = vals[5].value; break;
+			case "Down": obj.pathAttributes.fillColor = vals[6].value; break;
+		}
+	}
+	else
+	{
+		obj.pathAttributes.fillColor = vals[2].value;
+	}
+	obj.textChars = vals[4].value;
+
+	Widget.GetObjectByName("up_fill").visible     = ((state=="Up") || (state=="Over") || (!enabled));
+	Widget.GetObjectByName("up_border").visible   = ((state=="Up") || (!enabled));
+	Widget.GetObjectByName("over_border").visible = (((state=="Over") || (state=="Down")) && enabled);
+	Widget.GetObjectByName("down_fill").visible   = ((state=="Down") && enabled);
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+	default: break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

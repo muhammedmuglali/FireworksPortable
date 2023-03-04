@@ -1,0 +1,60 @@
+/**** Script to preview in Adobe Device Central ****/
+/**** deviceCentralTargetName should have the BridgeTalk specifier name for Device Central ****/
+
+var deviceCentralTargetName = "devicecentral-3.5";
+var appStatus = BridgeTalk.isRunning(deviceCentralTargetName);
+
+if (!appStatus)
+{
+	BridgeTalk.launch(deviceCentralTargetName);
+}
+else
+{
+	BridgeTalk.bringToFront(deviceCentralTargetName);
+}
+
+//Check whether Device Central is running after the previous call since both the calls
+//have no return value. We are not sure DC was indeed launched.
+
+var runStatus = BridgeTalk.isRunning(deviceCentralTargetName);
+
+if(runStatus)
+{
+	//Get the temporary path from FW
+	var tmpFilePath = Files.getTempFilePath(null);
+		
+	var tmpFileName = tmpFilePath.concat(".png");
+				
+	//Export the current page in PNG32 format
+	var result = fw.exportDocumentAs(null,tmpFilePath,{colorMode:"32 bit", exportFormat:"PNG"});
+
+	var platform = fw.platform;
+	//Strip of the prefix "file:///" Fireworks adds
+	tmpFileName = tmpFileName.replace("file:///" , "");
+	if(platform == "win")
+	{	
+		//Replace '|' with ':' after Drive name
+		tmpFileName = tmpFileName.replace('|',':');
+	}
+	else if (platform == "mac")
+	{
+		//Remove the Hard disk name from the path 
+		var curLength = tmpFileName.length;
+		var indexPos = tmpFileName.indexOf("/");
+		tmpFileName = tmpFileName.substr(indexPos, curLength);
+	}	
+	
+	
+	if(result)
+	{
+		//Call the Device Central with the filepath
+		var bt = new BridgeTalk;
+		bt.target = deviceCentralTargetName;
+		bt.body = "app.emulate('" + tmpFileName + "');";
+		bt.send();
+		
+	}
+}
+	
+
+

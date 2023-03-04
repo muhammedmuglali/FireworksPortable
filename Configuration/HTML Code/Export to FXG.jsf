@@ -1,0 +1,2127 @@
+﻿/*******************************************************************/
+/*                                                                 */
+/*                      ADOBE CONFIDENTIAL                         */
+/*                   _ _ _ _ _ _ _ _ _ _ _ _ _                     */
+/*                                                                 */
+/* Copyright 2010 Adobe Systems Incorporated                       */
+/* All Rights Reserved.                                            */
+/*                                                                 */
+/* NOTICE:  All information contained herein is, and remains the   */
+/* property of Adobe Systems Incorporated and its suppliers, if    */
+/* any.  The intellectual and technical concepts contained         */
+/* herein are proprietary to Adobe Systems Incorporated and its    */
+/* suppliers and may be covered by U.S. and Foreign Patents,       */
+/* patents in process, and are protected by trade secret or        */
+/* copyright law.  Dissemination of this information or            */
+/* reproduction of this material is strictly forbidden unless      */
+/* prior written permission is obtained from Adobe Systems         */
+/* Incorporated.                                                   */
+/*                                                                 */
+/*******************************************************************/
+/*          Fireworks 11.1.0 Export to FXG Script    	     	   */
+
+                                                                     
+//	Filename
+//		Export to FXG.jsf
+//
+//	Purpose
+//		Fireworks JavaScript file that is used to Export a file
+//		from Fireworks as an FXG file.
+//
+//****************************************************************************
+
+//Global Variables
+var __bitmapName = 0;
+var __currLayer = 0;
+var __showStroke = true;
+var Library = new Array();
+var SymbolID = new Array();
+var SymbolName = new Array();
+var identifierArr=new Array();
+var bInDefinition = false;
+var bIsLegacyText = false;
+var bIsMissingFont = false;
+var bExportSelection = false;
+var tabIndent = 1;
+var tabIndentToRevert = 1;
+var imageFolder = "";
+var localizedString;
+var SDK = false;
+var cntGroup = 1;
+var lastSavedLocation;
+var currFrameNum = 0;
+var counter = 1;
+
+var folder ="";
+
+identifierArr=[ "as","false","internal","is","native","null","super","to","use","each","include","final","get","set","NULL","colorTransform","fill","filters","mask","matrix","segments","stroke","transform","BevelFilter","BitmapFill","BitmapImage","BlurFilter","CDATASection","ColorMatrixFilter","ColorTransform","Definition","DropShadowFilter","GlowFilter","GradientBevelFilter","GradientEntry","GradientGlowFilter","Graphic","Group","Ellipse","Library","Line","LinearGradient","LinearGradientStroke","Matrix","Path","PlaceObject","RadialGradient","RadialGradientStroke","Rect","SolidColor","SolidColorStroke","RichText","Transform","kUnknownElement","Private","kPrivElement","content","states","Application","State","DesignLayer","VariantContent","div","p","span","a","tcy","TextLayoutFormat","linkNormalFormat","linkHoverFormat","linkActiveFormat","br","tab","img"];
+
+//*************************************************************************************
+// Function
+//		__main()
+//
+// Purpose
+//		The control moves to the main function after Export to FXG is invoked from the menu item.
+//		It creates a '*.fxg' file, '.assets' folder and calls __parseDocument to write a XML-based graphics
+//		interchange format for the Flash Platform according to FXG 2.0 specification.
+//
+// Parameters
+//		None
+// 
+// Returns
+//		Nothing
+// 
+//*************************************************************************************		
+function __main()
+{	
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Export to FXG.jsf");	//Execute the script 'Export to FXG.jsf'.
+	localizedString = __tooltips;
+		
+	var MXMLG = "";
+	var doc = "";
+
+		
+	
+	if(fw.fxgOutput == "fromBridge")  //Checking to see if the export is being invoked by Bridge or from FW. If it is from Bridge, then the default JS browse window is shown.
+	{
+		
+		folder = fw.browseForFolderURL();	//Displays a dialog box that lets a user select a particular directory.
+		
+				
+		if (folder == null)
+		return;
+			
+		var file = prompt(localizedString.fileName,"Fwks.fxg");
+				
+		if (file == null)
+		return;
+				
+		if (file.length > 4)
+		{
+			if(file.substr(file.length-4)!=".fxg")
+			file += ".fxg";
+		}	
+		else	file += ".fxg";
+
+				
+		imageFolder = file.substring(0,file.length - 4) + ".assets";
+		imageFolder= "/" + imageFolder;
+				
+		// Create Images folder if doesnt Exist
+		
+		if(!Files.exists(folder + imageFolder)) 
+		{
+			Files.deleteFileIfExisting(folder + imageFolder);
+		
+			Files.createDirectory(folder + imageFolder);
+		}
+
+		file = folder + "/" + file;
+		
+		
+		
+		
+		var CurrPage = fw.getDocumentDOM().currentPageNum;	//Get the index of the current page.
+		var psCase = __checkCase(fw.getDocumentDOM().pagesCount);	//Get the number of pages.
+				
+		for(var i = 0 ; i < fw.getDocumentDOM().pagesCount ; i++)
+		{				
+			fw.getDocumentDOM().changeCurrentPage(i);
+			tabIndent  = 1;
+			doc += __parseDocument(fw.getDocumentDOM(),psCase);				
+		}			
+		fw.getDocumentDOM().changeCurrentPage(CurrPage);	//Changes the currently active page to the specified page number
+	
+	}
+	else	
+	{
+		folder = exportDoc.htmlOutputPath.substring(0,exportDoc.htmlOutputPath.lastIndexOf("/"));
+		var file = exportDoc.htmlOutputPath.substring(exportDoc.htmlOutputPath.lastIndexOf("/"),exportDoc.htmlOutputPath.length);
+	
+		imageFolder = file.substring(0,file.length - 4) + ".assets";
+		Files.deleteFileIfExisting(folder + "/" + imageFolder);
+		Files.createDirectory(folder + imageFolder);
+		
+		file = folder + file;
+	
+	
+		if(exportDoc.exportSettings.exportPageMode == "selected objects")	//Only selected objects are to be exported?
+		{
+			if(fw.selection.length == 0) throw Errors.ENoActiveSelection;
+			bExportSelection = true;
+			doc += printTab(tabIndent++) + "<Group d:userLabel=\"Selection\">" ;
+			for(var i = fw.selection.length - 1 ; i >= 0; i--)
+			{				
+				doc += __parseElement(fw.selection[i],fw.getDocumentDOM());		//Write out corresponding tags for each selected object.	
+			}
+			doc += printTab(--tabIndent) + "</Group>";
+		}
+		/* Code commented as a result of Bug 2544670
+		if(exportDoc.exportSettings.exportPageMode == "selected objects")
+		{
+			if(fw.selection.length == 0) throw Errors.ENoActiveSelection;
+			bExportSelection = true;
+			var x = 9999 , y = 9999;
+			var selectionElement = "";
+			
+			for(var i = 0 ; i < fw.selection.length; i++)
+			{				
+				selectionElement += __parseElement(fw.selection[i],fw.getDocumentDOM());
+				if(x > fw.selection[i].left) x = fw.selection[i].left;
+				if(y > fw.selection[i].top) y = fw.selection[i].top;
+			}
+			
+			var selectionFXG = printTab(tabIndent++) + "<Definition name=\"Selection\">" +
+				   printTab(tabIndent++) + "<Group d:userLabel=\"Symbol\" x=\"-" + x + "\" y=\"-" + y + "\">" 
+			selectionFXG +=	selectionElement;
+				   
+			Library["Selection"] = selectionFXG + printTab(--tabIndent) + "</Group>" +
+			printTab(--tabIndent) + "</Definition>";
+			doc += printTab(tabIndent) + "<Selection x=\"" + x + "\" y=\"" + y + "\" />";				
+		}*/
+		else if(exportDoc.exportSettings.exportPageMode == "all pages")		//Export all pages present in Fireworks?
+		{			
+			var CurrPage = fw.getDocumentDOM().currentPageNum;	
+		
+			var psCase = __checkCase(fw.getDocumentDOM().pagesCount);
+		
+			for(var i = 0 ; i < fw.getDocumentDOM().pagesCount ; i++)
+			{				
+				fw.getDocumentDOM().changeCurrentPage(i);
+				tabIndent  = 1;
+				doc += __parseDocument(fw.getDocumentDOM(),psCase);				
+			}			
+			fw.getDocumentDOM().changeCurrentPage(CurrPage);	
+		}
+		else // export current page
+		{
+			var psCase = __checkCase(1);
+			
+			tabIndent  = 1;
+			doc += __parseDocument(fw.getDocumentDOM(),psCase);						
+		}
+	}
+	
+		
+	if(SDK)
+	{
+
+		MXMLG = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+		'<mx:Application xmlns="http://ns.adobe.com/mxml/2009" xmlns:mx="library:adobe/flex/halo" xmlns:d="http://ns.adobe.com/fxg/2008/dt">' +
+		"\n<Graphic version=\"2.0\"" + 		
+		" viewHeight= \"" + fw.getDocumentDOM().height + "\"" +
+		" viewWidth= \"" + fw.getDocumentDOM().width + "\">"+
+		"\n\t<Library>";
+
+	}	
+	else
+	{
+		MXMLG = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+		"\n<Graphic version=\"2.0\" xmlns=\"http://ns.adobe.com/fxg/2008\" " +
+		"xmlns:d=\"http://ns.adobe.com/fxg/2008/dt\" " +
+		"xmlns:fc=\"http://ns.adobe.com/flashcatalyst/2009\" " +
+		" viewHeight= \"" + fw.getDocumentDOM().height + "\"" +
+		" viewWidth= \"" + fw.getDocumentDOM().width + "\">" +
+		"\n\t<Library>";
+	}
+
+	for(var i in Library)
+		MXMLG += "\n" + Library[i].toString();
+
+	if(SDK)
+		MXMLG +=  "\n\t</Library>\n" + doc + "\n</Graphic>\n</mx:Application>";
+	else
+		MXMLG += "\n\t</Library>\n" + doc + "\n</Graphic>";
+
+	if(fw.fxgOutput == "fromBridge")
+	{
+		if(Files.exists(file))
+		Files.deleteFile(file);
+
+		Files.createFile(file,".txt","FWMX");
+		var f = Files.open(file, true, "UTF8");
+		f.writeUTF8(MXMLG);
+		f.close();
+		fw.fxgOutput = "";
+	}
+	else
+	{
+		fw.textOutputEncoding = "utf-8";
+		WRITE_FXG(MXMLG);
+	}
+	
+}
+
+//********************************************************************************************
+// Function
+//		__checkCase
+//
+// Purpose
+//		This function checks for the number of pages and the number of states and returns 
+//		the	value accordingly. The value returned by this function is used in the switch 
+//		statement of the function __parseDocument().
+//
+// Parameters
+//		pageCount : Number of pages in the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		1 : In case of, one page and one state.
+//		2 : In case of, one page and N(N>1) states.
+//		3 : In case of, N(N>1) pages and one state.
+//		4 : In case of, N(N>1) pages and N(N>1) states.
+// 
+//*********************************************************************************************		
+function __checkCase(pageCount)
+{	
+	var framesCount=0;
+	if(pageCount == 1)
+	{
+		// check frames
+		framesCount = fw.getDocumentDOM().frames.length;
+		if(framesCount == 1)
+			return 1;
+		else
+			return 2;
+	}
+	else
+	{
+		for(var i = 0 ; i < pageCount ; i++)
+		{
+			fw.getDocumentDOM().changeCurrentPage(i);
+			if(fw.getDocumentDOM().frames.length > 1)
+				return 4;	
+		}	
+		return 3;
+	}
+}
+
+//*************************************************************************************************
+// Function
+//		__parseDocument
+//
+// Purpose
+//		__parseDocument() calls __parseElement to write tags for each element in the document and adds 
+//		it to a group element, which is a container element for related elements. (OR)
+//		Iterates through every element in the document and groups related graphics elements.
+//		
+//
+// Parameters
+//		fwdom    				   :  Document object of the Fireworks Document that is currently being exported.
+//		psCase 					   :  Number of pages in the Fireworks Document that is currently being exported.
+//		isButton(default argument) :  If __parseDocument is invoked by __parseSymbol, and if symbol is a button,
+//									  then this argument is set to true.This is required to set the visibility of 
+//									  all the states of the button,except for the 'Up' State, to false.
+// 
+// Returns
+//		frames : 	String containing FXG tags to represent the states(previously, frames) of the Fireworks object in the Fireworks Document.
+// 
+//*************************************************************************************************		
+function __parseDocument(fwdom,psCase,isButton)		//Adding a default argument 'isButton' to check if we're writing out attributes for button symbol.
+{
+	var i,j,cntk;
+	var frames = "";
+	var myFrames = fwdom.frames;
+	isButton = typeof(isButton) != 'undefined' ?  isButton : false;	//If the function is not invoked by __parseSymbol, then make the default argument false.
+	
+	for(i = 0 ; i < myFrames.length ; i++)
+	{
+		currFrameNum = i;
+		
+		switch (psCase)
+		{
+			case 1: // CASE 1: 1 Page : 1 State
+				break;
+			case 3: // CASE 3: N Page : 1 State
+				frames += printTab(tabIndent++) + '<Group d:type="layer" d:layerType="page" ';
+				frames += 'd:userLabel="' + fwdom.pageName.replace(/[\W]/g,"_") + '"';
+				frames += ' d:pageWidth="' + fwdom.width + '"' + ' d:pageHeight="' + fwdom.height + '">';
+				break;
+				
+			case 4: // CASE 4: N Page : N State
+				frames += printTab(tabIndent++) + '<Group d:type="layer" d:layerType="page" ';
+				frames += 'd:userLabel="' + (fwdom.pageName + '_' + myFrames[i].name).replace(/[\W]/g,"_") + '"';					
+				frames += ' d:pageWidth="' + fwdom.width + '"' + ' d:pageHeight="' + fwdom.height + '">';
+				break;
+			
+			case 2: // CASE 2: 1 Page : N State
+			default:
+				frames += printTab(tabIndent++) + '<Group d:type="layer" d:layerType="page" ';
+				frames += 'd:userLabel="' + myFrames[i].name.replace(/[\W]/g,"_") + '"';
+				frames += ' d:pageWidth="' + fwdom.width + '"' + ' d:pageHeight="' + fwdom.height + '">';
+				break;
+			
+		}
+		
+			
+		
+		// add a rectangle to support background color.
+		if(fwdom.backgroundColor.search(/#ffffff/i) == -1)
+		{
+			
+			frames += printTab(tabIndent++) + '<Rect x="0" y="0" width="' + fwdom.width + '" height="' + fwdom.height + '" fc:isBackgroundRectangle="true" d:userLabel="Background" d:locked="true">' +
+				  printTab(tabIndent++) + '<fill>' +
+				  printTab(tabIndent) + '<SolidColor color="' + fwdom.backgroundColor + '"/>' + 
+				  printTab(--tabIndent) + '</fill>' +
+				  printTab(--tabIndent) + '</Rect>';
+		}
+			 
+		for(j = 0 ; j < myFrames[i].topLayers.length - 1 ; j++)
+		{	
+			var topLayer = myFrames[i].topLayers[j];
+			var elems = topLayer.elemsandsublayers;			
+			frames += printTab(tabIndent++) + "<Group d:userLabel=\""+ (topLayer.name).replace(/[\W]/g,"_") + "\" d:type=\"layer\"";
+			if(topLayer.locked) frames += " d:locked=\"true\"";
+			if(isButton==true)	//Check if we're writing out attributes for button symbol.
+			{ 	
+				var lang = fw.getFWLaunchLanguage();
+				switch(lang)				
+				{
+				
+					case "pt_BR":
+							if(( myFrames[i].name) == "Liberado")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+									
+					case "cs_CZ":
+							if(( myFrames[i].name) == "Nahoře")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "nl_NL":
+							if(( myFrames[i].name) == "Omhoog")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "fr_FR":	
+					case "fr_CA":   
+							if(( myFrames[i].name) == "Relevé")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "de_DE":
+							if(( myFrames[i].name) == "Nach oben")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "it_IT":
+							if(( myFrames[i].name) == "Su")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "ja_JP": 
+							if(( myFrames[i].name) == "アップ")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+								
+					case "ko_KR": 
+							if(( myFrames[i].name) == "위로")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "pl_PL": 
+							if(( myFrames[i].name) == "W górę")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "ru_RU":
+							if(( myFrames[i].name) == "Не нажата")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "zh_CN":
+							if(( myFrames[i].name) == "弹起")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "zh_TW":	
+							if(( myFrames[i].name) == "一般")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "es_ES":   
+					case "es_MX":
+							if(( myFrames[i].name) == "Arriba")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "sv_SE": 
+							if(( myFrames[i].name) == "Upp")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "tr_TR": 
+							if(( myFrames[i].name) == "Yukarı")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					case "uk_UA": 
+							if(( myFrames[i].name) == "Up")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+							
+					default: 
+							if(( myFrames[i].name) == "Up")	//If the button state is 'Up', set visibility to true.
+								frames += ">";
+							else
+								frames += " visible=\"false\">";
+							break;
+				}
+			}
+			else
+			{	
+				frames += topLayer.visible ?">":" visible=\"false\">";
+			}	
+			for(cntk = elems.length - 1 ; cntk >= 0 ; cntk--)
+			{	
+				//Check for empty text object
+				if(("[object Text]"==(elems[cntk].toString())) && (undefined == (elems[cntk].textRuns.textRuns)))
+				{
+					continue;
+				}
+				else
+				{
+					frames += __parseElement(elems[cntk],fwdom);
+				}
+			}
+			frames += printTab(--tabIndent) + "</Group>";
+		}	
+		if (psCase!=1) frames += printTab(--tabIndent) + "</Group>";
+	}
+	
+	currFrameNum = 0;
+	return frames;
+}
+
+//*******************************************************************************************
+// Function
+//		__parseLayer
+//
+// Purpose
+//		__parseLayer() calls __parseElement to write tags for each object in the layer and 
+//		adds it to a group element, which is a container element for related objects.
+//
+// Parameters
+//		myLayer :   Fireworks object in the particular layer.
+// 		fwdom   :   Document object of the Fireworks Document that is currently being exported.
+//
+// Returns
+//		layer   :	String containing FXG tags for the Fireworks objects present in a layer 
+//					along with an FXG tag to represent that layer.
+// 
+//*******************************************************************************************		
+function __parseLayer(myLayer,fwdom)
+{	
+	var layer = printTab(tabIndent++) + "<Group d:userLabel=\""+ (myLayer.name).replace(/[\W]/g,"_") + "\" d:type=\"layer\"";
+	if(myLayer.frames[currFrameNum] != undefined) 
+	{
+		if(myLayer.frames[currFrameNum].locked)
+		{			
+				layer += " d:locked=\"true\"";
+		}
+		if(myLayer.frames[currFrameNum].visible)
+		{
+				layer += ">";
+		}
+		else
+		{
+				layer += " visible=\"false\">";
+		}
+	}
+	else
+	{
+		layer += ">";	
+	}
+	
+	var j;	
+	for(j = myLayer.elems.length - 1 ; j >= 0 ; j--)
+	{
+		layer += __parseElement(myLayer.elems[j],fwdom);
+	}
+	layer += printTab(--tabIndent) + "</Group>";
+	
+	return layer;
+}
+
+
+
+/*
+
+Following Mask conditions are supported
+
+1. Base Object is Vector | Bitmap : Mask is Vector : Show Fill and Stroke is not checked : Edge is Hard
+2. Base Object is Vector | Bitmap : Mask is Bitmap : Mask is "Alpha Channel"
+
+*/
+
+
+//*************************************************************************************************
+// Function
+//		__parseElement
+//
+// Purpose
+//		This function checks for the type of element and calls the respective function to write out tags 
+//		for the element.
+//
+// Parameters
+//		myElement  :   Selection property of currently selected Fireworks object.(fw.selection[i],ith selected item)
+// 		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+//
+// Returns
+//		element    :	String containing FXG tags for each Fireworks object, which is in accordance with the FXG 2.0 Specification. 
+// 
+//*************************************************************************************************	
+function __parseElement(myElement,fwdom)
+{	
+	
+	var element = "";
+	
+	if(myElement.mask != null)
+	{	
+		if(myElement.mask.enabled)
+		{
+			tabIndent += 3;
+			var maskDefinition = __parseElement(myElement.mask.element,fwdom);
+			tabIndent -= 3;
+			element = printTab(tabIndent++) + "<Group maskType='" + ((maskDefinition.search(/BitmapImage/i)!= -1) ? "alpha" : "clip") + "'>" +
+				  printTab(tabIndent++) + "<mask>" + printTab(tabIndent++) + "<Group>" + maskDefinition + printTab(--tabIndent) + "</Group>" +
+				  printTab(--tabIndent) + "</mask>";
+			__showStroke = true;
+			//myElement.mask.enabled = false;			
+		}
+	}
+	tabIndentToRevert = tabIndent;
+	switch (myElement.toString())
+	{
+		case "[object Layer]":
+			if(myElement.layerType != "web")					
+				element += __parseLayer(myElement,fwdom);
+			break;        
+
+		case "[object RectanglePrimitive]":			
+			element += __parseRect(myElement,fwdom);
+			break;
+	
+		case "[object CompoundShape]":	
+			element += __parsePath(myElement.resultantPath,fwdom);			
+			break;
+		
+		case "[object Path]":
+			element += __parsePath(myElement,fwdom);
+			break;
+
+		case "[object Group]":					
+			element += __parseGroup(myElement,fwdom);  
+			break;
+
+		case "[object Text]":							
+			element += __parseText(myElement,fwdom);
+			break;
+
+		case "[object Image]":					
+			element += __parseImage(myElement,fwdom);
+			break;
+
+		case "[object Instance]":
+			element += __parseSymbol(myElement,fwdom);
+			break;
+			
+		case "[object Hotspot]":		
+		case "[object SliceHotspot]":		
+			break;
+	}
+	
+	if(myElement.mask != null)
+	{
+		//myElement.mask.enabled = true;
+		if(myElement.mask.enabled) element += printTab(--tabIndent) + "</Group>";
+	}
+	
+	return element;
+	
+}
+
+
+//*************************************************************************************************
+// Function
+//		__exportElement
+//
+// Purpose
+//		This function is invoked in case any property applied on Fireworks object cannot be
+//		mapped to a corresponding FXG tag. We then export the whole object as a bitmap image 
+//		and it is placed in the "*.assets" folder. 
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.	
+// 
+// Returns
+//		expElem	   :   String containing FXG tags for the Bitmap image.
+// 
+//*************************************************************************************************		
+function __exportElement(element,fwdom)
+{	
+	var bVisible = element.visible;
+	tabIndent = tabIndentToRevert;
+	//Ignore invisible elements inside a symbol.
+	if(!element.visible)
+	{
+		try 
+		{
+			element.visible = true;
+		}
+		catch(SymbolDomError)
+		{		
+			return "";
+		}
+	}
+	var Img = new Array();
+	Img.push(element);
+	fwdom.exportElements(Img,folder + imageFolder,"Image_" + __bitmapName);
+	
+	var expElem = printTab(tabIndent++) + "<BitmapImage source=\"@Embed('/" + (imageFolder.replace("/","")).replace(/%20/g," ") + "/Image_" + __bitmapName + ".png')\" x=\"" + 
+			Math.round(element.pixelRect.left) + "\" y=\"" + Math.round(element.pixelRect.top) + "\"" + 
+			(element.name == null ? '':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'"');
+			
+	if(!bVisible) element.visible  = false;
+	if(!element.visible) expElem += " visible=\"false\"";
+	if(element.locked) expElem += " d:locked=\"true\"";
+	
+	expElem += ">" + printTab(--tabIndent) + "</BitmapImage>";
+	__bitmapName++;
+	
+	return expElem;
+}
+
+//*************************************************************************************************
+// Function
+//		__parseImage
+//
+// Purpose
+//		__parseImage() writes tags for bitmap images and places all the bitmap images present in the 
+//		Fireworks document into the "*.assets" folder.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.
+//					   (fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		expElem	   :   String containing tags for the Bitmap image along with the effects applied, 
+//					   which is in accordance with FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __parseImage(element,fwdom)
+{	
+	var bVisible = element.visible;
+	// Ignore invisible elements inside a symbol.
+	if(!element.visible)
+	{
+		try
+		{
+			element.visible = true;
+		}
+		catch(SymbolDomError)
+		{		
+			return "";
+		}
+	}
+	var ImgArray = new Array();
+	ImgArray.push(element);
+	fwdom.exportElements(ImgArray,folder + imageFolder ,"Image_" + __bitmapName);
+	var bitmap = printTab(tabIndent++) + "<BitmapImage source=\"@Embed('/" + (imageFolder.replace("/","")).replace(/%20/g," ") + "/Image_" + __bitmapName + ".png')\" x=\"" + Math.round(element.pixelRect.left) +
+		     "\" y=\""+ Math.round(element.pixelRect.top) + "\"" + (element.name == null ? '':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'"');
+
+	if(element.locked) bitmap += " d:locked=\"true\"";
+	if(!bVisible) element.visible = false;
+	if(!element.visible) bitmap += " visible=\"false\"";
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) return __exportElement(element,fwdom);
+	bitmap += " blendMode=\"" + blendMode + "\"";	
+	bitmap += ">";
+	__bitmapName++;	
+	if(element.effectList)
+			if(element.effectList.effects.length > 0)
+			{
+				var fltr = __parseFilters(element);
+				if(fltr == -1) return __exportElement(element,fwdom);
+				bitmap += fltr;
+			}
+	bitmap += printTab(--tabIndent) + "</BitmapImage>";
+	return bitmap;
+
+}
+
+//*************************************************************************************************
+// Function
+//		__parseSymbol
+//
+// Purpose
+//		This function is used to parse a symbol present in Fireworks DOM. It can 
+//		either be a button, animation or graphic symbol. It invokes the __NameMangling function
+//		to get a unique, valid name for the symbol. It invokes the __getSymbolDeclaration function
+//		to write out the general properties of the symbol like fill color. The __parseDocument 
+//		function is invoked to look for other Fireworks objects present inside a symbol.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		symbol	   :   String containing FXG tags for symbol.
+// 
+//*************************************************************************************************		
+function __parseSymbol(element,fwdom)
+{	
+	
+	var i="";
+	var symbol = "";
+	var symName = "";
+	var resetTab = tabIndent;
+	var isButton=false;	
+	
+	if((element.instanceType.toString())=="button")	//If the symbol is a button, set 'isButton' to true.
+	{
+		isButton=true;
+	}
+	
+	for( i in SymbolID)
+	{
+		if(SymbolID[i] == element.symbolID)
+		{
+			//symbol = printTab(tabIndent) + "<" + i + " x=\"" + (element.left + element.width/2) + "\" y=\"" + (element.top + element.height/2)+ "\" />"
+			symbol = __getSymbolDeclaration(element,fwdom);
+			return symbol;
+		}
+	}
+
+	symName = __NameMangling(element,fwdom);
+	
+	i="";
+	
+	for( i in SymbolName)	//Rule 5:If the new name collides with an existing name, prepend an underscore and value of the counter
+	{	
+		if(SymbolName[i] == symName)
+		{
+			
+			symName= symName + "_" + counter;
+			counter++;
+		}
+	}
+	
+	SymbolName[element.symbolID] = symName ;
+	
+	SymbolID[element.symbolID] = element.symbolID ;
+		
+	var symbolDOM = fw.getDocumentDOM(element.symbolID);
+	tabIndent = 1 ; 
+	Library[element.symbolID] = printTab(tabIndent++) + "<Definition name=\"" + SymbolName[element.symbolID]+ "\">" +
+				    printTab(tabIndent++) + "<Group d:userLabel=\"Symbol\">" +
+				    __parseDocument(symbolDOM,2,isButton) + 
+				    printTab(--tabIndent) + "</Group>" +
+				    printTab(--tabIndent) + "</Definition>";				
+	tabIndent = resetTab;	
+	symbol = __getSymbolDeclaration(element,fwdom);
+	
+	return symbol;
+	
+}
+
+//*************************************************************************************************
+// Function
+//		__NameMangling
+//
+// Purpose
+//		Name Mangling algorithm is implemented to generate a unique, valid identifier for the symbol name.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		symName	   :   A unique, valid symbol name.
+// 
+//*************************************************************************************************		
+function __NameMangling(element,fwdom)	//Refer to https://zerowing.corp.adobe.com/display/thermo/FXG+Name+Mangling for symbol naming conventions. 
+{
+	var i = 0;
+	var len = 0;
+	var charMatch = 0;
+	var firstChar = "";
+	var lastChar = "";
+	var symName = "";
+	
+	symName = element.symbolName;
+	
+	if(symName == "")	//If symbol name is null,then replace null with "symXXX", where XXX is the value of the counter
+	{
+		symName = "sym_" + counter;
+		counter++;
+	}
+	else
+	{
+		firstChar = symName.charAt(0);
+		if((firstChar.match(/[A-Za-z0-9_]/)) == null)	//Rule 1A:If the initial character does not match the regex [A-Za-z0-9_],prepend the prefix "sym".
+		{
+					symName=symName.replace(symName.charAt(0),"sym_");
+		}	
+		else if((firstChar.match(/[A-Za-z]/)) == null)	//Rule 1B:If the initial character of the name does not match the regex [A-Za-z], prepend the prefix "sym".
+		{
+					symName=symName.replace(symName.charAt(0),"sym");
+		}			
+		len=symName.length;
+		
+		symName = symName.replace(/[^a-zA-Z0-9_]/g,"_");	//Rule 2:If symbol name contains characters that does not match the regex [A-Za-z0-9_]+,replace with a single underscore "_"	
+		symName = symName.replace(/[_][_]+/g,"_");	//Replace consecutive underscores with a single underscore.
+		
+		//Check for last character
+		len = symName.length;
+		lastChar = symName.charAt(len-1);
+		if(lastChar == "_")	//Rule 4:If last character is an underscore then append the value of counter to the symbol name.
+			{
+				symName = symName + counter;
+				counter++;
+			}
+			
+		for(i=0;i<identifierArr.length;i++)
+			{
+			if(symName.toLowerCase()==identifierArr[i].toLowerCase())		//If symbol names are any of the Identifiers,then prepend the prefix "sym_".
+				{
+					symName= "sym_" + symName;
+				}
+			}
+	}
+	return symName;
+}
+
+//*************************************************************************************************
+// Function
+//		__getSymbolDeclaration
+//
+// Purpose
+//		This function is used to define the general properties of the symbol on canvas
+//		such as width, height, effects added to it(if any) etc. 
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		symbolDec  :   String containing tags for defining the properties of symbol such as name, width, height, effects etc.
+// 
+//*************************************************************************************************		
+function __getSymbolDeclaration(element,fwdom)
+{
+	var symbolDec = "";
+	
+	var tMatrix = element.transform.matrix;
+	var strMatrix = __isValidTransformMatrix(tMatrix);
+	var fltr = "";
+	if(element.effectList)
+	{
+		if(element.effectList.effects.length > 0)
+		{
+			tabIndent = strMatrix == "invalid" ? tabIndent++ : tabIndent+2;
+			fltr = __parseFilters(element);
+			tabIndent = strMatrix == "invalid" ? tabIndent-- : tabIndent-2;
+			if(fltr == -1) return __exportElement(element,fwdom);				
+		}
+	}
+	
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) blendMode = "normal";
+	if(SymbolName[element.symbolID]==undefined)
+			{	
+				SymbolName[element.symbolID]=SymbolID[element.symbolID];
+			}	
+	if( strMatrix != "invalid")
+	{			
+		symbolDec = printTab(tabIndent++) + "<Group d:userLabel=\"" + SymbolName[element.symbolID] + "\">" + strMatrix +
+			    printTab(tabIndent) + "<" + SymbolName[element.symbolID] + " alpha=\"" + (element.opacity/100) + "\"" +
+			    (element.locked ? ' d:locked="true"':'') + (element.visible ? '':' visible="false"') + " blendMode=\"" + blendMode + "\"" +
+			    (fltr == "" ? '/>' : ('>' + fltr + printTab(tabIndent) + '</' + SymbolName[element.symbolID] + '>')) +			    
+			    printTab(--tabIndent) + "</Group>";		
+	}
+	else
+	{
+		symbolDec = printTab(tabIndent) + "<" + SymbolName[element.symbolID] +
+		" x=\"" + (element.left + element.width/2) + "\" y=\"" + (element.top + element.height/2) + "\"" +
+		" alpha=\"" + (element.opacity/100) + "\"" + (element.locked ? ' d:locked="true"':'') + (element.visible ? '':' visible="false"') + " blendMode=\"" + blendMode + "\"" +
+		(fltr == "" ? '/>' : ('>' + fltr + printTab(tabIndent) + '</' + SymbolName[element.symbolID] + '>'));
+	}	
+		
+	return symbolDec;
+}
+
+//*************************************************************************************************
+// Function
+//		__isValidTransformMatrix
+//
+// Purpose
+//		This function checks if the transform matrix is valid i.e., object is not skewed or distorted.
+//		If it is a valid transform, it writes out the scale, translation and rotation values as applicable.
+//
+// Parameters
+//		matrix     :	A matrix that indicates all the transformations that were applied to the object.
+// 
+// Returns
+//		strMatrix  :    Tags indicating the transformation values according to the FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __isValidTransformMatrix(matrix)
+{	
+	if(Math.abs(matrix[2]) > 0.001 || Math.abs(matrix[5]) > 0.001 || Math.abs(matrix[8]) > 1.001)	// Skew or distort is applied and cannot be represented
+		return "invalid";
+	
+	if((matrix[0] == 1 || matrix[0] == -1) && matrix[1] == 0 && matrix[3] == 0 && (matrix[4] == 1 || matrix[4] == -1)) // No transformation applied
+		return "invalid";
+	
+	tabIndent++;
+	var strMatrix = printTab(tabIndent++) + "<transform>" + 
+			printTab(tabIndent++) + "<Transform>" +
+			printTab(tabIndent++) + "<matrix>" +
+			printTab(tabIndent) + "<Matrix" ;
+		
+	if(matrix[0] != 1)
+		strMatrix += ' a="' + (matrix[0]) + '"';
+	if(matrix[1] != 0)
+		strMatrix += ' b="' + (matrix[1]) + '"';
+	if(matrix[3] != 0)
+		strMatrix += ' c="' + (matrix[3]) + '"';
+	if(matrix[4] != 1)
+		strMatrix += ' d="' + (matrix[4]) + '"';
+	strMatrix += ' tx="' + Math.round(matrix[6]) + '" ty="' + Math.round(matrix[7]) + '"/>';
+	
+	strMatrix += printTab(--tabIndent) + "</matrix>" +
+		     printTab(--tabIndent) + "</Transform>" +
+		     printTab(--tabIndent) + "</transform>";
+	tabIndent--;	
+	
+	return strMatrix;
+}
+
+//*************************************************************************************************
+// Function
+//		__parseRect
+//
+// Purpose
+//		This function is used to map the Fireworks Rectangle object to the FXG rectangle element.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.
+//					   (fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		rect	   :   	String containing tags for the Rectangle primitive object, which is in 
+//					    accordance with FXG 2.0 Specification.
+//	
+//*************************************************************************************************	
+function __parseRect(element,fwdom)
+{
+	var rect = "";
+	var width,height,x,y;
+	var tMatrix = element.transform.matrix;
+	var strMatrix = __isValidTransformMatrix(tMatrix);	
+	if( strMatrix != "invalid") 
+	{				
+		width = element.originalSides.right - element.originalSides.left;
+		height = element.originalSides.bottom - element.originalSides.top;	
+		x = element.originalSides.left;
+		y = element.originalSides.top;
+		rect = printTab(tabIndent++) + "<Group d:userLabel=\"" + ((element.name != null) ? element.name:"Rectangle") + "\">" + strMatrix ;
+	}
+	else
+	{
+		width = element.width;
+		height = element.height;
+		x = element.left;
+		y = element.top;
+	}
+	
+	rect += printTab(tabIndent++) + "<Rect x=\"" + x + 
+		   "\" y=\"" + y +
+		   "\" width=\"" + width +
+		   "\" height=\""+ height + "\"" +
+		   " alpha=\"" + (element.opacity/100) + "\"" +
+		   (element.name == null ? '':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'"');	
+	
+	if(element.locked) rect += " d:locked=\"true\"";
+	if(!element.visible) rect += " visible=\"false\"";
+
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) return __exportElement(element,fwdom);		   
+	rect += " blendMode=\"" + blendMode + "\"";	
+	
+	var radius = element.roundness;
+	
+	if(element.mode != "exact")
+	{		
+		if(width < height)
+			radius = (width/2) * radius;
+		else
+			radius = (height/2) * radius;
+	}	
+	
+	rect += " radiusX=\"" + radius + "\" radiusY=\"" + radius + "\">"; 
+	
+	var pathAttrs = __parsePathAttrs(element);
+	if(pathAttrs == -1) return __exportElement(element,fwdom);
+	rect += pathAttrs + printTab(--tabIndent) + "</Rect>";
+	if( strMatrix != "invalid") 
+		rect += printTab(--tabIndent) + "</Group>";
+	return rect;
+}
+
+//*************************************************************************************************
+// Function
+//		__parseLine
+//
+// Purpose
+//		This function maps the line object of the Fireworks document to FXG line element.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		line	   :   	String containing FXG tags for line object.
+// 
+//*************************************************************************************************		
+function __parseLine(element,fwdom)
+{
+	var contour,curr,prev;
+	contour = element.contours[0];
+	var line = printTab(tabIndent++) + "<Line ";
+	curr = contour.nodes[1];
+	prev = contour.nodes[0];	
+		
+	line += "xFrom=\"" + Math.round(prev.x) + "\" yFrom=\"" + Math.round(prev.y) + "\" xTo=\"" + Math.round(curr.x) +
+		"\" yTo=\"" + Math.round(curr.y) + "\"";
+ 	line += " alpha=\"" + (element.opacity/100) + "\"";
+	if(element.locked) line += " d:locked=\"true\"";
+	if(!element.visible) line += " visible=\"false\"";
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) return __exportElement(element,fwdom);		
+	line += " blendMode=\"" + blendMode + "\"";	
+	line += (element.name == null ? '>':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'">');
+	var pathAttrs = __parsePathAttrs(element);
+	if(pathAttrs == -1) return __exportElement(element,fwdom);
+	line += pathAttrs + printTab(--tabIndent) + "</Line>";
+	return line;	
+}
+
+//*************************************************************************************************
+// Function
+//		__parsePath
+//
+// Purpose
+//		This function maps the path object of the Fireworks document to FXG path element.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		path	   :   String containing tags for path object, according to the FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __parsePath(element,fwdom)
+{
+	var i,j,contour,curr,prev;
+	
+	//Only when the contour is 1 and its nodes are 2, is when we will export it as a Line tag
+	if ((element.contours.length == 1) && (element.contours[0].nodes.length == 2))
+	{
+		contour = element.contours[0];
+		curr = contour.nodes[1];
+		prev = contour.nodes[0];
+		
+		if ((curr.x == curr.predX) && (curr.y == curr.predY) && (curr.x == curr.succX) && (curr.y == curr.succY) &&
+		(prev.x == prev.predX) && (prev.y == prev.predY) && (prev.x == prev.succX) && (prev.y == prev.succY))
+			return __parseLine(element, fwdom);
+	}
+	
+	var path = printTab(tabIndent++) + '<Path winding="' +  (element.isEvenOddFill ? 'evenOdd' : 'nonZero') + '" data="'; 
+
+	for (i = 0 ; i < element.contours.length; i++)
+	{
+		contour = element.contours[i];
+		
+		path += "M " + Math.round(contour.nodes[0].x) + " " + Math.round(contour.nodes[0].y);
+			
+		for (j = 1 ; j < contour.nodes.length ; j++)
+		{
+			curr = contour.nodes[j];
+			prev = contour.nodes[j-1];
+
+			if ((curr.x == curr.predX) && (curr.y == curr.predY) && (curr.x == curr.succX) && (curr.y == curr.succY) &&
+			(prev.x == prev.predX) && (prev.y == prev.predY) && (prev.x == prev.succX) && (prev.y == prev.succY))
+				path += " L " + Math.round(curr.x) + " " + Math.round(curr.y);
+			else
+				path += " C " + Math.round(prev.succX) + " " + Math.round(prev.succY) + " " + Math.round(curr.predX) + " " + Math.round(curr.predY) +    
+					" " + Math.round(curr.x) + " " + Math.round(curr.y);
+		}
+
+		if (contour.isClosed)
+		{    
+
+			curr = contour.nodes[0];
+			prev = contour.nodes[contour.nodes.length - 1];
+
+
+			if ((curr.x == curr.predX) && (curr.y == curr.predY) && (curr.x == curr.succX) && (curr.y == curr.succY) &&
+			(prev.x == prev.predX) && (prev.y == prev.predY) && (prev.x == prev.succX) && (prev.y == prev.succY))
+				path += " L " + Math.round(curr.x) + " " + Math.round(curr.y);
+			else
+			{
+				path += " C "  + Math.round(prev.succX) + " " + Math.round(prev.succY) + " " + Math.round(curr.predX) + " " + Math.round(curr.predY) +    
+					" " + Math.round(curr.x) + " " + Math.round(curr.y);        
+			}
+
+			path += " Z ";
+		}
+	}
+	
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) return __exportElement(element,fwdom);
+	path += "\" blendMode=\"" + blendMode + "\"" + 
+		" alpha=\"" + (element.opacity/100) + "\"" +
+		(element.name == null ? '':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'"');	
+	if(element.locked) path += " d:locked=\"true\"";
+	if(!element.visible) path += " visible=\"false\"";
+	
+	var pathAttrs = __parsePathAttrs(element);
+	if(pathAttrs == -1) return __exportElement(element,fwdom);
+	
+	path += ">" + pathAttrs + printTab(--tabIndent) + "</Path>";
+	
+	return path;
+}
+
+//*************************************************************************************************
+// Function
+//		__parseGroup
+//
+// Purpose
+//		This function is called when objects are grouped in Fireworks using the "Group" option available in Fireworks.
+//		This function traverses through each Fireworks object present in the group and writes out tags for each one of
+//		Fireworks object according to the FXG 2.0 Specification.
+//
+// Parameters
+//		element	 :   Selection property of currently selected Fireworks object.(fw.selection[i],ith selected item)
+//		fwdom	 :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		group	 :	 String containing FXG tags for group object defined in Fireworks.
+// 
+//*************************************************************************************************		
+function __parseGroup(element,fwdom)
+{
+	var i;
+	var group = "";
+	var fltr = "";
+	if(element.effectList)
+	{
+		if(element.effectList.effects.length > 0)
+		{
+			tabIndent++;
+			fltr = __parseFilters(element);
+			tabIndent--;
+			if(fltr == -1) return __exportElement(element,fwdom);				
+		}
+	}
+	
+	if(element.name != null)
+		group = printTab(tabIndent++) + "<Group d:userLabel=\"" +  (element.name).replace(/[\W]/g,"_") + "\"";
+	else
+		group = printTab(tabIndent++) + '<Group d:userLabel="Group_' + cntGroup++  + '"';
+
+	if(element.opacity != 100) group += " alpha=\"" + (element.opacity/100) + "\"";	
+	if(element.locked) group += " d:locked=\"true\"";
+	if(!element.visible) group += " visible=\"false\"";
+	
+	group += ">";
+	
+	for( i = element.elements.length - 1 ; i >= 0 ; i--)
+		group += __parseElement(element.elements[i],fwdom);	
+	
+	group += fltr + printTab(--tabIndent) + "</Group>";
+	
+	return group;
+}
+
+
+/*
+
+List of Fireworks attributes and corresponding FXG mappings for Text
+
+Fireworks				FXG
+--------------------------------------------
+
+x					x
+y					y
+w					width
+h					height
+blend mode				blendMode
+autoKern				Kerning
+rawTop					paddingTop
+rawLeft					paddingLeft
+rawRight				paddingRight
+rawBottom				paddingBottom
+
+
+alignment				textAlign
+bold					fontWeight
+face					fontFamily
+fillColor				color
+italic					fontStyle
+Kerning/rangeKerning			tracking
+
+
+
+NO MAPPING				
+					MarginLeft
+					MarginRight
+antiAliased
+antiAliasMode
+orientation
+baselineShift
+horizontalScale
+fill and Stroke to Text
+
+
+
+*/
+//*************************************************************************************************
+// Function
+//		__parseText
+//
+// Purpose
+//		This function maps the text object in Fireworks document to RichText element of FXG.
+//		The first text run is present inside a paragraph tag and the succeeding text runs are added to
+//		a span tag. 
+//		If text contains missing fonts or if legacy text is present, then the text is exported as an image.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		fwdom	   :   Document object of the Fireworks Document that is currently being exported.
+// 
+// Returns
+//		text	   :   String containing tags for text object, according to the FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __parseText(element,fwdom)
+{	
+
+// Check if text contains CS3 Text / Missing font. If Yes then show a warning message for exporting all such text as Bitmaps 
+	var alertMsg = "";
+	var bAlert = false;
+	
+	
+	var cnt_i = 0; 
+	var Pposition = 0;
+	var text = printTab(tabIndent++) + "<RichText" +
+		   " x=\"" + Math.round(element.pixelRect.left) + "\"" +
+		   " y=\"" + Math.round(element.pixelRect.top) + "\"";
+		
+	//  Fix for the bug #2591612	
+	if(fw.getFamilyNameForPSFont(element.textRuns.textRuns[0].changedAttrs.face) != "")	//Check for missing fonts.
+	{
+		if(element.textRuns.textRuns[0].changedAttrs.size !=  undefined )		//Check for legacy text.
+		{ 
+			if((element.textRuns.textRuns.length)==1)	//fontFamily and associated attributes is written in the RichText tag only when a single type and size of font is present.
+			{  
+				if((element.textRuns.textRuns[0].changedAttrs)!=0)		//If the text is not null.
+				{
+					var currentRun = element.textRuns.textRuns[0].changedAttrs;
+					text += " fontFamily=\"" + fw.getPlatformNameForPSFont(currentRun.face) + "\"";
+					text += " fontSize=\"" + currentRun.size.toString().replace(/pt/,"") + "\"";
+					if((fw.getStyleNameForPSFont(currentRun.face).search(/Italic/i)!= -1) || currentRun.italic)
+						text +=  " fontStyle=\"italic\"";
+					else 
+						text += " fontStyle=\"normal\"";
+					if((fw.getStyleNameForPSFont(currentRun.face).search(/Bold/i)!= -1) || currentRun.bold)
+						text += " fontWeight=\"bold\"";
+					else
+						text += " fontWeight=\"normal\"";
+					if(currentRun.underline)
+						text += " textDecoration =\"underline\"";
+					if(currentRun.fillColor != "#000000")
+						text += " color=\"" + currentRun.fillColor + "\""; 
+				}
+			}	
+		}
+	}
+		
+	if(!element.autoExpand)
+		text +=	" width=\"" + Math.round((element.pixelRect.right - element.pixelRect.left)) + "\"" +
+			" height=\"" + Math.round(element.height) + "\"" ;
+	text += (element.name == null ? '':' d:userLabel="'+element.name.replace(/[\W]/g,"_")+'"');
+	if(!element.autoKern)	text += ' kerning="off"';
+		
+	var blendMode = __getBlendMode(element);
+	if(blendMode == -1) return __exportElement(element,fwdom);
+	
+	var pathAttrs = __parsePathAttrs(element);
+	if(pathAttrs == -1) return __exportElement(element,fwdom);
+			
+	text += ' blendMode="' + blendMode + '"' +
+		' whiteSpaceCollapse="preserve"' +
+		' alpha="' + (element.opacity/100) + '"' +	   
+		(element.visible ? '':' visible="false"') + (element.locked ? ' d:locked="true"':'') + '>';
+	
+	var tMatrix = element.transform.matrix;
+	var strMatrix = __isValidTransformMatrix(tMatrix);
+	if( strMatrix != "invalid") text += strMatrix; //return __exportElement(element,fwdom);
+		
+	
+	text +=	printTab(tabIndent++) + "<content>";
+	
+	for(cnt_i = 0 ; cnt_i < element.textRuns.textRuns.length ; cnt_i++)
+	{
+		
+		if(fw.getFamilyNameForPSFont(element.textRuns.textRuns[cnt_i].changedAttrs.face) == "") // Font is missing
+		{			
+
+			if(element.textRuns.textRuns[cnt_i].changedAttrs.size == undefined ) //Check if CS3 Text
+			{
+				if(bIsLegacyText && bIsMissingFont)
+					return __exportElement(element,fwdom);
+				else
+				{
+					alertMsg = localizedString.missingFont + "\n" + localizedString.oldText + "\n" + localizedString.exportAsBitmap;
+					bAlert = true;
+					bIsLegacyText = true;
+					bIsMissingFont = true;					
+				}
+			}
+			else
+			{
+				if(bIsMissingFont)
+					return __exportElement(element,fwdom);
+				else
+				{
+					alertMsg = localizedString.missingFont + "\n" + localizedString.exportAsBitmap;
+					bAlert = true;
+					bIsMissingFont = true;
+				}
+			}
+		}
+		else if (element.textRuns.textRuns[cnt_i].changedAttrs.size == undefined ) //Check if CS3 Text
+		{
+			if(bIsLegacyText)
+				return __exportElement(element,fwdom);
+			else
+			{
+				alertMsg = localizedString.oldText + "\n" + localizedString.exportAsBitmap;
+				bAlert = true;
+				bIsLegacyText = true;
+			}
+		
+		}
+
+		if(bAlert)
+		{
+			if(confirm(alertMsg))
+				return __exportElement(element,fwdom);
+			else
+				throw "Exit";
+		}
+
+
+		var curRun = element.textRuns.textRuns[cnt_i].changedAttrs;
+		var prevRun = cnt_i == 0 ? curRun:element.textRuns.textRuns[cnt_i - 1].changedAttrs;
+		// if p attributes are different from previous run
+			// write complete P
+		if(cnt_i == 0)	
+			text += __writeP(element,0);
+		
+		else if((prevRun.alignment != curRun.alignment) && (curRun.alignment != "stretch") &&  (curRun.alignment != "left") )
+		{
+			text += __writeP(element,cnt_i);
+			Pposition = cnt_i;
+		}
+		else if((prevRun.paragraphIndent != curRun.paragraphIndent) && (curRun.paragraphIndent != 0))
+		{
+			text += __writeP(element,cnt_i);
+			Pposition = cnt_i;
+		}
+		else if((prevRun.paragraphSpacingAfter != curRun.paragraphSpacingAfter) && (curRun.paragraphSpacingAfter != 0))
+		{
+			text += __writeP(element,cnt_i);
+			Pposition = cnt_i;
+		}
+		else
+			text += __writeSpan(element,cnt_i,Pposition);	
+	}
+
+	text += "</p>" + printTab(--tabIndent) + "</content>" + pathAttrs + printTab(--tabIndent) + "</RichText>";
+	
+	return text;
+}
+
+//*************************************************************************************************
+// Function
+//		__writeP
+//
+// Purpose
+//		This function is invoked by __parseText, to map the first text run to paragraph tag.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		position   :   Index of the current text run.
+// 
+// Returns
+//		strP	   :   String containing paragraph tag with its associated attributes, according to the FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __writeP(element,position)
+{
+
+	var strP = "";
+	if(position != 0)
+		strP = "</p>"; 
+	
+	strP += printTab(tabIndent) + "<p";
+	
+	var currRun = element.textRuns.textRuns[position].changedAttrs;
+				
+	if( (currRun.alignment != "stretch") &&  (currRun.alignment != "left") )
+	{
+		if(!element.autoExpand)
+		{
+			strP += ' textAlign="' + currRun.alignment + '"';
+			if(currRun.alignment == "justify" && position != 0)
+				strP += ' textAlignLast="' + element.textRuns.textRuns[position - 1].changedAttrs.alignment + '"';
+		}
+	}
+
+	if(currRun.paragraphIndent != 0)
+		strP += ' textIndent="' + currRun.paragraphIndent + '"';
+
+	if(currRun.paragraphSpacingBefore != 0)
+		strP += ' marginTop="' + currRun.paragraphSpacingBefore + '"';
+
+	if(currRun.paragraphSpacingAfter != 0)
+		strP += ' marginBottom="' + currRun.paragraphSpacingAfter + '"';
+
+	if(element.orientation.toString().search(/vertical/i) != -1)
+		strP += ' direction="rtl" ' + 'blockProgression= "rl"' ;
+		
+	strP += ' fontFamily="' + fw.getPlatformNameForPSFont(currRun.face) + '"';
+	
+	strP += ' fontSize="' + currRun.size.toString().replace(/pt/,"") + '"';
+	
+	if(currRun.italic || (fw.getStyleNameForPSFont(currRun.face).search(/Italic/i)!= -1))
+		strP += ' fontStyle="italic"';
+	
+	if(currRun.bold || (fw.getStyleNameForPSFont(currRun.face).search(/Bold/i)!= -1))
+		strP += ' fontWeight="bold"';
+		
+	if(currRun.leadingMode == "exact")
+	{
+		if(currRun.leading != 12)
+			strP += ' lineHeight="' + Math.round(currRun.leading) + '"';
+	}
+	else // Leading mode is percentage
+	{
+		if(Math.round(currRun.leading * 100) != 120)
+			strP += ' lineHeight="' + Math.round(currRun.leading * 100) + '\%"';
+	
+	}
+		
+	if(Math.round(currRun.rangeKerning * 100) != 0)
+		strP += ' tracking="' + Math.round(currRun.rangeKerning * 10) + '\%"';	//Note that we are multiplying FW tracking value by only 10 since FXG's tracking range is 1/10 that of FW. 
+		
+	if(currRun.underline)
+		strP += ' textDecoration ="underline"';
+		
+	if(currRun.fillColor != "#000000")
+		strP += ' color="' + currRun.fillColor + '"'; 
+		
+	var txtChars = element.textRuns.textRuns[position].characters.toString();
+	txtChars = txtChars.replace(/[^\x9^\xA^\xD^\x20-\xd7ff^\xe000-\xfffd^\u9^\uA^\uD^\u20-\ud7ff^\ue000-\ufffd^\u10000-\u10ffff]/g," ");
+	txtChars = txtChars.replace(/&/g,"&amp;");
+	txtChars = txtChars.replace(/\</g,"&lt;");
+	txtChars = txtChars.replace(/\>/g,"&gt;");
+	txtChars = txtChars.replace(/\r/g,"<br/>");
+	strP += ">" + txtChars;
+	
+	return strP;
+}
+
+//*************************************************************************************************
+// Function
+//		__writeSpan
+//
+// Purpose
+//		This function maps the first text run to paragraph tag and the succeeding text runs to span tag.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//		position   :   Index of the current text run.
+//		Pposition  :   Index of the previous text run.
+// 
+// Returns
+//		strSpan    :   String containing span tag with its associated attributes, according to the FXG 2.0 Specification.
+// 
+//*************************************************************************************************		
+function __writeSpan(element,position,Pposition)
+{
+	var strSpan = "<span";
+	var currRun = element.textRuns.textRuns[position].changedAttrs;
+	var prevRun = element.textRuns.textRuns[Pposition].changedAttrs;
+	
+	if(currRun.face != prevRun.face)
+		strSpan += ' fontFamily="' + fw.getPlatformNameForPSFont(currRun.face) + '"';
+	if((currRun.size != prevRun.size))
+		strSpan += ' fontSize="' + currRun.size.toString().replace(/pt/,"") + '"';
+	
+	var prevTemp = (prevRun.italic || (fw.getStyleNameForPSFont(prevRun.face).search(/Italic/i)!= -1) ? "italic" : "normal");
+	var currTemp = (currRun.italic || (fw.getStyleNameForPSFont(currRun.face).search(/Italic/i)!= -1) ? "italic" : "normal");
+	
+	if(prevTemp != currTemp)
+		strSpan += ' fontStyle="' + currTemp + '"'; 
+	
+	prevTemp = (prevRun.bold || (fw.getStyleNameForPSFont(prevRun.face).search(/Bold/i)!= -1) ? "bold" : "normal");
+	currTemp = (currRun.bold || (fw.getStyleNameForPSFont(currRun.face).search(/Bold/i)!= -1) ? "bold" : "normal");
+	
+	if(prevTemp != currTemp)
+		strSpan += ' fontWeight="' + currTemp + '"';
+	
+	if((currRun.leading != prevRun.leading))
+	{
+		if(currRun.leadingMode == "exact")
+		{
+			if(currRun.leading != 12)
+				strSpan += ' lineHeight="' + Math.round(currRun.leading) + '"';
+		}
+		else // Leading mode is percentage
+		{
+			if(Math.round(currRun.leading * 100) != 120)
+				strSpan += ' lineHeight="' + Math.round(currRun.leading * 100) + '\%"';
+		
+		}
+	
+	}
+	
+	if((currRun.rangeKerning != prevRun.rangeKerning))
+		strSpan += ' tracking="' + Math.round(currRun.rangeKerning * 10) + '\%"';   //Note that we are multiplying FW tracking value by only 10 since FXG's tracking range is 1/10 that of FW.
+	
+	if((currRun.underline != prevRun.underline))
+		strSpan += ' textDecoration="' + (currRun.underline ? "underline":"none") + '"';
+	
+	if((currRun.fillColor != prevRun.fillColor))
+		strSpan += ' color="' + currRun.fillColor + '"';
+			
+	var txtChars = element.textRuns.textRuns[position].characters.toString();
+	txtChars = txtChars.replace(/[^\x9^\xA^\xD^\x20-\xd7ff^\xe000-\xfffd^\u9^\uA^\uD^\u20-\ud7ff^\ue000-\ufffd^\u10000-\u10ffff]/g," ");
+	txtChars = txtChars.replace(/&/g,"&amp;");
+	txtChars = txtChars.replace(/\</g,"&lt;");
+	txtChars = txtChars.replace(/\>/g,"&gt;");
+	txtChars = txtChars.replace(/\r/g,"<br/>");
+	
+	strSpan += ">" + txtChars + "</span>";
+	
+	return strSpan;
+}
+
+//*************************************************************************************************
+// Function
+//		__parseFilters
+//
+// Purpose
+//		This function writes the tags for applied filters(such as blur, drop shadow, etc) on the element/object.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+// 
+// Returns
+//		strFltr	   :   String containing corresponding FXG tags for filters applied.
+// 
+//*************************************************************************************************		
+function __parseFilters(element)
+{
+	
+	var strFltr = printTab(tabIndent++)+ "<filters>";
+	var cnt_i = 0;
+	var effects = element.effectList.effects;
+	for ( cnt_i = 0 ; cnt_i < effects.length ; cnt_i++)
+	{		
+		var bInner = false;		
+		switch(effects[cnt_i].EffectMoaID)
+		{
+			
+			case "{f1cfce41-718e-11d1-8c8200a024cdc039}":	// Blur and Blur More
+			case "{f1cfce42-718e-11d1-8c8200a024cdc039}":
+				strFltr += printTab(tabIndent) + "<BlurFilter blurX=\"1\" blurY=\"1\" quality=\"3\" />"
+				break;
+			case "{5600f702-774c-11d3-baad0000861f4d01}": // Inner Shadow
+				bInner = true;
+			case "{a7944db8-6ce2-11d1-8c76000502701850}": // Drop Shadow
+				strFltr += printTab(tabIndent) + "<DropShadowFilter";
+				strFltr += " angle=\"" + (360 - Math.round(effects[cnt_i].ShadowAngle)) + "\"";
+				strFltr += " color=\"" + effects[cnt_i].ShadowColor.substr(0,7) + "\"";
+				strFltr += " distance=\"" + effects[cnt_i].ShadowDistance + "\"";
+				
+				if(effects[cnt_i].ShadowColor.length > 7)
+				{
+					var alpha = (parseInt((effects[cnt_i].ShadowColor.substr(7,9)),16))/255;			
+					strFltr += " alpha=\"" + Math.round(alpha*100)/100 + "\"";
+				}
+				strFltr += " quality=\"2\"";
+				strFltr += " blurX=\"" + effects[cnt_i].ShadowBlur + "\"" + " blurY=\"" + effects[cnt_i].ShadowBlur + "\"";
+				if(effects[cnt_i].shadowType == 1) strFltr += "knockout=\"true\"";
+				if(bInner) strFltr += " inner=\"true\"";
+				strFltr += "/>";
+				break;
+			default:
+				return -1;
+		}		
+	}	
+	strFltr += printTab(--tabIndent) + "</filters>";
+	return strFltr;	
+}
+
+//*************************************************************************************************
+// Function
+//		__getBlendMode
+//
+// Purpose
+//		This function obtains the type of blend mode applied to the Fireworks object.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+//	
+// 
+// Returns
+//		blendMode  :   String containing the blendMode attribute of Fireworks element.
+// 
+//**************************************************************************************************		
+function __getBlendMode(element)
+{
+	var blendMode = "";
+	
+	
+	switch(element.blendMode)
+	{
+		case "normal":
+		case "layer":
+		case "multiply":
+		case "screen":
+		case "lighten":
+		case "darken":
+		case "difference":
+		case "subtract":
+		case "invert":
+		case "alpha":
+		case "erase":
+		case "overlay":
+		case "hardlight":
+		case "colordodge":
+		case "exclusion":
+		case "hue":
+		case "saturation":
+		case "color":
+		case "luminosity":
+			blendMode = element.blendMode;
+			break;
+		case "additive":
+			blendMode = "add";
+			break;
+		case "colorBurn":
+			blendMode = "colorburn";
+			break;
+		case "softlight1":
+			blendMode = "softlight";
+			break;
+		default:
+			return -1; //blendMode = "normal";
+			break;
+	}
+	
+	return blendMode;
+
+}
+
+//*************************************************************************************************
+// Function
+//		__parsePathAttrs
+//
+// Purpose
+//		This function writes the sub-properties of path attributes applicable for Fireworks object/element.
+//		Several objects have the pathAttributes property. The valid set of pathAttributes 
+//		sub-properties that can be returned or set are: brushColor,fillColor,brush,fill,
+//		brushTexture,fillTexture,fillHandle1,fillHandle2,fillHandle3,brushPlacement and fillOnTop
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)
+// 
+// Returns
+//		String containing sub-properties of path attributes applicable for the fireworks object/element.
+// 
+//*************************************************************************************************		
+function __parsePathAttrs(element)
+{
+	var f = "";
+	var s = "";
+	
+	if (element.pathAttributes.fill && element.toString() != "[object Text]")
+	{
+
+		var Pt1 =  element.pathAttributes.fillHandle1;
+		var Pt2 =  element.pathAttributes.fillHandle2;
+		var rotation = (Math.atan2(Pt2.y - Pt1.y , Pt2.x - Pt1.x) * 180)/3.14;
+
+		f += printTab(tabIndent++) + "<fill>";
+
+		switch(element.pathAttributes.fill.shape)
+		{
+
+			case "linear":
+
+				var Pt1 =  element.pathAttributes.fillHandle1;
+				var Pt2 =  element.pathAttributes.fillHandle2;
+				var Pt3 =  element.pathAttributes.fillHandle2;				
+				var rotation = (Math.atan2(Pt2.y - Pt1.y , Pt2.x - Pt1.x) * 180)/3.14;
+				var scaleX = Math.sqrt(((Pt2.y - Pt1.y)*(Pt2.y - Pt1.y))+((Pt2.x - Pt1.x)*(Pt2.x - Pt1.x)));
+				f += printTab(tabIndent++) + "<LinearGradient";
+				if(element.toString() != "[object RectanglePrimitive]")
+				{
+				f += " x = \"" + Math.round(Pt1.x) + "\"";	//We have commented subtracting of element bounds now because, as per FXG2.0: x,y for gradients is simply horizontal & vertical translation from origin.
+				f += " y = \"" + Math.round(Pt1.y) + "\"";				
+				}
+				else
+				{
+				f += " x = \"" + Math.round(Pt1.x - element.left) + "\"";	
+				f += " y = \"" + Math.round(Pt1.y - element.top) + "\"";				
+				}
+				f += " scaleX = \"" + Math.round(scaleX) + "\"";
+				f += " rotation = \"" + Math.round(rotation) + "\">";
+				f += __getGradientEntry(element);					
+				f += printTab(--tabIndent) + "</LinearGradient>"
+
+				break;
+
+			case "radial":
+
+				var Pt1 =  element.pathAttributes.fillHandle1;
+				var Pt2 =  element.pathAttributes.fillHandle2;
+				var Pt3 =  element.pathAttributes.fillHandle2;
+				var rotation = (Math.atan2(Pt2.y - Pt1.y , Pt2.x - Pt1.x) * 180)/3.14;
+				var scaleX = Math.sqrt(((Pt2.y - Pt1.y)*(Pt2.y - Pt1.y))+((Pt2.x - Pt1.x)*(Pt2.x - Pt1.x)));
+				f += printTab(tabIndent++) + "<RadialGradient";
+				if(element.toString() != "[object RectanglePrimitive]")
+				{
+				f += " x = \"" + Math.round(Pt1.x) + "\"";	//We have commented subtracting of element bounds now because, as per FXG2.0: x,y for gradients is simply horizontal & vertical translation from origin.
+				f += " y = \"" + Math.round(Pt1.y) + "\"";
+				}
+				else
+				{
+				f += " x = \"" + Math.round(Pt1.x - element.left) + "\"";
+				f += " y = \"" + Math.round(Pt1.y - element.top) + "\"";				
+				}
+				f += " scaleX = \"" + Math.round((scaleX*2)) + "\"";
+				f += " scaleY = \"" + Math.round((scaleX*2)) + "\"";
+				f += " rotation = \"" + Math.round(rotation) + "\">";				
+				f += __getGradientEntry(element);				
+				f += printTab(--tabIndent)+ "</RadialGradient>"
+
+				break;
+
+			case "solid":
+				f += printTab(tabIndent) + "<SolidColor color=\"" + element.pathAttributes.fillColor + "\"/>";
+				break;
+
+			default:
+				return -1;
+		
+		}
+
+		f += printTab(--tabIndent) + "</fill>";
+
+	}
+
+	if (element.pathAttributes.brush && __showStroke && element.toString() != "[object Text]")
+	{
+
+		s += printTab(tabIndent++) + "<stroke>";
+		s += printTab(tabIndent) + "<SolidColorStroke color=\""+element.pathAttributes.brushColor+"\" weight=\""+element.pathAttributes.brush.diameter+"\" caps=\"none\"/>";
+		s += printTab(--tabIndent) + "</stroke>";
+	}
+	
+	if(element.effectList)
+		if(element.effectList.effects.length > 0)
+		{
+			var fltr = __parseFilters(element);
+			if(fltr == -1) return -1;
+			s += fltr;
+		}	
+	return f+s;
+}
+
+//*************************************************************************************************
+// Function
+//		__getGradientEntry
+//
+// Purpose
+//		This function separates the gradient and opacity nodes and sorts them based on their ratio.
+//
+// Parameters
+//		element	   :   The currently selected Fireworks object in the document being exported.(fw.selection[i],ith selected item)	
+// 
+// Returns
+//		gradEntry  :   Array containing the sorted gradient nodes.
+// 
+//*************************************************************************************************		
+function __getGradientEntry(element)
+{
+	var strGrad = new Array();
+	var GradNodes = element.pathAttributes.fill.gradient.nodes;
+	var OpacityNodes = element.pathAttributes.fill.gradient.opacityNodes;
+	var cnt_g = 0;
+	//1. Parse all Gradient Nodes
+	
+	for(var cnt_i = 0 ; cnt_i < GradNodes.length ; cnt_i++ , cnt_g++)
+	{
+		strGrad[cnt_g] = new Object();
+		strGrad[cnt_g].xml = printTab(tabIndent) + "<GradientEntry" +
+				     " color=\"" + GradNodes[cnt_i].color + "\"" +
+				     " ratio=\"" + Math.round(GradNodes[cnt_i].position*100)/100 + "\"" +
+				     " alpha=\"" + __getGradientValue(OpacityNodes,GradNodes[cnt_i].position,"Alpha") + "\"/>";
+		strGrad[cnt_g].ratio = 	GradNodes[cnt_i].position;		
+	}
+	
+	//2. Parse all Opacity Nodes
+	
+	for(var cnt_j = 0 ; cnt_j < OpacityNodes.length ; cnt_j++ , cnt_g++)
+	{
+		strGrad[cnt_g] = new Object();
+		strGrad[cnt_g].xml = printTab(tabIndent) + "<GradientEntry" +
+				     " color=\"" + __getGradientValue(GradNodes,OpacityNodes[cnt_j].position,"Color") + "\"" +
+				     " ratio=\"" + Math.round(OpacityNodes[cnt_j].position*100)/100 + "\"";
+		if(OpacityNodes[cnt_j].color.length > 7)
+			strGrad[cnt_g].xml += " alpha=\"" + (parseInt((OpacityNodes[cnt_j].color.substr(7,2)),16))/255 + "\"/>";
+		else 	strGrad[cnt_g].xml += " alpha=\"1\"/>";
+		strGrad[cnt_g].ratio = 	OpacityNodes[cnt_j].position;			
+	}
+	
+	// Sort strGrad based on ratio
+	for(var cnt_x = 0 ; cnt_x < strGrad.length; cnt_x++)
+	{
+		for(var cnt_y = cnt_x + 1 ; cnt_y < strGrad.length; cnt_y++)
+		{			
+			if(strGrad[cnt_y].ratio = strGrad[cnt_x].ratio)
+				strGrad.splice(cnt_y,1);
+			else if(strGrad[cnt_y].ratio < strGrad[cnt_x].ratio)
+			{
+				var tempNode = strGrad[cnt_x];
+				strGrad[cnt_x] = strGrad[cnt_y];
+				strGrad[cnt_y] = tempNode;
+			}
+		}		
+	}
+	
+	var gardEntry;
+	delete gradEntry;
+	var gradEntry = "";
+	for(var cnt_i = 0 ; cnt_i < strGrad.length ; cnt_i++)
+		gradEntry += strGrad[cnt_i].xml;
+	
+	return gradEntry;	
+}
+
+//*************************************************************************************************
+// Function
+//		__getGradientValue
+//
+// Purpose
+//		This function obtains the Red, Green and Blue Component values of the gradient nodes on the gradient swatch.
+//
+// Parameters
+//		gradNode	:	Array of gradient node objects.
+//		position    :	Position of the gradient node that is a float value from 0.0 to 1.0.
+//		type		:	Type of Gradient Node(Opacity Node or Color Node).
+// 
+// Returns
+//		Hexadecimal RGB values of the gradient nodes on the gradient swatch.    
+//	
+// 
+//*************************************************************************************************		
+function __getGradientValue(gradNode,position,type)
+{
+	var length = gradNode.length;
+	var previousNode = gradNode[0];
+	var nextNode = gradNode[length - 1];
+	for(var cnt_i = 0 ; cnt_i < length ; cnt_i++)
+	{
+		if((gradNode[cnt_i].position < position) && (previousNode.position < gradNode[cnt_i].position))
+			previousNode = gradNode[cnt_i];
+		else if((gradNode[cnt_i].position > position) && (gradNode[cnt_i].position < nextNode.position))
+			nextNode = gradNode[cnt_i];	
+	}
+	
+	if(type == "Alpha")
+	{	// Equation to find opacity 
+		return __getCurrentValue(previousNode,nextNode,position,type);	
+	}
+	else // type == "Color"
+	{		
+		var Red = Math.round(__getCurrentValue(previousNode,nextNode,position,"Red"));	
+		var Green = Math.round(__getCurrentValue(previousNode,nextNode,position,"Green"));	
+		var Blue = Math.round(__getCurrentValue(previousNode,nextNode,position,"Blue"));	
+		
+		return "#" + __getHex(Red) + __getHex(Green) + __getHex(Blue);
+	}
+}
+
+//*************************************************************************************************
+// Function
+//		__getCurrentValue
+//
+// Purpose
+//		This function checks for the type of the gradient node. If the type is opacity then the alpha
+//		value is obtained.If the gradient type is color, the function returns corresponding amount of
+//		gradient handle applied for Red, Green or Blue components of the gradient nodes in the gradient swatch.
+//
+// Parameters
+//		prevNode	:	The gradient node on the left side of the current gradient node in the gradient swatch.
+//		nextNode	:	The gradient node on the right side of the current gradient node in the gradient swatch.
+//		position    :	position of the current gradient node.
+//		type		:	Type of the gradient node, either color or opacity.
+//	
+// 
+// Returns
+//		Red, Green, Blue or Alpha values of the gradient nodes on the gradient swatch.  
+// 
+//*************************************************************************************************		
+function __getCurrentValue(prevNode,nextNode,position,type)
+{
+	
+	var p = position;
+	var p1 = prevNode.position;
+	var p2 = nextNode.position;
+	var a1,a2;
+	if(type == "Alpha")
+	{
+		a1 = a2 = 1;
+		if(prevNode.color.length > 7)
+			a1 = parseInt((prevNode.color.substr(7,2)),16)/255;
+		if(nextNode.color.length > 7)
+			a2 = parseInt((nextNode.color.substr(7,2)),16)/255;
+		if(a1 == a2) return a1;		
+	}
+	else if(type == "Red") // type == "Color"
+	{
+		a1 = parseInt((prevNode.color.substr(1,2)),16);
+		a2 = parseInt((nextNode.color.substr(1,2)),16);		
+		if(a1 == a2) return a1;
+	}
+	else if(type == "Green")
+	{
+		a1 = parseInt((prevNode.color.substr(3,2)),16);
+		a2 = parseInt((nextNode.color.substr(3,2)),16);
+		if(a1 == a2) return a1;	
+	}
+	else if(type == "Blue")
+	{
+		a1 = parseInt((prevNode.color.substr(5,2)),16);
+		a2 = parseInt((nextNode.color.substr(5,2)),16);
+		if(a1 == a2) return a1;	
+	}
+	var a = ((p - p1) * (a2 - a1))/(p2 - p1);
+	return (a1 + a);
+}
+
+//*************************************************************************************
+// Function
+//		__getHex
+//
+// Purpose
+//		This function converts the decimal value to hexadecimal value.
+//
+// Parameters
+//		intNum	:	Decimal value.
+// 
+// Returns
+//		strHex	:	Hexadecimal value.
+// 
+//*************************************************************************************		
+function __getHex(intNum)
+{
+	var strHex = "";
+	var arrHex = new Array("0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f");
+	var d1 = Math.floor(intNum / 16);
+	var d2 = intNum - d1 * 16;
+	strHex += arrHex[d1];
+	strHex += arrHex[d2];
+	return strHex;
+}
+
+//*************************************************************************************
+// Function
+//		printTab
+//
+// Purpose
+//		This function is used for indentation.
+//
+// Parameters
+//		tabCount	:  The number of tabs to be printed.
+// 
+// Returns
+//		strIndent	: String containing tab space.
+// 
+//*************************************************************************************		
+function printTab(tabCount)
+{
+	var strIndent = "\n";
+	for(var i = 0 ; i < tabCount ; i++)
+		strIndent += "\t";
+	return strIndent;
+}
+
+try
+{
+	__main();
+} 
+catch(FwErr)
+{
+	if(FwErr == "Exit")
+		Files.deleteFileIfExisting(folder + "/" + imageFolder);
+	else
+		alert(FwErr); 
+		
+}
+

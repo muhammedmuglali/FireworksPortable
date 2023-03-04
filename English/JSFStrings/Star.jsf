@@ -1,0 +1,13 @@
+﻿// English
+
+var __tooltips = new Object();
+var __alertMessage = new Object();
+
+__tooltips["points"]    = "Points";
+__tooltips["roundness1"] = "Roundness 1";
+__tooltips["roundness2"] = "Roundness 2";
+__tooltips["radius0"] = "Radius 1";
+__tooltips["radius1"] = "Radius 2";
+
+__alertMessage["maxmsg"] = "Star Autoshape can have maximum 50 points";
+__alertMessage["minmsg"] = "Star Autoshape should have atleast 3 points";

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+	<Payload adobeCode="{CA7C485C-7A89-11E1-B2C8-CD54B377BC52}">
+		<Data key="defaultAdobeCode">Fireworks-CS6-Installer-AdobeCode</Data>
+		<Data key="LicensingCode">Fireworks-CS6-Win-GM</Data>
+		<Data key="BridgeTalkCode">/adobe/bridgetalk/Fireworks-12.0</Data>
+		<Data key="AMTConfigPath">C:\Program Files\Adobe\Adobe Fireworks CS6\AMT\application.xml</Data><Data key="DefaultDriverPayload">{CA7C485C-7A89-11E1-B2C8-CD54B377BC52}</Data><Data key="InstallDate">1345743003</Data><Data key="driverAMTConfigPath">C:\Program Files\Adobe\Adobe Fireworks CS6\AMT\application.xml</Data><Data key="driverLEID">Fireworks-CS6-Win-GM</Data><Data key="installedLanguages">en_US</Data></Payload>
+	<Other adobeCode="Fireworks-CS6-Win-GM">
+		<Data key="EPIC_APP">Adobe Fireworks CS6</Data>
+		<Data key="EPIC_APP_193">Adobe Fireworks CS6</Data>
+		<!-- Note: This is a win-only serial -->
+		<Data key="TrialSerialNumber">979487094856770042687266</Data>
+		<Data key="PayloadCode">{CA7C485C-7A89-11E1-B2C8-CD54B377BC52}</Data></Other>
+	<Other adobeCode="/adobe/bridgetalk/Fireworks-12.0">
+		<Data key="Specifier">fireworks-12.0</Data>
+		<Data key="DisplayName">Adobe Fireworks CS6</Data>
+		<Data key="ExecutableBasename">Fireworks</Data>
+		<Data key="WindowClassName">Fireworks_CS6_MainWindow</Data>
+		<Data key="BundleIdentifier">com.adobe.Fireworks</Data>
+	</Other>
+</Configuration>

@@ -1,0 +1,1004 @@
+﻿/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+/*============================================================================*/
+/*                           Arrow & L-Shape tools                            */
+/*============================================================================*/
+/*
+
+The default Arrow has the following:-
+
+                       o control point 4
+                       |\
+  control points 0     | \
+  o--------------------+  \
+  |                    |   \ 
+  |         X      cp2 o    o control point 5
+  |                    |   /
+  |         +----------+  /
+  |         |          | /
+  |         |          |/
+  |         |
+  |         |
+  +----o----o control point 1
+    control point 3
+
+- Control point 0 (smartShape.elem.controlPoints[0])
+  This control point determines the roundness of the corner.
+  When this control point is dragged for the first time, its horizontal
+  movement is restricted such that it does NOT cross the point "X".
+  The inner corner can be rounded on the subsequent drag.
+  If this control point is dragged (& mouseup) to the left of "X", however,
+  the previous restriction will apply.
+
+- Control point 1 (smartShape.elem.controlPoints[1])
+  This control point determines the thickness of the shape.
+
+- Control points 2 & 3
+  (smartShape.elem.controlPoints[2] & smartShape.elem.controlPoints[3])
+  These control points determine the positions of their respective ends, but
+  does not affect the 'thickness' of the shape.
+
+- Control point 4 (smartShape.elem.controlPoints[4])
+  This control point determines the horizontal size of the tip.
+
+- Control point 5 (smartShape.elem.controlPoints[5])
+  This control point determines the vertical size of the tip.
+
+
+The default L-shape has the following:-
+
+  control points 0
+  o--------------------+
+  |                    |
+  |         X          o control point 2
+  |                    |
+  |         +----------+
+  |         |
+  |         |
+  |         |
+  |         |
+  +----o----o control point 1
+    control point 3
+
+- Control point 0 (smartShape.elem.controlPoints[0])
+  This control point determines the roundness of the corner.
+  When this control point is dragged for the first time, its horizontal
+  movement is restricted such that it does NOT cross the point "X".
+  The inner corner can be rounded on the subsequent drag.
+  If this control point is dragged (& mouseup) to the left of "X", however,
+  the previous restriction will apply.
+
+- Control point 1 (smartShape.elem.controlPoints[1])
+  This control point determines the the thickness of the shape.
+
+- Control points 2 & 3
+  (smartShape.elem.controlPoints[2] & smartShape.elem.controlPoints[3])
+  These control points determine the positions of their respective ends, but
+  does not affect the 'thickness' of the shape.
+
+*/
+
+
+/*============================================================================*/
+/*                             Default functions                              */
+/*============================================================================*/
+
+switch(smartShape.operation)
+{
+	case "BeginDragInsert":
+		InsertSmartShapeAt();
+		RegisterDragInsert();
+		break;
+
+	case "EndDragInsert":
+		EndDragInsert();
+		break;
+
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+
+	case "BeginDragControlPoint":
+		BeginDragControlPoint();
+		break;
+
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	case "RedrawSmartShape":
+		RedrawSmartShape();
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Arrow.jsf");
+	var t    = __tooltips;
+
+	var isArrow = true;	// true=Arrow, false=L-Shape
+	var cmp     = smartShape.currentMousePos;
+	var c       = {x:cmp.x, y:cmp.y};
+	var contour;
+
+	var c0, c1, c2, c3, c4, c5;
+
+	smartShape.elem.controlPoints.length = (isArrow)? 6 : 4;
+
+	// roundness
+	c0         = smartShape.elem.controlPoints[0];
+	c0.x       = c.x;
+	c0.y       = c.y + ((isArrow)? 50 : 0);
+	c0.toolTip = t.roundness;
+
+	// thickness
+	c1         = smartShape.elem.controlPoints[1];
+	c1.x       = c.x + 100;
+	c1.y       = c.y + ((isArrow)? 150 : 200);
+	c1.toolTip = t.thickness;
+
+	// right
+	c2         = smartShape.elem.controlPoints[2];
+	c2.x       = c.x + ((isArrow)? 200 : 200);
+	c2.y       = c.y + ((isArrow)? 100 :  50);
+	c2.toolTip = t.width;
+
+	// bottom
+	c3         = smartShape.elem.controlPoints[3];
+	c3.x       = c.x + 50;
+	c3.y       = c.y + ((isArrow)? 150 : 200);
+	c3.toolTip = t.height;
+
+	if (isArrow)
+	{
+		c4         = smartShape.elem.controlPoints[4];
+		c4.x       = c.x+200;
+		c4.y       = c.y;
+		c4.toolTip = t.arrowsize;
+
+		c5         = smartShape.elem.controlPoints[5];
+		c5.x       = c.x+300;
+		c5.y       = c.y+100;
+		c5.toolTip = t.arrowtip;
+	}
+
+	createShape(0, isArrow);
+
+	smartShape.elem.customData["width"]     = 200;
+	smartShape.elem.customData["height"]    = (isArrow)? 100 : 200;
+	smartShape.elem.customData["thickness"] = 100;
+	smartShape.elem.customData["roundness"] = 0;
+
+	if (isArrow)
+	{
+		smartShape.elem.customData["shapeName"]   = "arrow";
+		smartShape.elem.customData["arrowWidth"]  = 200;
+		smartShape.elem.customData["arrowLength"] = 0;
+		smartShape.elem.customData["arrowTip"]    = 100;
+		smartShape.elem.customData["awMin"]       = 100;
+		smartShape.elem.customData["atMin"]       = 0;
+	}
+	else
+		smartShape.elem.customData["shapeName"]   = "lshape";
+}
+
+function RegisterDragInsert()
+{
+	var isArrow = (smartShape.elem.customData["shapeName"]=="arrow");
+	var params  = smartShape.GetDefaultMoveParms();
+	var contour = smartShape.elem.elements[0].contours[0];
+
+	if (isArrow)
+	{
+		params.deltaXtoX = 0;
+		params.deltaYtoY = 1/4;
+		contour.nodes[0].RegisterInsertBBoxMove(params);
+		contour.nodes[10].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[0].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[1].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[3].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 2/3;
+		params.deltaYtoY = 1/4;
+		contour.nodes[1].RegisterInsertBBoxMove(params);
+
+		params.deltaYtoY = 1/2;
+		smartShape.elem.controlPoints[2].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 2/3;
+		params.deltaYtoY = 0;
+		contour.nodes[2].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[4].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 1;
+		params.deltaYtoY = 1/2;
+		contour.nodes[3].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[5].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 2/3;
+		params.deltaYtoY = 1;
+		contour.nodes[4].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 2/3;
+		params.deltaYtoY = 3/4;
+		contour.nodes[5].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX = 0;
+		contour.nodes[6].RegisterInsertBBoxMove(params);
+		contour.nodes[7].RegisterInsertBBoxMove(params);
+		contour.nodes[8].RegisterInsertBBoxMove(params);
+		contour.nodes[9].RegisterInsertBBoxMove(params);
+	}
+	else
+	{
+		params.deltaXtoX            = 0;
+		params.deltaYtoY            = 0;
+		contour.nodes[0].RegisterInsertBBoxMove(params);
+		contour.nodes[7].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[0].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX            = 1;
+		contour.nodes[1].RegisterInsertBBoxMove(params);
+
+		params.deltaShortestSideToY = 1/6;
+		smartShape.elem.controlPoints[2].RegisterInsertBBoxMove(params);
+
+		params.deltaShortestSideToY = 1/3;
+		contour.nodes[2].RegisterInsertBBoxMove(params);
+
+		params.deltaXtoX            = 0;
+		params.deltaShortestSideToX = 1/3;
+		contour.nodes[3].RegisterInsertBBoxMove(params);
+		contour.nodes[4].RegisterInsertBBoxMove(params);
+
+		params.deltaYtoY            = 1;
+		params.deltaShortestSideToX = 1/3;
+		params.deltaShortestSideToY = 0;
+		contour.nodes[5].RegisterInsertBBoxMove(params);
+		smartShape.elem.controlPoints[1].RegisterInsertBBoxMove(params);
+
+		params.deltaShortestSideToX = 1/6;
+		smartShape.elem.controlPoints[3].RegisterInsertBBoxMove(params);
+
+		params.deltaShortestSideToX = 0;
+		contour.nodes[6].RegisterInsertBBoxMove(params);
+	}
+}
+
+function EndDragInsert()
+{
+	var isArrow = (smartShape.elem.customData["shapeName"]=="arrow");
+	var c       = smartShape.elem.elements[0].contours[0];
+
+	if (isArrow)
+	{
+		var c0 = smartShape.elem.controlPoints[0];
+		var c1 = smartShape.elem.controlPoints[1];
+		var c2 = smartShape.elem.controlPoints[2];
+		var c3 = smartShape.elem.controlPoints[3];
+
+		var w, h, h_, t, dx, dy;
+
+		w  = c.nodes[1].x - c.nodes[0].x;
+		h  = c.nodes[9].y - c.nodes[0].y;
+		h_ = h/2;
+
+		if (h>w)
+		{
+			h  = w;
+			h_ = h/2;
+			t  = w;
+
+			moveNode_(c.nodes[ 0], c.nodes[ 0].x, c2.y-h_);
+			moveNode_(c.nodes[ 1], c.nodes[ 1].x, c2.y-h_);
+			moveNode_(c.nodes[ 5], c.nodes[ 5].x, c2.y+h_);
+			moveNode_(c.nodes[ 6], c.nodes[ 6].x, c2.y+h_);
+			moveNode_(c.nodes[ 7], c.nodes[ 7].x, c2.y+h_);
+			moveNode_(c.nodes[ 8], c.nodes[ 8].x, c2.y+h_);
+			moveNode_(c.nodes[ 9], c.nodes[ 9].x, c2.y+h_);
+			moveNode_(c.nodes[10], c.nodes[10].x, c2.y-h_);
+
+			c0.y = c.nodes[0].y;
+		}
+		else
+			t = h;
+
+		moveNode_(c.nodes[6], c.nodes[0].x+h, c.nodes[6].y);
+		moveNode_(c.nodes[7], c.nodes[0].x+h, c.nodes[7].y);
+		moveNode_(c.nodes[8], c.nodes[0].x+h, c.nodes[8].y);
+
+		c1.x = c.nodes[8].x;
+		c1.y = c.nodes[8].y;
+		c3.x = c.nodes[8].x - h_;
+		c3.y = c.nodes[8].y;
+
+		if (c.nodes[1].x>=c.nodes[2].x)
+		{
+			dx = (c2.y-c.nodes[2].y)*(c.nodes[1].x-c.nodes[2].x)/(c.nodes[1].y-c.nodes[2].y);
+			dx = dx - (c.nodes[1].x-c.nodes[2].x);
+			dy = 2*(c.nodes[1].x-c.nodes[2].x)*(c.nodes[3].y-c.nodes[2].y)/(c.nodes[3].x-c.nodes[2].x);
+		}
+		else
+		{
+			dx = c.nodes[3].x - c.nodes[2].x;
+			dy = c.nodes[5].y - c.nodes[1].y;
+		}
+
+		smartShape.elem.customData["width"]       = w;
+		smartShape.elem.customData["height"]      = h;
+		smartShape.elem.customData["thickness"]   = t;
+		smartShape.elem.customData["roundness"]   = c.nodes[0].x - c.nodes[10].x;
+		smartShape.elem.customData["arrowWidth"]  = c.nodes[4].y - c.nodes[2].y;
+		smartShape.elem.customData["arrowLength"] = c.nodes[1].x - c.nodes[2].x;
+		smartShape.elem.customData["arrowTip"]    = c.nodes[3].x - c.nodes[1].x;
+		smartShape.elem.customData["awMin"]       = Math.round(dy);
+		smartShape.elem.customData["atMin"]       = Math.round(dx);
+	}
+	else
+	{
+		smartShape.elem.customData["width"]     = c.nodes[1].x - c.nodes[7].x;
+		smartShape.elem.customData["height"]    = c.nodes[6].y - c.nodes[0].y;
+		smartShape.elem.customData["thickness"] = c.nodes[5].x - c.nodes[6].x;
+		smartShape.elem.customData["roundness"] = c.nodes[0].x - c.nodes[7].x;
+	}
+}
+
+function BeginDragControlPoint()
+{
+	var isArrow = (smartShape.elem.customData["shapeName"]=="arrow");
+	var cpIdx   = smartShape.currentControlPointIndex;
+	var c0      = smartShape.elem.controlPoints[0];
+	var c1      = smartShape.elem.controlPoints[1];
+	var c2      = smartShape.elem.controlPoints[2];
+	var c3      = smartShape.elem.controlPoints[3];
+	if (isArrow)
+	{
+		var c4 = smartShape.elem.controlPoints[4];
+		var c5 = smartShape.elem.controlPoints[5];
+	}
+	var contour = smartShape.elem.elements[0].contours[0];
+	var a       = (isArrow)? 3 : 0;
+	var params;
+	var g;
+	var maxY;
+
+	var c  = {x:contour.nodes[3+a].x, y:contour.nodes[4+a].y};
+	var h  = contour.nodes[2+a].y - contour.nodes[1  ].y;
+	var h_ = contour.nodes[5+a].y - contour.nodes[2+a].y;
+	var w  = contour.nodes[5+a].x - contour.nodes[6+a].x;
+	var w_ = contour.nodes[2+a].x - contour.nodes[5+a].x; 
+	var R  = contour.nodes[0  ].x - contour.nodes[7+a].x;
+	var r  = contour.nodes[3+a].x - contour.nodes[4+a].x;
+
+	var dx, dy, lim1, lim1_, lim2, lim2_;
+
+	switch (cpIdx)
+	{
+		case 0:
+			// calculate how far c0 can be dragged to create rounded corner
+			if (c0.x < contour.nodes[5+a].x)
+			{
+				dx    = w;
+				dy    = h;
+				lim1  = (dx>dy)? dx : dy;
+				lim1_ = lim1 - (lim1 * fw.ellipseBCPConst);
+				lim2  = 0;
+				lim2_ = lim2 - (lim2 * fw.ellipseBCPConst);
+			}
+			else
+			{
+				dx    = Math.abs(contour.nodes[1].x - contour.nodes[6+a].x);
+				dy    = Math.abs(contour.nodes[1].y - contour.nodes[6+a].y);
+				lim1  = (dx<dy)? dx : dy;
+				lim1_ = lim1 - (lim1 * fw.ellipseBCPConst);
+				lim2  = (w<h)? lim1-h : lim1-w;
+				lim2_ = lim2 - (lim2 * fw.ellipseBCPConst);
+			}
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaYtoY = 0;
+			params.minX      = contour.nodes[7+a].x;
+			params.maxX      = params.minX + lim1;
+			c0.RegisterMove(params);
+
+			params.movePred  = false;
+			params.movePt    = true;
+			params.moveSucc  = true;
+			contour.nodes[0].RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.deltaXtoX = lim1_/lim1;
+			params.maxX      = contour.nodes[7+a].x + lim1_;
+			contour.nodes[0].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.movePred  = true;
+			params.movePt    = true;
+			params.moveSucc  = false;
+			params.deltaYtoY = 0;
+			params.minX      = contour.nodes[5+a].x;
+			params.maxX      = params.minX + lim2;
+			contour.nodes[3+a].RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.deltaXtoX = lim2_/lim2;
+			params.maxX      = contour.nodes[5+a].x + lim2_;
+			contour.nodes[3+a].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.movePred  = false;
+			params.movePt    = true;
+			params.moveSucc  = true;
+			params.deltaXtoX = 0;
+			params.deltaYtoY = 0;
+			params.deltaXtoY = 1;
+			params.minY      = contour.nodes[2+a].y;
+			params.maxY      = params.minY + lim2;
+			contour.nodes[4+a].RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.deltaXtoY = lim2_/lim2;
+			params.maxY      = contour.nodes[2+a].y + lim2_;
+			contour.nodes[4+a].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.movePred  = true;
+			params.movePt    = true;
+			params.moveSucc  = false;
+			params.deltaXtoX = 0;
+			params.deltaYtoY = 0;
+			params.deltaXtoY = 1;
+			params.minY      = contour.nodes[0].y;
+			params.maxY      = params.minY + lim1;
+			contour.nodes[7+a].RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.deltaXtoY = lim1_/lim1;
+			params.maxY      = contour.nodes[0].y + lim1_;
+			contour.nodes[7+a].RegisterMove(params);
+			break;
+
+		case 1:
+			createShape(1, isArrow);
+
+			contour = smartShape.elem.elements[1].contours[0];
+
+			if (isArrow)
+			{
+				if (c4.x < c2.x)
+				{
+					g = (c5.y-c4.y)/(c5.x-c4.x);
+					lim1 = (c0.y-c4.y) - ((c2.x-c4.x)*g);
+				}
+				else
+					lim1 = contour.nodes[1].y - contour.nodes[2].y;
+			}
+			else
+				lim1 = ((w_<h_)? w_ : h_) - r;
+
+			dy = contour.nodes[5+a].y - contour.nodes[4+a].y - r;
+
+			lim1 = (lim1<dy)? lim1 : dy;
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaXtoX = -1;
+			params.deltaYtoY = 0;
+			params.deltaXtoY = -1;
+			params.minX      = contour.nodes[6+a].x - lim1;
+			params.maxX      = c3.x;
+			params.minY      = contour.nodes[1].y - lim1;
+			params.maxY      = c2.y;
+			contour.nodes[0  ].RegisterMove(params);
+			contour.nodes[7+a].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaXtoX = 0;
+			params.deltaYtoY = 0;
+			params.deltaXtoY = -1;
+			params.minY      = contour.nodes[1].y - lim1;
+			params.maxY      = c2.y;
+			contour.nodes[1].RegisterMove(params);
+
+			params.deltaXtoY*= -1;
+			params.minY      = c2.y;
+			params.maxY      = contour.nodes[2+a].y + lim1;
+			contour.nodes[2+a].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaYtoY = 0;
+			params.deltaXtoY = 1;
+			params.minX      = c3.x;
+			params.maxX      = contour.nodes[5+a].x + lim1;
+			params.minY      = c2.y;
+			params.maxY      = contour.nodes[2+a].y + lim1;
+			contour.nodes[3+a].RegisterMove(params);
+			contour.nodes[4+a].RegisterMove(params);
+
+			params           = smartShape.GetDefaultMoveParms();
+			params.deltaYtoY = 0;
+			params.minX      = c3.x;
+			params.maxX      = contour.nodes[5+a].x + lim1;
+			contour.nodes[5+a].RegisterMove(params);
+			c1.RegisterMove(params);
+
+			params.deltaXtoX*= -1;
+			params.minX      = contour.nodes[6+a].x - lim1;
+			params.maxX      = c3.x;
+			contour.nodes[6+a].RegisterMove(params);
+
+			break;
+
+		case 2:
+		case 5:
+			if ( (cpIdx==5) || ((cpIdx==2) && (isArrow) && (c2.x==c5.x)) )
+			{
+				params           = smartShape.GetDefaultMoveParms();
+				params.deltaYtoY = 0;
+				params.minX      = (c4.x>=c2.x)? c4.x : (c2.x + (c2.y-c0.y)*(c2.x-c4.x)/(c0.y-c4.y));
+				c5.RegisterMove(params);
+				contour.nodes[3].RegisterMove(params);
+			}
+			else
+			{
+				params           = smartShape.GetDefaultMoveParms();
+				params.minX      = contour.nodes[5+a].x + r + ((isArrow)? ((c4.x<c2.x)? (c2.x-c4.x) : 0) : 0);
+				params.maxY      = contour.nodes[5+a].y - r;
+				contour.nodes[2+a].RegisterMove(params);
+
+				params.maxY     -= h/2;
+				c2.RegisterMove(params);
+
+				params.maxY     -= h/2;
+				contour.nodes[1].RegisterMove(params);
+
+				if (isArrow)
+				{
+					maxY = params.maxY;
+
+					params.minX      = contour.nodes[5+a].x + r + ((isArrow)? ((c4.x>c2.x)? (c4.x-c2.x) : 0) : 0);
+					params.maxY     -= (c5.y-c4.y-h/2);
+					contour.nodes[2].RegisterMove(params);
+					c4.RegisterMove(params);
+
+					params.maxY     += (c5.y-c4.y)*2;
+					contour.nodes[4].RegisterMove(params);
+
+					params.minX     += ((c2.x-c4.x) + (c5.x-c2.x));
+					params.maxY     -= (c5.y-c4.y);
+					contour.nodes[3].RegisterMove(params);
+					c5.RegisterMove(params);
+
+					params.maxY = maxY;
+				}
+
+				params.deltaXtoX = 0;
+				params.minX      = params.minY;
+				c0.RegisterMove(params);
+				contour.nodes[0].RegisterMove(params);
+
+				params.maxY     += h;
+				contour.nodes[3+a].RegisterMove(params);
+
+				params.movePred  = false;
+				params.movePt    = true;
+				params.moveSucc  = true;
+				params.minX      = contour.nodes[5+a].x;
+				params.maxY      = contour.nodes[5+a].y;
+				contour.nodes[4+a].RegisterMove(params);
+
+				params.movePred  = !params.movePred;
+				params.movePt    = !params.movePt;
+				params.moveSucc  = !params.moveSucc;
+				params.maxY     -= r*fw.ellipseBCPConst;
+				contour.nodes[4+a].RegisterMove(params);
+
+				params.movePred  = true;
+				params.movePt    = true;
+				params.moveSucc  = false;
+				params.minX      = contour.nodes[7+a].x;
+				params.maxY      = contour.nodes[7+a].y + (contour.nodes[5+a].y-contour.nodes[4+a].y);
+				contour.nodes[7+a].RegisterMove(params);
+
+				params.movePred  = !params.movePred;
+				params.movePt    = !params.movePt;
+				params.moveSucc  = !params.moveSucc;
+				params.maxY     -= R*fw.ellipseBCPConst;
+				contour.nodes[7+a].RegisterMove(params);
+			}
+			break;
+
+		case 3:
+			params           = smartShape.GetDefaultMoveParms();
+			params.maxX      = contour.nodes[2+a].x - r;
+			params.minY      = contour.nodes[2+a].y + r;
+			contour.nodes[5+a].RegisterMove(params);
+			c1.RegisterMove(params);
+			params.maxX     -= w/2;
+			c3.RegisterMove(params);
+			params.maxX     -= w/2;
+			contour.nodes[6+a].RegisterMove(params);
+
+			params.deltaYtoY = 0;
+			params.minY      = params.minX;
+			contour.nodes[7+a].RegisterMove(params);
+
+			params.maxX     += w;
+			contour.nodes[4+a].RegisterMove(params);
+
+			params.movePred  = true;
+			params.movePt    = true;
+			params.moveSucc  = false;
+			params.maxX      = contour.nodes[2+a].x;
+			contour.nodes[3+a].RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.maxX     -= r*fw.ellipseBCPConst;
+			contour.nodes[3+a].RegisterMove(params);
+
+			params.movePred  = false;
+			params.movePt    = true;
+			params.moveSucc  = true;
+			params.maxX      = contour.nodes[0].x + (contour.nodes[2+a].x-contour.nodes[3+a].x);
+			contour.nodes[0].RegisterMove(params);
+			c0.RegisterMove(params);
+
+			params.movePred  = !params.movePred;
+			params.movePt    = !params.movePt;
+			params.moveSucc  = !params.moveSucc;
+			params.maxX     -= R*fw.ellipseBCPConst;
+			contour.nodes[0].RegisterMove(params);
+
+			break;
+	}
+}
+
+function DragControlPoint()
+{
+	if ((smartShape.currentControlPointIndex==4) && 
+		(smartShape.elem.customData["shapeName"]=="arrow"))
+	{
+		var c0 = smartShape.elem.controlPoints[0];
+		var c1 = smartShape.elem.controlPoints[1];
+		var c2 = smartShape.elem.controlPoints[2];
+		var c4 = smartShape.elem.controlPoints[4];
+		var c5 = smartShape.elem.controlPoints[5];
+		var c  = smartShape.elem.elements[0].contours[0];
+		var cm = smartShape.currentMousePos;
+		var mg = (c2.y-c0.y)/(c5.x-c2.x);
+		var g, h;
+
+		g = (c2.y - cm.y)/(c5.x - cm.x);
+
+		if      (cm.x >= c2.x) c4.x = c2.x;
+		else if (cm.x <  c1.x) c4.x = c1.x;
+		else if (cm.x <  c1.x) c4.x = c1.x;
+		else                   c4.x = cm.x;
+
+		if      (g < mg)       c4.y = c2.y - (mg * (c5.x-c4.x))
+		else                   c4.y = cm.y;
+
+		h = (c2.y - c4.y)*2;
+
+		moveNode(c.nodes[2], c4.x, c4.y,   c4.x, c4.y,   c4.x, c4.y  );
+		moveNode(c.nodes[4], c4.x, c4.y+h, c4.x, c4.y+h, c4.x, c4.y+h);
+	}
+}
+
+function EndDragControlPoint()
+{
+	var isArrow = (smartShape.elem.customData["shapeName"]=="arrow");
+	var c2      = smartShape.elem.controlPoints[2];
+	var c       = smartShape.elem.elements[0].contours[0];
+	var a       = (isArrow)? 3 : 0;
+
+	if (smartShape.currentControlPointIndex==1)
+		recreateShape(isArrow);
+
+	smartShape.elem.customData["width"]     = c.nodes[1  ].x - c.nodes[7+a].x;
+	smartShape.elem.customData["height"]    = c.nodes[6+a].y - c.nodes[0  ].y;
+	smartShape.elem.customData["thickness"] = c.nodes[5+a].x - c.nodes[6+a].x;
+	smartShape.elem.customData["roundness"] = c.nodes[0  ].x - c.nodes[7+a].x;
+
+	if (isArrow)
+	{
+		smartShape.elem.customData["arrowWidth"]  = c.nodes[4].y - c.nodes[2].y;
+		smartShape.elem.customData["arrowLength"] = c.nodes[1].x - c.nodes[2].x;
+		smartShape.elem.customData["arrowTip"]    = c.nodes[3].x - c.nodes[1].x;
+
+		var dx, dy;
+
+		if (c.nodes[1].x>=c.nodes[2].x)
+		{
+			dx = (c2.y-c.nodes[2].y)*(c.nodes[1].x-c.nodes[2].x)/(c.nodes[1].y-c.nodes[2].y);
+			dx = dx - (c.nodes[1].x-c.nodes[2].x);
+			dy = 2*(c.nodes[1].x-c.nodes[2].x)*(c.nodes[3].y-c.nodes[2].y)/(c.nodes[3].x-c.nodes[2].x);
+		}
+		else
+		{
+			dx = c.nodes[3].x - c.nodes[2].x;
+			dy = c.nodes[5].y - c.nodes[1].y;
+		}
+
+		smartShape.elem.customData["awMin"] = Math.round(dy);
+		smartShape.elem.customData["atMin"] = Math.round(dx);
+	}
+}
+
+function RedrawSmartShape()
+{
+	var isArrow = (smartShape.elem.customData["shapeName"]=="arrow");
+	var c0      = smartShape.elem.controlPoints[0];
+	var c1      = smartShape.elem.controlPoints[1];
+	var c2      = smartShape.elem.controlPoints[2];
+	var c3      = smartShape.elem.controlPoints[3];
+	if (isArrow)
+	{
+		var c4 = smartShape.elem.controlPoints[4];
+		var c5 = smartShape.elem.controlPoints[5];
+	}
+
+	var w  = parseInt(smartShape.elem.customData["width"]);
+	var h  = parseInt(smartShape.elem.customData["height"]);
+	var t  = parseInt(smartShape.elem.customData["thickness"]);
+	var r  = parseInt(smartShape.elem.customData["roundness"]);
+	if (isArrow)
+	{
+		var aw = parseInt(smartShape.elem.customData["arrowWidth"]);
+		var al = parseInt(smartShape.elem.customData["arrowLength"]);
+		var at = parseInt(smartShape.elem.customData["arrowTip"]);
+	}
+	var r_ = (r>t)? r-t : 0;
+	var c  = smartShape.elem.elements[0].contours[0];
+	var a  = (isArrow)? 3 : 0;
+	var x  = c.nodes[7+a].x;
+	var y  = c.nodes[0  ].y;
+
+	moveNode(c.nodes[0], x+r, y, x+r-r*fw.ellipseBCPConst, y, x+r, y);
+	if (isArrow)
+	{
+		moveNode_(c.nodes[1], x+w,    y         );
+		moveNode_(c.nodes[2], x+w-al, y+(t-aw)/2);
+		moveNode_(c.nodes[3], x+w+at, y+(t/2)   );
+		moveNode_(c.nodes[4], x+w-al, y+(t+aw)/2);
+		moveNode_(c.nodes[5], x+w,    y+t       );
+	}
+	else
+	{
+		moveNode_(c.nodes[1], x+w, y  );
+		moveNode_(c.nodes[2], x+w, y+t);
+	}
+	moveNode (c.nodes[3+a], x+t+r_, y+t,    x+t+r_, y+t,               x+t+r_*fw.ellipseBCPConst, y+t          );
+	moveNode (c.nodes[4+a], x+t,    y+t+r_, x+t,    y+t+r_-r_*fw.ellipseBCPConst, x+t,            y+t+r_       );
+	moveNode_(c.nodes[5+a], x+t,    y+h);
+	moveNode_(c.nodes[6+a], x,      y+h);
+	moveNode (c.nodes[7+a], x,      y+r,    x,      y+r,               x,              y+r-r*fw.ellipseBCPConst);
+
+	c0.x = x + r;
+	c0.y = y;
+
+	c1.x = x + t;
+	c1.y = y + h;
+
+	c2.x = c.nodes[1].x;
+	c2.y = y + t/2;
+
+	c3.x = x + t/2;
+	c3.y = y + h;
+
+	if (isArrow)
+	{
+		c4.x = c.nodes[2].x;
+		c4.y = c.nodes[2].y;
+
+		c5.x = c.nodes[3].x;
+		c5.y = c.nodes[3].y;
+
+		var dx, dy;
+
+		if (c.nodes[1].x>=c.nodes[2].x)
+		{
+			dx = (c2.y-c.nodes[2].y)*(c.nodes[1].x-c.nodes[2].x)/(c.nodes[1].y-c.nodes[2].y);
+			dx = dx - (c.nodes[1].x-c.nodes[2].x);
+			dy = 2*(c.nodes[1].x-c.nodes[2].x)*(c.nodes[3].y-c.nodes[2].y)/(c.nodes[3].x-c.nodes[2].x);
+		}
+		else
+		{
+			dx = c.nodes[3].x - c.nodes[2].x;
+			dy = c.nodes[5].y - c.nodes[1].y;
+		}
+
+		smartShape.elem.customData["awMin"] = Math.round(dy);
+		smartShape.elem.customData["atMin"] = Math.round(dx);
+	}
+}
+
+/*============================================================================*/
+/*                           User defined functions                           */
+/*============================================================================*/
+
+// returns distance between (x1,y1) and (x2,y2)
+
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function createShape(e, isArrow)
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var w2    = c1.x - c3.x;
+
+	if (isArrow)
+	{
+		var c4 = smartShape.elem.controlPoints[4];
+		var c5 = smartShape.elem.controlPoints[5];
+	}
+
+	// allocate space for the shape
+	smartShape.elem.elements[e] = new Path;
+	smartShape.elem.elements[e].contours[0] = new Contour;
+
+	var contour = smartShape.elem.elements[e].contours[0];
+
+	contour.nodes.length = 0;
+
+	addPathPoint(contour, c3.x-w2, c2.y-w2);
+	addPathPoint(contour, c2.x,    c2.y-w2);
+
+	if (isArrow)
+	{
+		addPathPoint(contour, c4.x, c4.y);
+		addPathPoint(contour, c5.x, c5.y);
+		addPathPoint(contour, c4.x, c2.y+(c2.y-c4.y));
+	}
+
+	addPathPoint(contour, c2.x,    c2.y+w2);
+	addPathPoint(contour, c1.x,    c2.y+w2);
+	addPathPoint(contour, c1.x,    c2.y+w2);
+	addPathPoint(contour, c1.x,    c1.y   );
+	addPathPoint(contour, c3.x-w2, c1.y   );
+	addPathPoint(contour, c3.x-w2, c2.y-w2);
+
+	contour.isClosed = true;
+}
+
+function recreateShape(isArrow)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var e0 = smartShape.elem.elements[0].contours[0];
+	var e1 = smartShape.elem.elements[1].contours[0];
+	var a  = (isArrow)? 3 : 0;
+	var R0 = e0.nodes[0  ].x - e0.nodes[7+a].x;
+	var r0 = e0.nodes[3+a].x - e0.nodes[4+a].x;
+	var s  = (e1.nodes[5+a].x-e1.nodes[6+a].x)/(e0.nodes[5+a].x-e0.nodes[6+a].x);
+	var R1;
+	var r1 = r0;
+	var ctype;
+
+	if (e0.nodes[0].x == e0.nodes[7+a].x)
+		ctype = 0;
+	else if (e0.nodes[0].x <= e0.nodes[5+a].x)
+		ctype = 1;
+	else
+		ctype = 2;
+
+	copyNodePos(e1.nodes[1  ], e0.nodes[1  ]);
+	copyNodePos(e1.nodes[2+a], e0.nodes[2+a]);
+
+	e0.nodes[3+a].x     = e1.nodes[5+a].x + r1;
+	e0.nodes[3+a].y     = e1.nodes[2+a].y;
+	e0.nodes[3+a].predX = e1.nodes[5+a].x + r1;
+	e0.nodes[3+a].predY = e0.nodes[3+a].y;
+	e0.nodes[3+a].succX = e0.nodes[3+a].x - (r1 * fw.ellipseBCPConst);
+	e0.nodes[3+a].succY = e0.nodes[3+a].y;
+
+	e0.nodes[4+a].x     = e1.nodes[5+a].x;
+	e0.nodes[4+a].y     = e1.nodes[2+a].y + r1;
+	e0.nodes[4+a].predX = e0.nodes[4+a].x;
+	e0.nodes[4+a].predY = e0.nodes[4+a].y - (r1 * fw.ellipseBCPConst);
+	e0.nodes[4+a].succX = e0.nodes[4+a].x;
+	e0.nodes[4+a].succY = e0.nodes[4+a].y;
+
+	copyNodePos(e1.nodes[5+a], e0.nodes[5+a]);
+	copyNodePos(e1.nodes[6+a], e0.nodes[6+a]);
+
+	R1 = (ctype==0)? 0 : ((ctype==1)? (R0 * s) : e0.nodes[3+a].x - e0.nodes[6+a].x);// * s;
+
+	e0.nodes[0].x     = (ctype==2)? e0.nodes[3+a].x : (e0.nodes[6+a].x + ((ctype==0)? 0 : R1));
+	e0.nodes[0].y     = e0.nodes[1].y;
+	e0.nodes[0].predX = e0.nodes[0].x - (R1 * fw.ellipseBCPConst);
+	e0.nodes[0].predY = e0.nodes[0].y;
+	e0.nodes[0].succX = e0.nodes[0].x;
+	e0.nodes[0].succY = e0.nodes[0].y;
+
+	c0.x = e0.nodes[0].x;
+	c0.y = e0.nodes[0].y;
+
+	e0.nodes[7+a].x     = e0.nodes[6+a].x;
+	e0.nodes[7+a].y     = (ctype==2)? e0.nodes[4+a].y : (e0.nodes[1].y + ((ctype==0)? 0 : R1));
+	e0.nodes[7+a].predX = e0.nodes[7+a].x;
+	e0.nodes[7+a].predY = e0.nodes[7+a].y;
+	e0.nodes[7+a].succX = e0.nodes[7+a].x;
+	e0.nodes[7+a].succY = e0.nodes[7+a].y - (R1 * fw.ellipseBCPConst);
+
+	smartShape.elem.elements.length--;
+}
+
+function copyNodePos(ns, nd)
+{
+	nd.x     = ns.x;
+	nd.y     = ns.y;
+	nd.predX = ns.predX;
+	nd.predY = ns.predY;
+	nd.succX = ns.succX;
+	nd.succY = ns.succY;
+}
+
+function moveNode(n, x, y, px, py, sx, sy)
+{
+	n.x     = x;
+	n.y     = y;
+	n.predX = px;
+	n.predY = py;
+	n.succX = sx;
+	n.succY = sy;
+}
+
+function moveNode_(n, x, y)
+{
+	moveNode(n, x, y, x, y, x, y);
+}
+
+/*============================================================================*/
+/*                    Copyright (c) 2005 Macromedia, Inc.                     */
+/*                            All rights reserved.                            */
+/*============================================================================*/

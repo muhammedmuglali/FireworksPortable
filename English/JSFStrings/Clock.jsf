@@ -1,0 +1,10 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["settime"] = "Click to set time";
+__tooltips["minute"] = "Minute";
+__tooltips["hour"] = "Hour";
+__tooltips["changetick"] = "Click to change tick marks";
+__tooltips["entertime"] = "Please enter a new time (e.g. 20:04)";
+__tooltips["incorrect"] = "Incorrect format. Please try again.";

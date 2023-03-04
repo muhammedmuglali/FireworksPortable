@@ -1,0 +1,26 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["changeFormat"] = "Change Format";
+__tooltips["fileName"] = "File Name";
+__tooltips["date"] = "Date";
+__tooltips["time"] = "Time";
+__tooltips["page"] = "Current Page";
+__tooltips["of"] = "of";
+__tooltips["tpages"] = "Pages";
+__tooltips["layers"] = "Layers";
+__tooltips["frames"] = "States";
+__tooltips["width"] = "Width";
+__tooltips["height"] = "Height";
+__tooltips["resolution"] = "Resolution";
+__tooltips["units"] = "Units";
+__tooltips["platform"] = "Platform";
+__tooltips["fireworksVersion"] = "Fireworks Version";
+__tooltips["newLine"] = "New line";
+__tooltips["pixels"] = "pixels";
+__tooltips["created"] = "Created";
+__tooltips["on"] = "on";
+__tooltips["using"] = "using";
+__tooltips["inch"] = "Inch";
+__tooltips["cm"] = "cm";

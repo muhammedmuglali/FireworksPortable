@@ -1,0 +1,9 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["shapeName"]   = "Shadow";
+__tooltips["perspective"] = "Perspective; click to reset";
+__tooltips["direction"]   = "Direction; click to reset";
+__tooltips["invalid"]     = "This command requires that a Path or Text object be selected, or a marquee selection.";
+__tooltips["bitmap"]      = "A marquee selection is required for a Bitmap.";

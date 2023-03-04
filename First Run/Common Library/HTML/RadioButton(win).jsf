@@ -1,0 +1,67 @@
+function setDefaultValues() {
+	Widget.elem.customData["type"] = "RadioButton";
+	Widget.elem.customData["currentValues"] = [
+		{name: "Label", type: "text", value: "Label"},
+		{name: "Color", type: "color", value: "#000000"},
+		{name: "Font", type: "combobox", value: "Arial - Helvetica - sans-serif,Arial - Helvetica - sans-serif,Arial Black - Gadget - sans-serif,Comic Sans MS - cursive,Courier New - Courier - monospace,Geneva - Arial - Helvetica - sans-serif,Georgia - Times New Roman - Times - serif,Impact - Charcoal - sans-serif,Lucinda Sans Unicode - Lucinda Grande - sans-serif,Palatino Linotype - Book Antiqua - Palatino - serif,Tahoma - Geneva - sans-serif,Times New Roman - Times - serif,Trebuchet MS - Helvetica - sans-serif,Verdana - Arial - Helvetica - sans-serif"},	 
+		{name: "Size", type: "number", value: "12"},
+		{name: "Style", type: "combobox", value: "normal,normal,italic,oblique"},		
+		{name: "Weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "State", type: "combobox", value: "Normal,Normal,Over,Press,Selected,Selected Over,Disabled"}
+	];
+}
+
+function applyCurrentValues() {
+	var values = Widget.elem.customData["currentValues"];
+	var e = Widget.GetObjectByName("label");
+	var replaceThis = new RegExp("<br "+String.fromCharCode(47)+">","g");
+	values[0].value = values[0].value.replace(replaceThis,String.fromCharCode(13));
+	e.textChars = (values[0].value.length <= 0 ? "Label" : values[0].value);
+	e.pathAttributes.fillColor = values[1].value; 
+	e.font = values[2].value.split(" - ")[0];
+	e.fontsize = parseInt(values[3].value);
+	e.italic = (values[4].value.split(",")[0].toLowerCase() == "italic" || values[4].value.split(",")[0].toLowerCase() == "oblique");
+	e.bold = (values[5].value.split(",")[0].toLowerCase() == "bold");
+	
+	Widget.GetObjectByName("normal").visible = false;
+	Widget.GetObjectByName("hover").visible = false;
+	Widget.GetObjectByName("press").visible = false;
+	Widget.GetObjectByName("selected").visible = false;
+	Widget.GetObjectByName("selectedhover").visible = false;
+	Widget.GetObjectByName("disabled").visible = false;
+	
+	var s = values[6].value.split(",")[0];
+	
+	if (s == "Normal") {
+		Widget.GetObjectByName("normal").visible = true;
+	}
+	else if (s == "Over") {
+		Widget.GetObjectByName("hover").visible = true;
+	}
+	else if (s == "Press") {
+		Widget.GetObjectByName("press").visible = true;
+	}
+	else if (s == "Selected") {
+		Widget.GetObjectByName("selected").visible = true;
+	}
+	else if (s == "Selected Over") {
+		Widget.GetObjectByName("selectedhover").visible = true;
+	}
+	else if (s == "Disabled") {
+		Widget.GetObjectByName("disabled").visible = true;
+		e.pathAttributes.fillColor = "#919095";
+	}
+	
+	Widget.elem.customData["css"] = "\tcolor: "+values[1].value+
+									";\n\tfont-family: "+values[2].value.split(",")[0].replace(/ - /g,", ")+
+									";\n\tfont-size: "+parseInt(values[3].value*10)+"%"+
+									";\n\tfont-style: "+values[4].value.split(",")[0]+
+									";\n\tfont-weight: "+values[5].value.split(",")[0]+
+									";";
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}

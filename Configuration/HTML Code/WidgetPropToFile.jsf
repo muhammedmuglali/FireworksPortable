@@ -1,0 +1,64 @@
+function fwalert( alertText )
+{
+	//alert( alertText );
+}
+
+var curValues = Widget.elem.customData["currentValues"];
+
+fwalert( curValues );
+
+if( curValues )
+{
+	var arrLength = curValues.length;
+
+	var objSep   = new String();
+	var fieldSep = new String();
+	
+	objSep   = "&;&";
+	fieldSep = "&|&";
+
+	var encodedString  = new String();
+
+	//encode each of the values
+	for( index = 0 ; index < arrLength ; index++)
+	{
+
+		var propName  = "";
+		var propValue = "";
+		var propType  = "";
+		
+		try{
+			propName = curValues[index].name;
+		}catch(expn){
+		}
+
+		try{
+			propValue = curValues[index].value;
+		}catch(expn){
+		}
+
+		try{
+			propType = curValues[index].type;
+		}catch(expn){
+		}
+		
+
+		encodedString += propName + fieldSep + propValue + fieldSep + propType;
+
+		//We should not be adding the object seperator after the last element
+		if( index < (arrLength - 1) )
+		{
+			encodedString = encodedString + objSep;
+		}
+
+	}
+
+
+	fwalert("Encoded String = " + encodedString);
+
+	//assign the encoded string back to  be read from the C++ Layer 
+	Widget.propString = encodedString;
+}else
+{
+	Widget.propString = null;
+}

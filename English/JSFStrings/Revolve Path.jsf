@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["centerpoint"] = "Center Point";
+__tooltips["radius"] = "Radius";
+__tooltips["division"] = "Divisions";
+__tooltips["point"] = "Point";

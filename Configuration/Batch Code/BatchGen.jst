@@ -1,0 +1,195 @@
+
+// Macromedia Fireworks Batch Script Generator
+// Copyright (c) 1998-2005 Macromedia. All rights reserved.
+
+	var errorString = null;
+	var srcFile = null;
+	var dstFile = null;
+	
+	do {
+		
+		if (Files.exists(theScriptFilePath) == false) {
+			if (!Files.createFile(theScriptFilePath, App.appMacJsfFileType, App.appMacCreator)) {
+				errorString = Files.getLastErrorString();
+				break;
+			}
+		}
+		
+		var dstDir = Files.getDirectory(theScriptFilePath);
+		var dstFilePath = Files.getTempFilePath(dstDir);
+		if (!Files.createFile(dstFilePath, App.appMacJsfFileType, App.appMacCreator)) {
+			errorString = Files.getLastErrorString();
+			break;
+		}
+
+		var srcFilePath = Files.makePathFromDirAndFile(App.appBatchCodeDir, App.getPref("BatchTemplateName"));
+		if (!Files.exists(srcFilePath)) {
+			errorString = Files.getLastErrorString();
+			break;
+		}
+		
+		var srcFile = Files.open(srcFilePath, false);
+		if (srcFile == null) {
+			errorString = Files.getLastErrorString();
+			break;
+		}
+
+		var dstFile = Files.open(dstFilePath, true);
+		if (dstFile == null) {
+			errorString = Files.getLastErrorString();
+			break;
+		}
+		
+		while (true) {
+
+			var curline = srcFile.readline();
+			if (curline == null)
+				break;
+
+			WriteSubstituteInfo(dstFile, curline);
+			dstFile.write("\n");
+			
+		}
+
+		if (srcFile != null)
+			srcFile.close();
+		srcFile = null;
+		if (dstFile != null)
+			dstFile.close();
+		dstFile = null;
+		
+		if (!Files.swap(dstFilePath, theScriptFilePath)) {
+			errorString = Files.getLastErrorString();
+			break;
+		}
+		
+		if (!Files.deleteFileIfExisting(dstFilePath)) {
+			errorString = Files.getLastErrorString();
+			break;
+		}			
+
+	} while (0);
+	
+	// it's safe to close the file multiple times.
+	if (srcFile != null)
+		srcFile.close();
+	srcFile = null;
+	if (dstFile != null)
+		dstFile.close();
+	dstFile = null;
+
+	if (dstFile != null)
+		dstFile.close();
+
+	if (errorString != null)
+		alert(errorString);
+
+	function WriteTabs(dstFile, num)
+	{
+		for (var i = 0; i < num; i++)
+			dstFile.write("\t");
+	}
+
+	function MustWriteAsUnicode(tmp)
+	{
+		var len = tmp.length;
+		for (var i = 0; i < len; i++) {
+			var cc = tmp.charCodeAt(i);
+			// If there are any characters outside ASCII, we write the entire 
+			// string as a concatenation of Unicode values. This reduces weirdness 
+			// on non-Roman systems, or when transferring files across platforms.
+			// If you find this inconvenient or unnecessary, modify this routine
+			// to always return false.
+			if (cc < 32 || cc > 127) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function WriteAsUnicode(dstFile, tmp, depth)
+	{
+		dstFile.write("String.fromCharCode(");
+		var len = tmp.length;
+		for (var i = 0; i < len; i++) {
+			if (i > 0)
+				dstFile.write(",");
+			dstFile.write(tmp.charCodeAt(i));
+		}
+		dstFile.write(")");
+	}
+	
+	function ShouldWriteObjAsArray(someObject)
+	{
+		if (someObject == null)
+			return false;
+			
+		var index = 0;
+		for (var prop in someObject) {
+			if (typeof(prop) != "number")
+				return false;
+			if (prop != index)
+				return false;
+			index++;
+		}
+		return true;
+	}
+
+	function WriteObjectInitializerString(dstFile, someObject, depth)
+	{
+		if (someObject == null) {
+			dstFile.write("null");
+		} else if (typeof(someObject) == "number") {
+			dstFile.write(someObject);
+		} else if (typeof(someObject) == "string") {
+			var tmp = someObject.toString();
+			if (MustWriteAsUnicode(tmp) == true) {
+				WriteAsUnicode(dstFile, tmp, depth + 1);
+			} else {
+				dstFile.write('"');
+				// Note that even if we can write it as straight characters,
+				// we must replace all backslashes with backslash-backslash,
+				// and all doublequotes with backslash-doublequote.
+				tmp = tmp.replace(/\\/g, "\\\\");
+				tmp = tmp.replace(/\"/g, "\\\"");
+				dstFile.write(tmp);
+				dstFile.write('"');
+			}
+		} else if (typeof(someObject) == "object") {
+			var isArray = ShouldWriteObjAsArray(someObject);
+			var first = true;
+			dstFile.write(isArray ? "[" : "{");
+			for (var prop in someObject) {
+				if (first)
+					dstFile.write("\n");
+				else
+					dstFile.write(",\n");
+				WriteTabs(dstFile, depth + 1);
+				if (!isArray) {
+					dstFile.write(prop);
+					dstFile.write(":");
+				}
+				WriteObjectInitializerString(dstFile, someObject[prop], depth + 1);
+				first = false;
+			}
+			if (!first) {
+				dstFile.write("\n");
+				WriteTabs(dstFile, depth);
+			}
+			dstFile.write(isArray ? "]" : "}");
+
+		} else {
+			dstFile.write(someObject);
+		}
+	}
+
+	function WriteSubstituteInfo(dstFile, curline)
+	{
+		if (curline == "#BATCH_SETTINGS#") {
+			WriteObjectInitializerString(dstFile, batch, 0);
+		} else if (curline == "#BATCH_OPERATIONS#") {
+			WriteObjectInitializerString(dstFile, batchProcessOperations, 0);
+		} else {
+			dstFile.write(curline);
+		}
+	}

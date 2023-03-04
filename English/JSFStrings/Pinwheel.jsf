@@ -1,0 +1,15 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["innerradius"] = "Inner Radius";
+__tooltips["reset"] = "Reset Inner Radius";
+__tooltips["solid"] = "Solid";
+__tooltips["checker"] = "Checker";
+__tooltips["wire"] = "Wire";
+__tooltips["circular"] = "Circular";
+__tooltips["spiral"] = "Spiral";
+__tooltips["sizenrotation"] = "Size and Rotation";
+__tooltips["curvenkind"] = "Curve and Kind";
+__tooltips["countnstyle"] = "Count and Style";
+__tooltips["px"] = "px";

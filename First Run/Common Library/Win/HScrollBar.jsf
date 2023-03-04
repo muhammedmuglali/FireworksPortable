@@ -1,0 +1,51 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	var currValues = new Array();
+    currValues.push({ name:"State (Left)",  type:"ComboBox", value:"Normal,Normal,Over,Press" });
+	currValues.push({ name:"State (Thumb)", type:"ComboBox", value:"Normal,Normal,Over,Press" });
+	currValues.push({ name:"State (Track)", type:"ComboBox", value:"Normal,Normal,Over,Press" });
+	currValues.push({ name:"State (Right)", type:"ComboBox", value:"Normal,Normal,Over,Press" });
+	currValues.push({ name:"enabled",       type:"Boolean",  value:"true"                     });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var vals       = Widget.elem.customData["currentValues"];
+    var states = new Array(4);
+    for(i=0;i<4;i++)
+    {
+       states[i] = vals[i].value.split(",")[0].toLowerCase()+(i+1);
+    }
+    var enabled    = (vals[4].value.toString()=="true");
+    for(i=0;i<4;i++)
+    {
+       Widget.GetObjectByName("normal"+(i+1)).visible = false;
+	   Widget.GetObjectByName("press"+(i+1)).visible = false;
+	   Widget.GetObjectByName("over"+(i+1)).visible = false;
+	}
+    if(enabled)
+    {
+       Widget.GetObjectByName("disabled").visible = false;
+       
+       for(i=0;i<4;i++)
+          Widget.GetObjectByName(states[i]).visible = true;
+    }
+    else
+           Widget.GetObjectByName("disabled").visible = true;
+
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}
+
+    

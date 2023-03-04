@@ -1,0 +1,499 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Tabs.jsf");
+
+gTT[0] = __tooltips["delete"];
+gTT[1] = __tooltips["add"];
+gTT[2] = __tooltips["hue"];
+gTT[3] = __tooltips["enter"];
+
+/*==========================================================================*/
+/*                        Global variables/constants                        */
+/*==========================================================================*/
+
+var gCPD        = 0.552;
+var gTabWidth   = 100;
+var gTabHeight  = 30;
+var gInitTabNum = 3;
+var gHueIdx     = 5;
+var gInitHue    = 200;
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "DragControlPoint":
+		DragControlPoint();
+		break;
+
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var W   = gTabWidth;
+	var H   = gTabHeight;
+	var H2  = H/2;
+	var N   = gInitTabNum;
+	var c   = {x:cmp.x-(W*N/2), y:cmp.y};
+	var i;
+
+	var cp;
+
+	smartShape.elem.controlPoints.length = 2;
+
+	cp                   = smartShape.elem.controlPoints[0];
+	cp.x                 = c.x - 5;
+	cp.y                 = c.y + H2;
+	cp.toolTip           = gTT[0];
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[1];
+	cp.x                 = c.x + 5;
+	cp.y                 = c.y + H2;
+	cp.toolTip           = gTT[1];
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	for (i=0; i<N; i++)
+	{
+		addTab();
+	}
+}
+
+function DragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var cm    = smartShape.currentMousePos;
+	var i     = cpIdx-2;
+	var l     = c0.x + 5 + i*gTabWidth;
+	var r     = l + gTabWidth;
+	var cp, h;
+
+	l += 5;
+	r -= 5;
+
+	switch (cpIdx)
+	{
+		case 0:
+		case 1:
+			break;
+
+		default:
+			cp = smartShape.elem.controlPoints[cpIdx];
+
+			if (cm.x < l)
+			{
+				cp.x = l;
+				h    = 0;
+			}
+			else if (cm.x > r)
+			{
+				cp.x = r;
+				h    = 360;
+			}
+			else
+			{
+				cp.x = cm.x;
+				h    = 360*(cm.x-l)/(gTabWidth-10);
+			}
+
+			cp.toolTip = gTT[2] + ": " + parseInt(h);
+
+			break;
+	}
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var cp    = smartShape.elem.controlPoints[cpIdx];
+	var dm    = smartShape.mouseDownPos;
+	var cm    = smartShape.currentMousePos;
+	var d     = Math.abs(dm.x-cm.x);
+	var i     = cpIdx-2;
+	var l     = c0.x + 5 + i*gTabWidth;
+	var r     = l + gTabWidth;
+	var h;
+
+	switch (cpIdx)
+	{
+		case 0:
+			deleteTab();
+			break;
+
+		case 1:
+			addTab();
+			break;
+
+		default:
+			if (d<1)
+			{
+				var newColor = fw.popupColorPickerOverMouse("#000000", true, false);
+				var hlsColor = ConvertRGBToHLS(newColor);
+				h = hlsColor.h;
+			}
+			else
+			{
+				h = 360*(cp.x-l-5)/(gTabWidth-10);
+			}
+
+			if (smartShape.altOptKeyDown)
+				changeAllHues(h);
+			else
+				changeHue(i, h);
+
+			cp.toolTip = gTT[2] + ": " + parseInt(h);
+
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function addElement(element, bc, fc)
+{
+	element.elements[element.elements.length] = new Path;
+
+	var e = element.elements[element.elements.length-1];
+
+	e.contours[0] = new Contour;
+	e.contours[0].nodes.length = 0;
+
+	e.opacity = 100;
+
+	if (bc!="")
+	{
+		e.pathAttributes.brush = {	alphaRemap:"none",
+									angle:0, 
+									antiAliased:true, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Basic", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:10, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"brush", 
+									flowRate:0, 
+									maxCount:14, 
+									minSize:1, 
+									name:"bn_Soft Line", 
+									numDashes:0, 
+									shape:"square", 
+									softenMode:"bell curve", 
+									softness:50, 
+									spacing:6, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = bc;
+	}
+	else
+		e.pathAttributes.brush = null;
+
+	if (fc!="")
+	{
+		e.pathAttributes.fill = {	category:"fc_Solid", 
+									ditherColors:[ "#000000", "#000000" ], 
+									edgeType:"antialiased", 
+									feather:0, 
+									gradient:null, 
+									name:"fn_Normal", 
+									pattern:null, 
+									shape:"solid", 
+									stampingMode:"blend opaque", 
+									textureBlend:0, 
+									webDitherTransparent:false };
+		e.pathAttributes.fillColor = fc;
+	}
+	else
+		e.pathAttributes.fill = null
+
+	e.effectList = {	category:"UNUSED", 
+						effects:[	{	EffectIsVisible:true, 
+										EffectMoaID:"{5600f702-774c-11d3-baad0000861f4d01}", 
+										ShadowAngle:270, 
+										ShadowBlur:17, 
+										ShadowColor:"#ffffffb0", 
+										ShadowDistance:16, 
+										ShadowType:0, 
+										category:"Shadow and Glow", 
+										name:"Inner Shadow" }, 
+									{ 	EffectIsVisible:true, 
+										EffectMoaID:"{5600f702-774c-11d3-baad0000861f4d01}", 
+										ShadowAngle:450, 
+										ShadowBlur:6, 
+										ShadowColor:"#666666", 
+										ShadowDistance:17, 
+										ShadowType:0, 
+										category:"Shadow and Glow", 
+										name:"Inner Shadow" }, 
+									{	EffectIsVisible:true, 
+										EffectMoaID:"{5600f702-774c-11d3-baad0000861f4d01}", 
+										ShadowAngle:360, 
+										ShadowBlur:5, 
+										ShadowColor:"#666666", 
+										ShadowDistance:9, 
+										ShadowType:0, 
+										category:"Shadow and Glow", 
+										name:"Inner Shadow" }, 
+									{	EffectIsVisible:true, 
+										EffectMoaID:"{5600f702-774c-11d3-baad0000861f4d01}", 
+										ShadowAngle:180, 
+										ShadowBlur:5, 
+										ShadowColor:"#666666", 
+										ShadowDistance:9, 
+										ShadowType:0, 
+										category:"Shadow and Glow", 
+										name:"Inner Shadow" }, 
+									{	BevelContrast:65, EffectIsVisible:true, 
+										EffectMoaID:"{2ba87123-8220-11d3-baad0000861f4d01}", 
+										GlowStartDistance:0, 
+										GlowWidth:4, 
+										MaskSoftness:9, 
+										OuterBevelColor:"#000000", 
+										category:"Shadow and Glow", 
+										name:"Inner Glow" }, 
+									{	EffectIsVisible:true, 
+										EffectMoaID:"{3439b08d-1922-11d3-9bde00e02910d580}", 
+										MB_filter_preview_tile_size:"-1 -1", 
+										category:"Adjust Color", 
+										hls_colorize:true, 
+										hue_amount:gInitHue, 
+										lightness_amount:-1, 
+										name:"Hue/Saturation...", 
+										saturation_amount:100 }, 
+									{	EffectIsVisible:true, 
+										EffectMoaID:"{3439b08e-1923-11d3-9bde00e02910d580}", 
+										MB_filter_preview_tile_size:"-1 -1", 
+										blue_points:[ { x:0, y:0 }, { x:255, y:255 } ], 
+										category:"Adjust Color", 
+										green_points:[ { x:0, y:0 }, { x:255, y:255 } ], 
+										name:"Curves...", red_points:[ { x:0, y:0 }, { x:255, y:255 } ], 
+										rgb_points:[ { x:0, y:0 }, { x:97, y:87 }, { x:152, y:107 }, { x:190, y:206 }, { x:255, y:255 } ] } ], 
+						name:"UNUSED" };
+}
+
+function addTab()
+{
+	var c0  = smartShape.elem.controlPoints[0];
+	var c1  = smartShape.elem.controlPoints[1];
+	var i   = smartShape.elem.controlPoints.length-2;
+	var bc  = "#000000";
+	var fc  = "#0088FF";
+	var l   = c0.x + 5 + i*gTabWidth;
+	var r   = l + gTabWidth;
+	var t   = c0.y - gTabHeight/2;
+	var b   = c0.y + gTabHeight/2;
+	var R   = gTabHeight/2;
+	var cpd = R*gCPD;
+	var c, cp;
+
+	addElement(smartShape.elem, bc, fc);
+
+	c = smartShape.elem.elements[i].contours[0];
+
+	addPathPointBez(c, l,   t+R, l,       t+R,     l,       t+R-cpd);
+	addPathPointBez(c, l+R, t,   l+R-cpd, t,       l+R,     t      );
+	addPathPointBez(c, r-R, t,   r-R,     t,       r-R+cpd, t      );
+	addPathPointBez(c, r,   t+R, r,       t+R-cpd, r,       t+R    );
+	addPathPoint   (c, r, b);
+	addPathPoint   (c, l, b);
+
+	c.isClosed = true;
+
+	smartShape.elem.controlPoints.length++;
+
+	cp                   = smartShape.elem.controlPoints[i+2];
+	cp.x                 = l+5+(gTabWidth-10)*gInitHue/360;
+	cp.y                 = t - 5;
+	cp.toolTip           = gTT[2] + ": " + gInitHue;
+	cp.toolTipTracksDrag = true;
+	cp.type              = "default";
+
+	cp                   = smartShape.elem.controlPoints[1];
+	cp.x                += gTabWidth;
+}
+
+function deleteTab()
+{
+	if (smartShape.elem.elements.length>1)
+	{
+		smartShape.elem.elements.length--;
+		smartShape.elem.controlPoints.length--;
+		smartShape.elem.controlPoints[1].x -= gTabWidth;
+	}
+}
+
+function changeAllHues(h)
+{
+	var len = smartShape.elem.elements.length;
+	for (var i = 0; i < len; i++) {
+		changeHue(i, h);
+	}
+}
+
+function changeHue(i, h)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var cp = smartShape.elem.controlPoints[i+2];
+	var l  = c0.x + 5 + i*gTabWidth;
+	var r  = l + gTabWidth;
+
+	cp.x       = l + 5 + (gTabWidth-10)*h/360;
+
+	// Get the Effect List
+	var list = smartShape.elem.elements[i].effectList;
+	// Get the Hue Effect
+	var eff = list.effects[gHueIdx];
+	// Set the Hue Amount
+	eff.hue_amount = h;
+	// Re-set the modified effect into the list
+	list.effects[gHueIdx] = eff;
+	// Re-apply the modified effect list to the element
+	smartShape.elem.elements[i].effectList = list;
+}
+
+/* ----------------------------------------------------------- ConvertRGBToHLS */
+function ConvertRGBToHLS(color)
+{
+	var kOneOver360 = 1.0 / 360.0;
+	var kOneOver255 = 1.0 / 255.0;
+
+	var r = fw.getRed(color);
+	var g = fw.getGreen(color);
+	var b = fw.getBlue(color);
+
+	var hue;
+	var lightness
+	var saturation;
+	
+	var dr = r;
+	var dg = g;
+	var db = b;
+
+	var red = dr * kOneOver255;
+	var green = dg * kOneOver255;
+	var blue = db * kOneOver255;
+
+	var maxc = Math.max(Math.max(red, green), blue);
+	var minc = Math.min(Math.min(red, green), blue);
+
+	lightness = (maxc + minc) / 2.0;
+
+	if (maxc == minc) {
+		saturation = 0;
+		hue = 0;
+	} else {
+		if (lightness <= 0.5) {
+			saturation = (maxc - minc) / (maxc + minc);
+		} else {
+			saturation = (maxc - minc) / (2 - maxc - minc);
+		}
+
+		var delta = maxc - minc;
+	
+		if (red == maxc) {
+			hue = (green - blue)/delta;
+		} else if (green == maxc) {
+			hue = 2 + ((blue-red)/delta);
+		} else if (blue == maxc) {
+			hue = 4 + ((red - green)/delta);
+		}
+
+		hue = hue * 60.0;
+		if (hue < 0.0 )
+			hue += 360.0;
+	}
+	
+	var dh = (hue * kOneOver360) * 255.0;
+	var dl = lightness * 255.0;
+	var ds = saturation * 255.0;
+
+	if (dh < 0.0)
+		dh = 0.0;
+	if (dh > 255.0)
+		dh = 255.0;
+
+	if (dl < 0.0)
+		dl = 0.0;
+	if (dl > 255.0)
+		dl = 255.0;
+
+	if (ds < 0.0)
+		ds = 0.0;
+	if (ds > 255.0)
+		ds = 255.0;
+	
+	var newColor = new Object();
+	newColor.h = dh;
+	newColor.l = dl;
+	newColor.s = ds;
+	return(newColor);
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

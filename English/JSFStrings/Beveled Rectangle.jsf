@@ -1,0 +1,7 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["corner"] = "Click to switch corners";
+__tooltips["altopt"] = "Alt/Opt for individual corners";
+__tooltips["resize"] = "Resize";

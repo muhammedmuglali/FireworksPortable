@@ -1,0 +1,38 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+
+function setDefaultValues()
+{
+	Widget.elem.customData["flexClassName"] = "Cursor";
+
+	var currValues = new Array();
+
+	currValues.push({ name:"Cursor", type:"ComboBox", value:"Pointer,Pointer,Copy,Link,Reject,Busy" });
+
+	Widget.elem.customData["currentValues"] = currValues;
+}
+
+function applyCurrentValues()
+{
+	var val = Widget.elem.customData["currentValues"][0].value.split(",")[0];
+
+	Widget.GetObjectByName("cursor").visible        = (val=="Pointer");
+	Widget.GetObjectByName("cursor_copy").visible   = (val=="Copy");
+	Widget.GetObjectByName("cursor_link").visible   = (val=="Link");
+	Widget.GetObjectByName("cursor_reject").visible = (val=="Reject");
+	Widget.GetObjectByName("cursor_busy").visible   = (val=="Busy");
+}
+
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+	default: break;
+}
+
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

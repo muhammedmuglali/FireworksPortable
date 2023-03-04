@@ -1,0 +1,174 @@
+﻿
+var gTT = new Array();
+
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Ruler.jsf");
+
+gTT[0] = __tooltips["len"];
+gTT[1] = __tooltips["ang"];
+
+
+// VARIABLES
+var mouse = smartShape.currentMousePos;
+var cps = smartShape.elem.controlPoints;
+var elems = smartShape.elem.elements;
+var ccpi = smartShape.currentControlPointIndex;
+
+var operation = new Object();
+operation.InsertSmartShapeAt = function(){
+	SetControlPoint(0, "default",  mouse);
+	SetControlPoint(1, "default", AddPoints(mouse, Point(100,0)));
+	SetControlPoint(2, "defaultInverted", cps[0]);
+	SetControlPoint(3, "defaultInverted", cps[0]);
+
+	elems[0] = new Path();
+	elems[1] = new Path();
+	elems[1].contours[0].isClosed = true;
+
+	Render(false);
+}
+operation.BeginDragControlPoint = function(){
+	if (ccpi < 2){
+		smartShape.getsDragEvents = true;
+		var params = smartShape.GetDefaultMoveParms();
+		cps[ccpi].RegisterMove(params);
+	}else{
+		smartShape.getsDragEvents = false;
+		NextDivisionSet()
+	}
+	UpdateToolTips(AngleBetween(cps[0], cps[1]), true);
+}
+operation.DragControlPoint = function(){
+	Render(true);
+}
+operation.EndDragControlPoint = function(){
+	Render(false);
+}
+
+
+
+Render = function(dragPoints){
+	var size = 12;
+	var rad45 = Math.PI/4;
+	
+	var a = AngleBetween(cps[1], cps[0]);
+	var tip1 = PointFromVector(cps[1], a+Math.PI+rad45, size);
+	var tip2 = PointFromVector(cps[0], a-rad45, size);
+	
+	var n = elems[1].contours[0].nodes;
+	n.length = 4;
+	
+	SetNodePosition(n[0], tip1);
+	SetNodePosition(n[1], tip2);
+	SetNodePosition(n[2], PointFromVector(cps[0], a+rad45, size));
+	SetNodePosition(n[3], PointFromVector(cps[1], a+Math.PI-rad45, size));
+	UpdateDivisionSet(tip1, tip2, a, size);
+	UpdateToolTips(a, dragPoints);
+}
+
+UpdateDivisionSet = function(tip1, tip2, a, size){
+	a += Math.PI/2;
+	size /= 2;
+	var n
+	elems[0] = new Path();
+	for (var i = 2; i<cps.length; i++){
+		SetControlPoint(i, "defaultInverted", PointBetweenPercent(tip1, tip2, (i-2)/(cps.length-3)));
+		elems[0].contours[i-2] = new Contour();
+		elems[0].contours[i-2].isClosed = false;
+		n = elems[0].contours[i-2].nodes;
+		n.length = 2;
+		
+		SetNodePosition(n[0], cps[i]);
+		if (i == 2) SetNodePosition(n[1], cps[1]);
+		else if (i < cps.length-1) SetNodePosition(n[1], PointFromVector(cps[i], a, size));
+		else SetNodePosition(n[1], cps[0]);
+	}
+}
+NextDivisionSet = function(){
+	if (cps.length >= 13) cps.length = 4;
+	else cps.length++;
+	Render(false);
+}
+
+UpdateToolTips = function(a, dragPoints){
+	if (dragPoints == undefined) dragPoints = true;
+	var factor = 1;
+	var unit = "px";
+	var ornd = 10;
+	var rnd = ornd;
+	if (smartShape.ctrlCmdKeyDown){
+		var dom = fw.getDocumentDOM();
+		factor = 1/dom.resolution;
+		unit = dom.resolutionUnits;
+		rnd = 100;
+	}
+	var i = cps.length;
+	var opt, pt = Point(0,0);
+	while (i-- > 1){
+		if (i>1) {
+			opt = pt;
+			pt = smartShape.elem.smartShapeToGlobalCoords({x:cps[i].x, y:cps[i].y});
+			pt.x = Math.round(pt.x*factor*rnd)/rnd;
+			pt.y = Math.round(pt.y*factor*rnd)/rnd;
+			cps[i].toolTip = "(X: "+pt.x+", Y: "+pt.y+") "+unit;
+		}else{
+			var len = DistanceBetween(opt, pt);
+			len = Math.round(len*rnd)/rnd;
+			a = Math.round((180-(a*180/Math.PI))*ornd)/ornd;
+			cps[0].toolTip = (dragPoints) ? "(X: "+opt.x+", Y: "+opt.y+") " : "";
+			cps[1].toolTip = (dragPoints) ? "(X: "+pt.x+", Y: "+pt.y+") " : "";
+			cps[0].toolTip += gTT[0]+": "+len +" "+unit+" "+gTT[1]+": "+a+"°";
+			cps[1].toolTip += gTT[0]+": "+len +" "+unit+" "+gTT[1]+": "+a+"°";
+		}
+	}
+}
+
+
+// POINT METHODS
+Point = function(x,y){
+	return {x:x, y:y};
+}
+AddPoints = function(p1, p2){
+	return {x:p1.x+p2.x, y:p1.y+p2.y};
+}
+PointBetween = function(p1, p2){
+	return {x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2};
+}
+PointBetweenPercent = function(p1, p2, p){
+	return {x:p1.x+(p2.x-p1.x)*p, y:p1.y+(p2.y-p1.y)*p};
+}
+DistanceBetween = function(p1,p2){
+	var dx = p2.x - p1.x;
+	var dy = p2.y - p1.y;
+	return Math.sqrt(dx*dx + dy*dy);
+}
+AngleBetween = function(p1,p2){
+	return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+}
+PointFromVector = function(origin, angle, power){
+	return {
+		x: origin.x + Math.cos(angle)*power,
+		y: origin.y + Math.sin(angle)*power
+	}
+}
+
+
+// NODE/CP POSITIONING
+SetControlPoint = function(index, type, pt){
+	if (index >= cps.length) cps.length = index+1;
+	cps[index].type = type;
+	cps[index].x = pt.x;
+	cps[index].y = pt.y;
+	cps[index].toolTipTracksDrag = true;
+}
+SetNodePosition = function(n, pt){
+	SetBezierNodePosition(n, pt,pt,pt);
+}
+SetBezierNodePosition = function(n, ptp, pt, pts){
+	n.predX	= ptp.x;	n.predY	= ptp.y;
+	n.x		= pt.x;	n.y		= pt.y;
+	n.succX	= pts.x;	n.succY	= pts.y;
+}
+
+// INVOKE OPERATION
+if (operation[smartShape.operation])
+	operation[smartShape.operation]();

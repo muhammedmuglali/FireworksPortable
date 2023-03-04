@@ -1,0 +1,9 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["px"]    = "px";
+__tooltips["inch"] = "inch";
+__tooltips["drag"] = "Drag";
+__tooltips["length"] = "Length:";
+__tooltips["angle"] = "Angle:";

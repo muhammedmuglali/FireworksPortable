@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FWACPlayer>
+	<Player name="Sliver Silver (Flash)" preview="sliver_silver.jpg" launch="index.html">
+		<File src="sliver_silver.sw_"  dst="sliver_silver.swf"/>
+		<File src="index.html" dst="index.html"/>
+        <File src="scripts/AC_RunActiveContent.js" dst="scripts/AC_RunActiveContent.js"/>
+		<Info src="sliver_silver_info.html"/>
+	</Player>
+</FWACPlayer>

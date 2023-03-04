@@ -1,0 +1,457 @@
+// Fireworks Director HTML & JavaScript.
+// Version 4.0 03Sept2000
+
+// To export HTML without comments change the value of variable doComments to "false".
+var doComments=fw.getPref("HTMLCommentsOn");
+var indentNestedImagemaps=false;
+
+// When doComments is set to "true" the WRITE_HTML_COMMENT and WRITE_JS_COMMENT functions
+// include HTML and JavaScript comments in the exported file.
+function WRITE_HTML_COMMENT(str) {
+	if (doComments) WRITE_HTML("<!--"+str+"-->\n");
+}
+
+function WRITE_JS_COMMENT(str) {
+	if (doComments) WRITE_HTML("/* "+str+" */\n");
+}
+
+var doHeader = true;
+doHeader = exportDoc.generateHeader; 
+// When HTML is generated to a file, generateHeader is true.
+// When HTML is generated for the clipboard, 
+// generateHeader is false.
+
+					
+var optAlert = false;
+var gotSlices = false;
+
+
+var d = new Date();
+if (doHeader) {
+	// Write general comments for copying and pasting Fireworks-generated code into existing HTML documents.
+	WRITE_HTML_COMMENT("This html is intended to be imported into Director using the Fireworks Import xtra.");
+	WRITE_HTML("\n");
+
+	WRITE_HTML("<!-- saved from url=(0014)about:internet -->\n");
+	WRITE_HTML("<html>\n");
+	WRITE_HTML("\n");
+
+	WRITE_HTML("<head>\n");
+	WRITE_HTML("\n");
+
+	// Use Base Name from export dialog as document title.
+	WRITE_HTML("<title>", exportDoc.filename, "</title>\n");
+	WRITE_HTML("\n");
+
+	// Write Meta tags.
+	WRITE_HTML("<meta http-equiv=\"Content-Type\" content=\"text/html;", fw.textOutputEncoding, "\">\n"); 
+	WRITE_HTML("<meta name=\"description\" content=\"Fireworks Splice HTML\">\n");
+	WRITE_HTML("\n");
+
+}
+// Write HTML target and date created.
+WRITE_HTML("<!-- Fireworks Director HTML target.\n    Created ", d, " -->\n");
+WRITE_HTML("\n");
+
+// Declare variables for processing Behaviors.	
+var kActionStatusMessage = 1;
+var kActionSwapImage = 2;
+var kActionButtonDown = 4;
+var kActionSwapImageRestore = 5;
+var kActionButtonHighlight = 6; 
+var kActionButtonRestore = 7;
+
+
+var kEventMouseOver = 0;
+var kEventOnClick = 1;
+var kEventMouseOut = 2;
+var kEventOnLoad = 3;
+
+var hasStatusMessage = false;
+var hasSwap = false;
+var hasDown = false;
+var hasRestore = false;
+var hasOnloadInits = false;
+
+
+var rollover = false;
+var navButton = false;
+var disjoint = 0;
+
+// Function LayerName determines the name of the current layer.
+function LayerName(str) {
+	var newName = str.toString().replace(/_/g, "");
+	newName = newName.replace(/ /g, "");
+	if (newName == "") newName = "EmptyName";
+	if (!newName) newName = "EmptyName";
+	if (newName.search(/\d/) == 0) {
+		newName = "L"+newName;
+	}
+	return(newName);
+}
+
+
+// Determine and process Behaviors in the document.
+function ProcessBehavior(theCurBehaviors, curSprite) {
+
+	var localDisjoint = 0;
+	// Look for 3 things: button, navbar & disjoint.
+	for (var i=0; i<theCurBehaviors.numberOfBehaviors; i++) {
+		var curBehavior = theCurBehaviors[i];
+		var swapRow = curBehavior.targetRowNum;
+		var swapCol = curBehavior.targetColumnNum;
+		var swapFrame = curBehavior.targetFrameNum; 
+		var swapTable = curBehavior.targetTable;
+
+		if (curBehavior.event != kEventMouseOver) {
+			continue;
+		}
+
+		if (!swapTable) {
+			/* Not a swap behavior, so continue. */
+			continue;
+		}
+		
+		var hasHref = curBehavior.hasHref; 
+		if (hasHref) {
+			continue;
+		} 
+					
+		var targetSprite = swapTable[swapRow][swapCol].spriteIndex;
+		var selfTarget =  (targetSprite == curSprite);
+		
+		//alert("Self target "+selfTarget+" action="+curBehavior.action);
+		// Translate button Behaviors into JavaScript.
+		if (curBehavior.action == kActionButtonHighlight && selfTarget) {
+			navButton = true;
+			continue;
+		}
+		// Translate Swap Image Behaviors into lingo.
+		if (curBehavior.action == kActionSwapImage && selfTarget) {
+			rollover = true;
+			continue;
+		}
+		if (curBehavior.action == kActionSwapImage) {
+			var targetSlice = swapTable[swapRow][swapCol];
+			if (!targetSlice.getFrameFileName(swapFrame)) continue;
+			disjoint++;
+			continue;
+		}		
+	}
+}
+
+
+// Determine and process Behaviors in the document.
+function bogusProcessBehavior(theCurBehaviors, curSprite) {
+	javaOver = ProcessEvent(theCurBehaviors, kEventMouseOver, curSprite);
+	javaOut = ProcessEvent(theCurBehaviors, kEventMouseOut, curSprite);
+	javaClick = ProcessEvent(theCurBehaviors, kEventOnClick, curSprite);
+	if (javaOver != "" || javaOut != "" || javaClick != "") {
+		return(true);
+	}
+	return(false);
+}
+
+
+if (doHeader) {
+	// Close head tag.
+	WRITE_HTML("</head>\n");
+
+	// Begin body tag. Set background color to Fireworks document canvas color.
+	WRITE_HTML("<body>\n");
+	WRITE_HTML("\n");
+}
+
+var theCurSprite = 1;
+
+function LabelSprites(curSlices) {
+	var curCol;
+	var curRow;
+
+	// Write table rows.
+	for (curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			curSlice.spriteIndex = 0;
+			if (curSlice.skipCell) continue; 
+
+			var nestedTable = curSlice.nestedTableSlices;
+			if (nestedTable) {
+				LabelSprites(nestedTable);
+				continue;
+			}
+
+			if (!curSlice.hasImage) {
+				continue;
+			}
+
+			if (curSlice.isUndefined && curSlices.doSkipUndefined) {
+				continue;
+			}
+			curSlice.spriteIndex = theCurSprite;
+			theCurSprite++;
+		}
+	}
+}
+
+LabelSprites(slices);
+
+// Find and declare all images used in Behaviors.
+
+function WriteTable(curSlices, indent) {
+	var curCol;
+	var curRow;
+	var downIndex = 0;	
+	var curZ = 1;		   
+
+
+/* First, write out undefined slices */
+	// Write table rows.
+	for (curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			if (curSlice.skipCell) continue; 
+
+			var nestedTable = curSlice.nestedTableSlices;
+			if (nestedTable) {
+				WriteTable(nestedTable, "	"+indent);
+				continue;
+			}
+
+			// Write HTML text from curSlices set to "Text (No Image)"
+			if (!curSlice.hasImage) {
+				// no image, just dump out html text.
+				curSlice.alreadyWritten = true;
+				continue;
+			}
+
+			// If current slice is not defined by a slice object and Export Undefined
+			// curSlices is not checked, don't output an image and if Shims are specified 
+			// place a shim image in the current cel
+			if (curSlice.isUndefined && curSlices.doSkipUndefined) {
+				// Tell Fireworks to not write the image file. Setting the filename to "" forces 
+				// Fireworks to not generate the image.
+				var q;
+				for (q=0; q<exportDoc.numFrames; q++) {
+					curSlice.setFrameFileName(q, "");
+				}	
+				curSlice.alreadyWritten = true;
+				continue;
+			}
+			if (!curSlice.isUndefined) continue;
+			var anchorTagOpen = false;
+
+			// Determine the current slice's file name and name the layer accordingly.
+			var imageName = curSlice.getFrameFileName(0);
+			if (imageName == "") continue;
+			var layerName = LayerName(imageName);
+
+			if (!curSlice.getFrameFileName(0)) continue;
+			// Write the div tag to specify layer. Obtain and enter height, width and 
+			// positioning information.
+			// Ex: <div id="Layer1" style="position:absolute; left:35px; top:34px; width:115px; height:96px; z-index:1">
+			WRITE_HTML("<div id=\"", layerName, "\" style=\"position:absolute; ");
+			WRITE_HTML("left:", curSlice.left, "px; top:", curSlice.top, "px;")
+			WRITE_HTML("width:", curSlice.width, "px; height:", curSlice.height, "px;");
+			WRITE_HTML("z-index:", curZ, "; visibility:visible\">");
+			curZ++;
+			// Place image.
+			imageName = curSlice.getFrameFileName(0);
+			// Ex: <img name="N_03_02" src="File_03_02.gif" width="79" height="71" border="0"
+			WRITE_HTML("<img src=\"",
+				slices.imagesDirPath, imageName, curSlice.imageSuffix, "\" width=\"",
+				curSlice.width,"\" height=\"", curSlice.height, "\" border=\"0\"");
+			// Close layer div tag.
+			WRITE_HTML("></div>\n");
+			curSlice.alreadyWritten = true;
+		}
+	}
+
+	// Write cells without behaviors
+	for (curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			if (curSlice.skipCell) continue; 
+			if (curSlice.alreadyWritten) continue; 
+			if (curSlice.nestedTableSlices) {
+				continue;
+			}
+			var anchorTagOpen = false;
+
+			// Determine the current slice's file name and name the layer accordingly.
+			var imageName = curSlice.getFrameFileName(0);
+			if (imageName == "") continue;
+			var layerName = LayerName(imageName);
+
+			var q;
+			rollover = false;
+			navButton = false;
+			disjoint = 0;
+
+			var behaviors = curSlice.behaviors;
+			ProcessBehavior(behaviors, curSlice.spriteIndex);
+			if (rollover || navButton || disjoint) {
+				continue; // process last;
+			}
+
+			if (!curSlice.getFrameFileName(0)) continue;
+			// Write the div tag to specify layer. Obtain and enter height, width and 
+			// positioning information.
+			// Ex: <div id="Layer1" style="position:absolute; left:35px; top:34px; width:115px; height:96px; z-index:1">
+			WRITE_HTML("<div id=\"", layerName, "\" style=\"position:absolute; ");
+			WRITE_HTML("left:", curSlice.left, "px; top:", curSlice.top, "px;")
+			WRITE_HTML("width:", curSlice.width, "px; height:", curSlice.height, "px;");
+			WRITE_HTML("z-index:", curZ, "; visibility:visible\">");
+			curZ++;
+			// Place image.
+			imageName = curSlice.getFrameFileName(0);
+			// Ex: <img name="N_03_02" src="File_03_02.gif" width="79" height="71" border="0"
+			WRITE_HTML("<img src=\"",
+				slices.imagesDirPath, imageName, curSlice.imageSuffix, "\" width=\"",
+				curSlice.width,"\" height=\"", curSlice.height, "\" border=\"0\"");
+			// Close layer div tag.
+			WRITE_HTML("></div>\n");
+			curSlice.alreadyWritten = true;
+
+		}
+	}
+		
+	// Write cells with behaviors
+	for (curRow = 0; curRow < curSlices.numRows; curRow++) {
+		for (curCol = 0; curCol < curSlices.numColumns; curCol++) {
+			var curSlice = curSlices[curRow][curCol];
+			if (curSlice.skipCell) continue; 
+			if (curSlice.alreadyWritten) continue; 
+			if (curSlice.nestedTableSlices) {
+				continue;
+			}
+
+			var anchorTagOpen = false;
+
+			// Determine the current slice's file name and name the layer accordingly.
+			var imageName = curSlice.getFrameFileName(0);
+			if (imageName == "") continue;
+			var layerName = LayerName(imageName);
+
+			var q;
+			rollover = false;
+			navButton = false;
+			disjoint = 0;
+			for (q=0; q<exportDoc.numFrames; q++) {
+				var targetFrame = q;
+				if (q>3) break;
+				if (!rollover && !navButton && q>0) break;
+				if (!navButton && q>1) break;
+
+				if (!curSlice.getFrameFileName(targetFrame)) continue;
+				// Write the div tag to specify layer. Obtain and enter height, width and 
+				// positioning information.
+				// Ex: <div id="Layer1" style="position:absolute; left:35px; top:34px; width:115px; height:96px; z-index:1">
+				WRITE_HTML("<div id=\"", layerName, "\" style=\"position:absolute; ");
+				WRITE_HTML("left:", curSlice.left, "px; top:", curSlice.top, "px;")
+				WRITE_HTML("width:", curSlice.width, "px; height:", curSlice.height, "px;");
+				if (q==0) {
+					WRITE_HTML("z-index:", curZ, "; visibility:visible\">");
+					curZ++;
+				} else {
+					WRITE_HTML("z-index:", 0, "; visibility:invisible\">");
+				}
+				
+				if (q==0) { // only get behaviors on first image.
+					var behaviors = curSlices[curRow][curCol].behaviors;
+					ProcessBehavior(behaviors, curSlice.spriteIndex);
+					if (rollover || navButton || disjoint) {
+						if (navButton) rollover = false;
+						WRITE_HTML("\n<!-- lingo:");
+						// Write rollover and swap image events.
+						WRITE_HTML("rollover=");
+						if (rollover) {
+							WRITE_HTML("1");
+						} else {
+							WRITE_HTML("0");
+						}
+						WRITE_HTML(" navbutton=");
+						if (navButton) {
+							WRITE_HTML("1");
+						} else {
+							WRITE_HTML("0");
+						}
+						WRITE_HTML(" swap="+disjoint);
+						WRITE_HTML("-->\n")
+					}
+				}
+
+				// Place image.
+				imageName = curSlice.getFrameFileName(targetFrame);
+				// Ex: <img name="N_03_02" src="File_03_02.gif" width="79" height="71" border="0"
+				WRITE_HTML("<img src=\"",
+					slices.imagesDirPath, imageName, curSlice.imageSuffix, "\" width=\"",
+					curSlice.width,"\" height=\"", curSlice.height, "\" border=\"0\"");
+				
+
+				// Close layer div tag.
+				WRITE_HTML("></div>\n");
+			}	
+
+			if (disjoint) {
+				// Look for disjoint.
+				var theCurBehaviors = curSlices[curRow][curCol].behaviors;
+				for (var i=0; i<theCurBehaviors.numberOfBehaviors; i++) {
+					var curBehavior = theCurBehaviors[i];
+					var swapRow = curBehavior.targetRowNum;
+					var swapCol = curBehavior.targetColumnNum;
+					var swapFrame = curBehavior.targetFrameNum; 
+					var swapTable = curBehavior.targetTable;
+
+					if (curBehavior.event != kEventMouseOver) continue;
+					if (!swapTable) continue;						
+					var hasHref = curBehavior.hasHref; 
+					if (curBehavior.hasHref)  continue;
+								
+					var targetSprite = swapTable[swapRow][swapCol].spriteIndex;
+					var selfTarget =  (targetSprite == curSlice.spriteIndex);
+					if (selfTarget) continue;
+					if (curBehavior.action == kActionSwapImage) {
+						// disjoint
+						var targetSlice = swapTable[swapRow][swapCol];
+						if (!targetSlice.getFrameFileName(swapFrame)) continue;
+						// Write the div tag to specify layer. Obtain and enter height, width and 
+						// positioning information.
+						// Ex: <div id="Layer1" style="position:absolute; left:35px; top:34px; width:115px; height:96px; z-index:1">
+						WRITE_HTML("<div id=\"", layerName, "\" style=\"position:absolute; ");
+						WRITE_HTML("left:", targetSlice.left, "px; top:", targetSlice.top, "px;")
+						WRITE_HTML("width:", targetSlice.width, "px; height:", targetSlice.height, "px;");
+						WRITE_HTML("z-index:", curZ, "; visibility:visible\">");
+						curZ++;
+						// Place image.
+						imageName = targetSlice.getFrameFileName(swapFrame);
+						// Ex: <img name="N_03_02" src="File_03_02.gif" width="79" height="71" border="0"
+						WRITE_HTML("<img src=\"",
+							slices.imagesDirPath, imageName, targetSlice.imageSuffix, "\" width=\"",
+							targetSlice.width,"\" height=\"", targetSlice.height, "\" border=\"0\"");
+						// Close layer div tag.
+						WRITE_HTML("></div>\n");
+					}
+				}		
+			}
+
+		}
+	}		
+
+}
+
+
+WriteTable(slices, "");
+WRITE_HTML("\n");
+
+WRITE_HTML("\n");  
+
+if (doHeader) {
+	WRITE_HTML("</body>\n");
+
+	WRITE_HTML("</html>\n");
+}
+
+var retval = "ok";
+retval;
+

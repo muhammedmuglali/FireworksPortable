@@ -1,0 +1,8 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["delete"] = "Delete tab";
+__tooltips["add"] = "Add tab";
+__tooltips["hue"] = "Hue";
+__tooltips["enter"] = "Please enter a new hue value between 0 and 360";

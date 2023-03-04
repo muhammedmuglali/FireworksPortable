@@ -1,0 +1,23 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["figure"] = "Figure";
+__tooltips["torso"] = "Torso";
+__tooltips["head"] = "Head";
+__tooltips["lshoulder"] = "Left Shoulder";
+__tooltips["lelbow"] = "Left Elbow";
+__tooltips["lwrist"] = "Left Wrist";
+__tooltips["lhand"] = "Left Hand";
+__tooltips["rshoulder"] = "Right Shoulder";
+__tooltips["relbow"] = "Right Elbow";
+__tooltips["rwrist"] = "Right Wrist";
+__tooltips["rhand"] = "Right Hand";
+__tooltips["lhip"] = "Left Hip";
+__tooltips["lknee"] = "Left Knee";
+__tooltips["lankle"] = "Left Ankle";
+__tooltips["lfoot"] = "Left Foot";
+__tooltips["rhip"] = "Right Hip";
+__tooltips["rknee"] = "Right Knee";
+__tooltips["rankle"] = "Right Ankle";
+__tooltips["rfoot"] = "Right Foot";

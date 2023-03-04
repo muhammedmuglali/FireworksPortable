@@ -1,0 +1,707 @@
+﻿/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/*                                 Tooltips                                 */
+/*==========================================================================*/
+
+	fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Calendar.jsf");
+	var t    = __tooltips;
+
+
+/*==========================================================================*/
+/*                            Default functions                             */
+/*==========================================================================*/
+
+switch(smartShape.operation)
+{
+	case "InsertSmartShapeAt":
+		InsertSmartShapeAt();
+		break;
+		
+	case "EndDragControlPoint":
+		EndDragControlPoint();
+		break;
+
+	default:
+		break;
+}
+
+function InsertSmartShapeAt()
+{
+	var cmp = smartShape.currentMousePos;
+	var cw  = 40; //cell width
+	var ch  = 35; //cell height
+	var w   = 7*cw;
+	var h   = 7*ch;
+	var c   = {x:cmp.x-w/2, y:cmp.y-h/2};
+	var d   = new Date;
+	var cp;
+
+	smartShape.elem.controlPoints.length = 6;
+
+	createCalendar(c, cw, ch, d.getFullYear(), d.getMonth());
+}
+
+function EndDragControlPoint()
+{
+	var cpIdx = smartShape.currentControlPointIndex;
+	var c0    = smartShape.elem.controlPoints[0];
+	var c1    = smartShape.elem.controlPoints[1];
+	var c2    = smartShape.elem.controlPoints[2];
+	var c3    = smartShape.elem.controlPoints[3];
+	var c4    = smartShape.elem.controlPoints[4];
+	var c5    = smartShape.elem.controlPoints[5];
+	var e0    = smartShape.elem.elements[0].elements[3].contours[0];
+	var e_    = smartShape.elem.elements[2].elements[0].elements[1].contours[0];
+	var cw    = e_.nodes[1].x - e_.nodes[0].x;
+	var ch    = e_.nodes[3].y - e_.nodes[0].y;
+	var c     = {x:e0.nodes[0].x, y:e0.nodes[0].y};
+	var y     = parseInt(c0.name);
+	var m     = parseInt(c2.name);
+	var err   = false;
+	var y_, m_;
+
+	switch (cpIdx)
+	{
+		case 0:
+			y-=2;
+		case 1:
+			y++;
+
+			if (y<1) y = 1;
+
+			updateYear(y);
+
+			updateDays(y, m);
+
+			break;
+
+		case 2:
+			m-=2;
+		case 3:
+			m++;
+
+			if (m<0)
+			{
+				m = 11;
+				y--;
+				updateYear(y);
+			}
+			else if (m>11)
+			{
+				m = 0;
+				y++;
+				updateYear(y);
+			}
+
+			updateMonth(m);
+
+			updateDays(y, m);
+
+			break;
+
+		case 4:
+			y_ = prompt(t.enterYear.toString());
+
+			if ((y_=="") || (y_==null))
+				err = true
+			else
+			{
+				y_ = parseInt(y_);
+
+				if ( (y_<0) || isNaN(y_) )
+				{
+					alert(t.errorInvalidNumber);
+					err = true;
+				}
+				else
+				{
+					updateYear(y_);
+					updateDays(y_, m);
+				}
+			}
+			break;
+
+		case 5:
+			m_ = prompt(t.enterMonth);
+
+			if ((m_=="") || (m_==null))
+				err = true;
+			else
+			{
+				m_ = parseInt(m_)-1;
+
+				if ( (m_<0) || (m_>11) || isNaN(m_) )
+				{
+					alert(t.errorInvalidNumber);
+					err = true;
+				}
+				else
+				{
+					updateMonth(m_);
+					updateDays(y, m_);
+				}
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
+/*==========================================================================*/
+/*                          User defined functions                          */
+/*==========================================================================*/
+
+// converts Radians to Degrees
+function rad2deg(a) { return (a*360)/g2PI; }
+
+// returns angle at (x,y)
+function evalAngle(x,y) { return Math.atan2(y,x); }
+
+// returns distance between (x1,y1) and (x2,y2)
+function dist(x1, y1, x2, y2)
+{
+	return(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)));
+}
+
+// adds a point with no handles at (x,y)
+function addPathPoint(contour, x, y)
+{
+	addPathPointBez(contour, x, y, x, y, x, y);
+}
+
+// adds a point at (x,y) with specified handle positions
+function addPathPointBez(contour, x, y, predX, predY, succX, succY)
+{
+	var theNodes = contour.nodes;
+
+	// increase the length to add a new point
+	theNodes.length++;
+
+	// get the new point
+	var node = theNodes[theNodes.length - 1];
+	
+	// Set the new point's values
+	node.x     = x;
+	node.y     = y;
+	node.predX = predX;
+	node.predY = predY;
+	node.succX = succX;
+	node.succY = succY;
+}
+
+function addElement(element, bc, fc)
+{
+	element.elements[element.elements.length] = new Path;
+
+	var e = element.elements[element.elements.length-1];
+
+	e.contours[0] = new Contour;
+	e.contours[0].nodes.length = 0;
+
+	e.opacity = 100;
+
+	if (e.pathAttributes.brush==null)
+		bc = "#000000";
+
+	if (bc!="")
+	{
+		e.pathAttributes.brush = {	alphaRemap:"none", 
+									angle:0, 
+									antiAliased:false, 
+									aspect:100, 
+									blackness:0, 
+									category:"bc_Pencil", 
+									concentration:100, 
+									dashOffSize1:2, 
+									dashOffSize2:2, 
+									dashOffSize3:2, 
+									dashOnSize1:8, 
+									dashOnSize2:1, 
+									dashOnSize3:1, 
+									diameter:1, 
+									feedback:"none", 
+									flowRate:0, 
+									maxCount:15, 
+									minSize:1, 
+									name:"bn_1-Pixel", 
+									numDashes:0, 
+									shape:"circle", 
+									softenMode:"bell curve", 
+									softness:0, 
+									spacing:15, 
+									textureBlend:0, 
+									textureEdge:0, 
+									tipColoringMode:"random", 
+									tipCount:1, 
+									tipSpacing:0, 
+									tipSpacingMode:"random", 
+									type:"simple" };
+		e.pathAttributes.brushColor = bc;
+	}
+
+	if (fc!="")
+	{
+		e.pathAttributes.fill = {	category:"fc_Solid", 
+									ditherColors:[ "#000000", "#000000" ], 
+									edgeType:"antialiased", 
+									feather:0, 
+									gradient:null, 
+									name:"fn_Normal", 
+									pattern:null, 
+									shape:"solid", 
+									stampingMode:"blend opaque", 
+									textureBlend:0, 
+									webDitherTransparent:false };
+		e.pathAttributes.fillColor = fc;
+	}
+}
+
+function addText(c, element, t, s, fc)
+{
+	var e;
+
+	element.elements[element.elements.length] = new Text;
+
+	e = element.elements[element.elements.length-1];
+	e.autoExpand = true;
+	e.textRuns = { 	initialAttrs:{	alignment:"left", 
+									baselineShift:0, 
+									bold:false, 
+									face:"Arial", 
+									fillColor:fc, 
+									horizontalScale:1, 
+									italic:false, 
+									leading:1, 
+									leadingMode:"percentage", 
+									paragraphIndent:0, 
+									paragraphSpacingAfter:0, 
+									paragraphSpacingBefore:0, 
+									rangeKerning:0, 
+									size:""+s+"pt", 
+									underline:false }, 
+					textRuns:[ {	changedAttrs:{  }, 
+									characters:t } ] };
+	e.rawLeft = c.x - (e.rawWidth/2);
+	e.rawTop  = c.y - (e.rawHeight/2);
+}
+
+function int2Month(m)
+{
+	switch (m)
+	{
+		case 12:
+		case  0: return t.january;   break;
+		case  1: return t.february;  break;
+		case  2: return t.march;     break;
+		case  3: return t.april;     break;
+		case  4: return t.may;       break;
+		case  5: return t.june;      break;
+		case  6: return t.july;      break;
+		case  7: return t.august;    break;
+		case  8: return t.september; break;
+		case  9: return t.october;   break;
+		case 10: return t.november;  break;
+		case -1:
+		case 11: return t.december;  break;
+
+		default:
+			alert(t.errorMonthIndex);
+			break;
+	}
+}
+
+function int2Day(d)
+{
+	switch (d)
+	{
+		case 0: return t.sunday; break;
+		case 1: return t.monday; break;
+		case 2: return t.tuesday; break;
+		case 3: return t.wednesday; break;
+		case 4: return t.thursday; break;
+		case 5: return t.friday; break;
+		case 6: return t.saturday; break;
+
+		default:
+			alert(t.errorDayIndex);
+			break;
+	}
+}
+
+function updateText(e, c, t)
+{
+	var fc = e.elements[0].textRuns.initialAttrs.fillColor;
+
+	addText({x:c.x, y:c.y}, e, t, 24, fc);
+
+	e.elements[0].textRuns = e.elements[e.elements.length-1].textRuns;
+
+	e.elements[0].rawLeft = c.x - (e.elements[0].rawWidth/2);
+	e.elements[0].rawTop  = c.y - (e.elements[0].rawHeight/2);
+
+	e.elements.length--;
+}
+
+function updateYear(y)
+{
+	var c0 = smartShape.elem.controlPoints[0];
+	var c1 = smartShape.elem.controlPoints[1];
+	var e  = smartShape.elem.elements[0];
+	var c  = {x:(e.elements[3].contours[0].nodes[0].x+e.elements[3].contours[0].nodes[1].x)/2,
+	          y:(e.elements[3].contours[0].nodes[0].y+e.elements[3].contours[0].nodes[3].y)/2};
+
+	updateText(e, c, y);
+
+	c0.name = y;
+
+	c0.toolTip = y-1;
+	c1.toolTip = y+1;
+}
+
+function updateMonth(m)
+{
+	var c2 = smartShape.elem.controlPoints[2];
+	var c3 = smartShape.elem.controlPoints[3];
+	var e  = smartShape.elem.elements[1];
+	var c  = {x:(e.elements[3].contours[0].nodes[0].x+e.elements[3].contours[0].nodes[1].x)/2,
+	          y:(e.elements[3].contours[0].nodes[0].y+e.elements[3].contours[0].nodes[3].y)/2};
+
+	updateText(e, c, int2Month(m));
+
+	c2.name = m;
+
+	c2.toolTip = int2Month(m-1);
+	c3.toolTip = int2Month(m+1);
+}
+
+function updateDays(y, m)
+{
+	var d = new Date;
+	var e, c, w, h;
+
+	d.setFullYear(y);
+	d.setMonth(m);
+
+	if      (d.getDate(d.setDate(29))==1) days = 28;
+	else if (d.getDate(d.setDate(30))==1) days = 29;
+	else if (d.getDate(d.setDate(31))==1) days = 30;
+	else                                  days = 31;
+
+	d.setMonth(m);
+	d.setDate(1);
+
+	smartShape.elem.elements.length--;
+
+	for (i=0,day=1,n=3; day<=days; i++)
+	{
+		if (n>=smartShape.elem.elements.length)
+			addWeek();
+
+		for (j=0; j<7; j++,n++)
+		{
+			e = smartShape.elem.elements[n];
+
+			c = {x:(e.elements[1].contours[0].nodes[0].x+e.elements[1].contours[0].nodes[1].x)/2,
+			     y:(e.elements[1].contours[0].nodes[0].y+e.elements[1].contours[0].nodes[3].y)/2};
+
+			if ( ((i==0)&&(j<d.getDay())) || (day>days) )
+				updateText(e, c, " ")
+			else
+			{
+				updateText(e, c, day);
+				day++;
+			}
+		}
+	}
+
+	if (n<smartShape.elem.elements.length)
+		smartShape.elem.elements.length -= 7;
+
+	c = {x:smartShape.elem.elements[0].elements[3].contours[0].nodes[0].x,
+	     y:smartShape.elem.elements[0].elements[3].contours[0].nodes[0].y};
+
+	w = smartShape.elem.elements[0].elements[3].contours[0].nodes[1].x -
+	    smartShape.elem.elements[0].elements[3].contours[0].nodes[0].x;
+
+	h = smartShape.elem.elements[n-1].elements[1].contours[0].nodes[2].y -
+	    smartShape.elem.elements[0  ].elements[3].contours[0].nodes[0].y;
+
+	addFrame(c, w, h);
+}
+
+function copyTextAttributes(s, d)
+{
+	d.blendMode      = s.blendMode;
+	d.effectList     = s.effectList;
+	d.opacity        = s.opacity;
+}
+
+function copyPathAttributes(s, d)
+{
+	d.blendMode      = s.blendMode;
+	d.effectList     = s.effectList;
+	d.opacity        = s.opacity;
+	d.pathAttributes = s.pathAttributes;
+}
+
+function addWeek()
+{
+	var eLen = smartShape.elem.elements.length;
+	var e0   = smartShape.elem.elements[0];
+	var e_   = smartShape.elem.elements[eLen-1];
+	var c    = {x:e0.elements[3].contours[0].nodes[0].x, y:e_.elements[1].contours[0].nodes[3].y};
+	var cw   = e_.elements[1].contours[0].nodes[1].x - e_.elements[1].contours[0].nodes[0].x;
+	var ch   = e_.elements[1].contours[0].nodes[3].y - e_.elements[1].contours[0].nodes[0].y;
+	var contour;
+	var i, e, fc;
+
+	for (i=0; i<7; i++,eLen++)
+	{
+		smartShape.elem.elements[eLen] = new Group;
+
+		e = smartShape.elem.elements[eLen];
+
+		fc = smartShape.elem.elements[eLen-7].elements[0].textRuns.initialAttrs.fillColor;
+
+		addText({x:c.x+cw/2, y:c.y+ch/2}, e, " ", 24, fc);
+
+		copyTextAttributes(smartShape.elem.elements[eLen-7].elements[0], e.elements[0]);
+
+		addElement(e, "#000000", "#FFFFFF");
+
+		copyPathAttributes(smartShape.elem.elements[eLen-7].elements[1], e.elements[1]);
+
+		contour = e.elements[1].contours[0];
+
+		addPathPoint(contour, c.x,    c.y   );
+		addPathPoint(contour, c.x+cw, c.y   );
+		addPathPoint(contour, c.x+cw, c.y+ch);
+		addPathPoint(contour, c.x,    c.y+ch);
+
+		contour.isClosed = true;
+
+		c.x += cw;
+	}
+}
+
+function addFrame(c, w, h)
+{
+	var eLen = smartShape.elem.elements.length;
+
+	addElement(smartShape.elem, "#000000", "#FFFFFF");
+
+	var contour = smartShape.elem.elements[eLen].contours[0];
+
+	addPathPoint(contour, c.x,   c.y  );
+	addPathPoint(contour, c.x+w, c.y  );
+	addPathPoint(contour, c.x+w, c.y+h);
+	addPathPoint(contour, c.x,   c.y+h);
+
+	contour.isClosed = true;
+}
+
+function createCalendar(c, cw, ch, y, m)
+{
+	var i, j, n, cp, contour, days, day;
+
+	var w  = 7*cw;
+	var c_ = {x:c.x, y:c.y};
+
+	smartShape.elem.elements.length = 0;
+
+	// Year
+	smartShape.elem.elements[0] = new Group;
+
+	addText({x:c_.x+w/2, y:c_.y+ch/2}, smartShape.elem.elements[0], y, 24, "#000000");
+
+	cp         = smartShape.elem.controlPoints[0];
+	cp.x       = c_.x + ch/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = parseInt(y)-1;
+
+	cp.name    = y;
+
+	cp         = smartShape.elem.controlPoints[1];
+	cp.x       = c_.x + w - ch/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = parseInt(y)+1;
+
+	cp         = smartShape.elem.controlPoints[4];
+	cp.x       = c_.x + w/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = t.specifyYear;
+
+	addElement(smartShape.elem.elements[0], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[0].elements[1].contours[0];
+
+	addPathPoint(contour, c_.x+ch-10, c_.y+5   );
+	addPathPoint(contour, c_.x+ch-10, c_.y+ch-5);
+	addPathPoint(contour, c_.x+5,     c_.y+ch/2);
+
+	contour.isClosed = true;
+
+	addElement(smartShape.elem.elements[0], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[0].elements[2].contours[0];
+
+	addPathPoint(contour, c_.x+w-ch+10, c_.y+5   );
+	addPathPoint(contour, c_.x+w-ch+10, c_.y+ch-5);
+	addPathPoint(contour, c_.x+w-5,     c_.y+ch/2);
+
+	contour.isClosed = true;
+
+	addElement(smartShape.elem.elements[0], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[0].elements[3].contours[0];
+
+	addPathPoint(contour, c_.x,   c_.y   );
+	addPathPoint(contour, c_.x+w, c_.y   );
+	addPathPoint(contour, c_.x+w, c_.y+ch);
+	addPathPoint(contour, c_.x,   c_.y+ch);
+
+	contour.isClosed = true;
+
+	c_.x  = c.x;
+	c_.y += ch;
+
+	// Month
+	smartShape.elem.elements[1] = new Group;
+
+	addText({x:c_.x+w/2, y:c_.y+ch/2}, smartShape.elem.elements[1], int2Month(m), 24, "#000000");
+
+	cp         = smartShape.elem.controlPoints[2];
+	cp.x       = c_.x + ch/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = int2Month(parseInt(m)-1);
+
+	cp.name    = m;
+
+	cp         = smartShape.elem.controlPoints[3];
+	cp.x       = c_.x + w - ch/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = int2Month(parseInt(m)+1);
+
+	cp         = smartShape.elem.controlPoints[5];
+	cp.x       = c_.x + w/2;
+	cp.y       = c_.y + ch/2;
+	cp.toolTip = t.specifyMonth;
+
+	addElement(smartShape.elem.elements[1], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[1].elements[1].contours[0];
+
+	addPathPoint(contour, c_.x+ch-10, c_.y+5   );
+	addPathPoint(contour, c_.x+ch-10, c_.y+ch-5);
+	addPathPoint(contour, c_.x+5,     c_.y+ch/2);
+
+	contour.isClosed = true;
+
+	addElement(smartShape.elem.elements[1], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[1].elements[2].contours[0];
+
+	addPathPoint(contour, c_.x+w-ch+10, c_.y+5   );
+	addPathPoint(contour, c_.x+w-ch+10, c_.y+ch-5);
+	addPathPoint(contour, c_.x+w-5,     c_.y+ch/2);
+
+	contour.isClosed = true;
+
+	addElement(smartShape.elem.elements[1], "#000000", "#FFFFFF");
+
+	contour = smartShape.elem.elements[1].elements[3].contours[0];
+
+	addPathPoint(contour, c_.x,   c_.y   );
+	addPathPoint(contour, c_.x+w, c_.y   );
+	addPathPoint(contour, c_.x+w, c_.y+ch);
+	addPathPoint(contour, c_.x,   c_.y+ch);
+
+	contour.isClosed = true;
+
+	c_.x  = c.x;
+	c_.y += ch;
+
+	// Days of week
+	smartShape.elem.elements[2] = new Group;
+
+	for (i=0,n=2; i<7; i++)
+	{
+		smartShape.elem.elements[n].elements[i] = new Group;
+
+		addText({x:c_.x+cw/2, y:c_.y+ch/2}, smartShape.elem.elements[n].elements[i], int2Day(i), 24, "#000000");
+
+		addElement(smartShape.elem.elements[n].elements[i], "#000000", "#FFFFFF");
+
+		contour = smartShape.elem.elements[n].elements[i].elements[1].contours[0];
+
+		addPathPoint(contour, c_.x,    c_.y   );
+		addPathPoint(contour, c_.x+cw, c_.y   );
+		addPathPoint(contour, c_.x+cw, c_.y+ch);
+		addPathPoint(contour, c_.x,    c_.y+ch);
+
+		contour.isClosed = true;
+
+		c_.x += cw;
+	}
+
+	c_.x  = c.x;
+	c_.y += ch;
+
+	// Days
+	var d = new Date;
+
+	d.setFullYear(y);
+	d.setMonth(m);
+
+	if      (d.getDate(d.setDate(29))==1) days = 28;
+	else if (d.getDate(d.setDate(30))==1) days = 29;
+	else if (d.getDate(d.setDate(31))==1) days = 30;
+	else                                  days = 31;
+
+	d.setMonth(m);
+	d.setDate(1);
+
+	for (i=0,day=1,n=3; day<=days; i++)
+	{
+		for (j=0; j<7; j++,n++)
+		{
+			smartShape.elem.elements[n] = new Group;
+
+			if ( ((i==0)&&(j<d.getDay())) || (day>days) )
+				addText({x:c_.x+cw/2, y:c_.y+ch/2}, smartShape.elem.elements[n], " ", 24, "#000000");
+			else
+			{
+				addText({x:c_.x+cw/2, y:c_.y+ch/2}, smartShape.elem.elements[n], day, 24, "#000000");
+				day++;
+			}
+
+			addElement(smartShape.elem.elements[n], "#000000", "#FFFFFF");
+
+			contour = smartShape.elem.elements[n].elements[1].contours[0];
+
+			addPathPoint(contour, c_.x,    c_.y   );
+			addPathPoint(contour, c_.x+cw, c_.y   );
+			addPathPoint(contour, c_.x+cw, c_.y+ch);
+			addPathPoint(contour, c_.x,    c_.y+ch);
+
+			contour.isClosed = true;
+
+			c_.x += cw;
+		}
+
+		c_.x  = c.x;
+		c_.y += ch;
+	}
+
+	addFrame(c, w, ch*(i+3));
+}
+
+/*==========================================================================*/
+/*                      Copyright (c) 2003 Macromedia.                      */
+/*                           All rights reserved.                           */
+/*==========================================================================*/

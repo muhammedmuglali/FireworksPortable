@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FWACPlayer>
+	<Player name="Dw Web Photo Album Style (Flash)" preview="dw_webphotoalbum.jpg" launch="index.html">
+		<File src="dw_webphotoalbum.sw_"  dst="dw_webphotoalbum.swf"/>
+		<File src="dw_webphotoalbum.html" dst="index.html"          />
+        <File src="scripts/AC_RunActiveContent.js" dst="scripts/AC_RunActiveContent.js"          />
+		<Info src="dwphotoalbum_info.html"/>
+	</Player>
+</FWACPlayer>

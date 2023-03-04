@@ -1,0 +1,7 @@
+﻿// English
+
+var __tooltips = new Object();
+
+__tooltips["arch"] = "Arch";
+__tooltips["radius"] = "Radius";
+__tooltips["hollow"] = "Hollow";

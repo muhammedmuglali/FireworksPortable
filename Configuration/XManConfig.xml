@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+    <VariableForExMan> 
+       <Data key="HostNameForCSXS">FWKS</Data>
+       <Data key="ProductVersion">12.0</Data>       
+	   <Data key="PreExtensionFolder">$SharedCommonDataFolder/Adobe/Fireworks CS6/PreInstall</Data>       
+       <Data key="$fireworks">$installfolder</Data>
+	   <Data key="$fireworksuser">$userdatafolder/adobe/Fireworks CS6</Data>
+       <Data key="SupportedInSuite">CS6</Data>
+       <Data key="Bit">32</Data>
+    </VariableForExMan>  
+</Configuration>
+

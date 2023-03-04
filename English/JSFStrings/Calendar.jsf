@@ -1,0 +1,30 @@
+// English
+
+var __tooltips = new Object();
+
+__tooltips["specifyYear"] = "Click to specify year";
+__tooltips["specifyMonth"] = "Click to specify month";
+__tooltips["enterYear"] = "Please enter a new year.";
+__tooltips["errorInvalidNumber"] = "ERROR: invalid number entered.";
+__tooltips["enterMonth"] = "Please enter a new month (e.g. 1=January, 12=December).";
+__tooltips["errorMonthIndex"] = "ERROR: invalid month index.";
+__tooltips["errorDayIndex"] = "ERROR: invalid day index.";
+__tooltips["january"] = "January";
+__tooltips["february"] = "February";
+__tooltips["march"] = "March";
+__tooltips["april"] = "April";
+__tooltips["may"] = "May";
+__tooltips["june"] = "June";
+__tooltips["july"] = "July";
+__tooltips["august"] = "August";
+__tooltips["september"] = "September";
+__tooltips["october"] = "October";
+__tooltips["november"] = "November";
+__tooltips["december"] = "December";
+__tooltips["sunday"] = "S";
+__tooltips["monday"] = "M";
+__tooltips["tuesday"] = "T";
+__tooltips["wednesday"] = "W";
+__tooltips["thursday"] = "T";
+__tooltips["friday"] = "F";
+__tooltips["saturday"] = "S";

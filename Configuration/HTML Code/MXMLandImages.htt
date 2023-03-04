@@ -1,0 +1,1692 @@
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/
+// Fireworks MXML and Images export script
+// Version 9.0 05FEBRUARY2007
+
+
+
+// VARIABLES:
+// xml/mxml application
+var gXMLDeclaration = '<?xml version="1.0" encoding="utf-8"?>\n';	// XML declaration
+var gApplicationLayout = "absolute";	// layout to be used for the the main application; absolute retains all object positions
+var gApplicationUsesCanvasSize = true;	// when true, the size of the MXML application is based on the canvas size in Fireworks
+var gApplicationUsesCanvasColor = true;	// when true, the color of the MXML application is based on the canvas color in Fireworks
+
+// object to MXML conversions
+var gRectangleAsCanvas = false;			// determines if rectangle primitives are interpreted as Canvas instances
+var gTextAsTextAndLabel = true;			// if true converts text to Label instances (if auto fitting) and Text instances (if explicitly sized)
+var gBitmapClassName = "Image";			// class name used for graphics exported as images and linked to an MXML tag via the source attribute
+
+// styles
+var gUseStyles = true;					// determines if styles are separated from MXML tag attributes
+var gUseTypeSelectors = true;			// determines, if all instances of a type use the same style, that the style is defined with a type selector
+var gGroupLikeStyles = true;			// determines if styles with the same values are consolidated into one style
+var gGenericStylePrefix = "generic";	// prefix of name used for generic styles used for multiple instances of varying types (Followed by "Style")
+
+// image export
+var gExportImages = true;				// determins if images are exported for non-class instances
+var gExportImagesDirectory = "";		// export directory for bitmap images, if no value, based on export settings (exportDoc)
+var gUseTransparentBackground = true;	// indicates that images, where applicable, are exported with a transparent background. Otherwise the canvas color is used
+var gImageNameSuffix = "";				// pattern for image name suffix; {fireworks-pageName} = page name, {fireworks-pageNumber} = page number
+										// (allows pages to export different images of the same name)
+fw.textOutputEncoding = "utf-8";
+
+
+// fw dom
+var dom = fw.selection					// Fireworks DOM
+	? fw.getDocumentDOM()
+	: null;
+
+
+
+// MAIN:
+var lastMXMLExport = "";
+function main() {
+	
+	// if dom is not defined, do nothing
+	if (dom) {
+		
+		// transform globals where needed;
+		if (gImageNameSuffix) {
+			gImageNameSuffix = gImageNameSuffix.replace(/{fireworks-pageName}/g, dom.pageName); 
+			gImageNameSuffix = gImageNameSuffix.replace(/{fireworks-pageNumber}/g, dom.currentPageNum);
+		}
+		if (!gExportImagesDirectory) {
+			try { 
+				gExportImagesDirectory = Files.getDirectory(exportDoc.htmlOutputPath) + "/" + slices.imagesDirPath;
+			}catch(e) {} 
+		}
+		
+		// flex DOM from Fireworks objects
+		var flexDOM;
+		try {
+			flexDOM = new FlexClasses(new FlexClassApplication());
+		}catch(e) {
+			alert("MXML Export: Error reading document for export\n"+String(e));
+			return 0;
+		}
+		
+		// images before MXML; they define source in mxml
+		try {
+			flexDOM.exportImages();
+		}catch(e) {
+			alert("MXML Export: Error during Image export\n"+String(e));
+		}
+		
+		// write MXML to file and return MXML output
+		var mxml;
+		try {
+			mxml = flexDOM.outputMXML();
+		}catch(e) {
+			alert("MXML Export: Error during MXML export\n"+String(e));
+		}
+		
+		// if valid mxml, return for script output
+		if (mxml) {
+			lastMXMLExport = mxml;
+			return mxml;
+		}
+	}
+	
+	return 0;
+}
+
+
+
+// CLASS DEFINITIONS:
+/**
+ * Flex DOM managing all components in the document
+ */
+function FlexClasses(rootElement) {
+
+	this.rootElement = rootElement;
+	this.instances = new Array();
+	this.extractInstances();
+	this.defineHierarchy();
+	this.transparentBackground = this.getUsingTransparentBackground();
+}
+
+FlexClasses.prototype.rootElement = null;			// root element of the DOM (canvas/Application)
+FlexClasses.prototype.instances = new Array();		// all FlexClass children within the root element
+FlexClasses.prototype.transparentBackground = null;	// determines if transparent background is used to export bitmap images
+FlexClasses.prototype.layerNum = 0;					// counter for layers when extracting instances
+
+/**
+ * Returns whether or not the export settings allow for a transparent background
+ */
+ FlexClasses.prototype.getUsingTransparentBackground = function() {
+ 
+	if (!gUseTransparentBackground) return false;						// user set false
+	if (dom.exportOptions.colorMode == "32 bit") return true;			// 32-bit PNG
+	if (dom.exportOptions.colorMode == "indexed"
+	&& dom.exportOptions.paletteTransparency != "none") return true;	// transparent GIF/PNG
+	
+	return false;														// JPEG or GIF/PNG no transparency
+}
+
+/**
+ * Outputs text content in .MXML and, if applicable, .css files
+ */
+FlexClasses.prototype.outputMXML = function() {
+
+	// style sheets
+	if (gUseStyles) {
+		var styles = this.defineStyles();
+		
+		if (styles.length) {
+			var style = new FlexClassStyle(this.rootElement);
+			style.children = styles;
+			style.associateStylesWithTargets();
+			
+			// external style sheet
+			try {
+			
+				// only write to external style sheet if possible
+				if (WRITE_EXTERNAL_CSS && exportDoc.externalCSS && exportDoc.externalCSSFileName) {
+					var css = style.getMXMLChildrenString();
+					if (css) {
+						WRITE_EXTERNAL_CSS(css);
+						
+						// update style instance to use source instead of nested declarations
+						style.src = exportDoc.externalCSSFileName;
+						style.children = new Array();
+					}
+				}
+			}catch(e) {};
+			
+			// Style MXML tag
+			this.rootElement.children.push(style);
+		}
+	}
+	
+	// MXML tags
+	var mxml = this.rootElement.getMXMLString();
+	if (WRITE_HTML && mxml) {
+		mxml = gXMLDeclaration + mxml;
+		WRITE_HTML(mxml);
+	}
+	
+	return mxml;
+}
+
+/**
+ * Extracts styles from instances and defines declarations
+ */
+FlexClasses.prototype.defineStyles = function() {
+
+	var typeHash = new Object();
+	var typeStyles = new Array();
+	var classStyles = new Array();
+	
+	// create new style declarations grouped by type
+	var i, n = this.instances.length;
+	var instance, style;
+	i = n;
+	for (i=0; i<n; i++) { // walk forward 
+		instance = this.instances[i];
+		style = new FlexClassStyleDeclaration(this.rootElement, [instance], "style"+i, instance.styleProperties);
+
+		if (!typeHash[instance.className]) typeHash[instance.className] = new Array();
+		typeHash[instance.className].push(style);
+	}
+	
+	// walk through types seeing if all styles match
+	// non matching styles get grouped into a single array
+	var name, styles, match;
+	for (name in typeHash) {
+		styles = typeHash[name];
+		
+		if (gUseTypeSelectors) {
+			style = styles[0];
+			
+			// check to see if all styles match the first
+			i = styles.length;
+			match = true;
+			while (i-- > 1) {
+				if (!style.propertiesEqual(styles[i])) {
+					match = false;
+					break;
+				}
+			}
+			
+			// delegate styles based on those matching
+			if (match) {
+				style.selectorName = name;
+				style.selectorType = "type";
+				typeStyles.push(style);
+			}else{
+				classStyles = classStyles.concat(styles);
+			}
+		}else{
+			classStyles = classStyles.concat(styles);
+		}
+	}
+	
+	styles = classStyles;
+	
+	// group like styles
+	if (gGroupLikeStyles) {
+		var si, sn;
+		for (i=0; i<classStyles.length; i++) {
+			style = classStyles[i];
+			si = classStyles.length;
+			sn = i+1;
+			while (si-- > sn) {
+				if (style.propertiesEqual(classStyles[si])) {
+					style.targets = style.targets.concat(classStyles[si].targets);
+					classStyles.splice(si, 1);
+				}
+			}
+		}
+	}
+	
+	styles = typeStyles.concat(classStyles);	// all styles
+	styles.reverse(); 							// more appropriate order
+	
+	// remove empty styles
+	i = styles.length;
+	while (i--) {
+		if (!styles[i].hasProperties()) styles.splice(i, 1);
+	}
+	
+	// apply style naming
+	i = styles.length;
+	while(i--) {
+		style = styles[i];
+		if (style.selectorType != "type") {
+			style.selectorName = style.getUniqueStyleName();
+		}
+	}
+	
+	return styles;
+}
+
+/**
+ * Exports bitmap images from objects not associated with classes
+ */
+FlexClasses.prototype.exportImages = function() {
+
+	if (!gExportImages) return false;
+	
+	var i, n = this.instances.length;
+	var instance;
+	var origBackground;
+	var origSel = new Array().concat(fw.selection);
+	var exportErrors = "";
+	
+	// set background to transparent so that images exported 
+	// will have transparent backgrounds
+	if (this.transparentBackground) {
+		origBackground = dom.backgroundColor;
+		dom.setDocumentCanvasColor("#ffffff00");
+	}
+	
+	// hide all elements
+	i = n;
+	while(i--) this.instances[i].elem.visible = false;
+	
+	// export images
+	i = n; 
+	for (i=0; i<n; i++) { // walk forward (for vs while) to match id naming
+		instance = this.instances[i];
+		if (instance.className == gBitmapClassName) {
+		
+			// show only this element and export it
+			try {
+				instance.elem.visible = true;
+				instance.exportElement();
+				instance.elem.visible = false;
+			}catch(e) {
+				exportErrors += (exportErrors) ? "\n"+String(instance) : String(instance);
+			};
+		}
+	}
+	
+	// restore all elements visibility
+	i = n;
+	while(i--) this.instances[i].elem.visible = true;
+	
+	// restore background color
+	if (this.transparentBackground) {
+		dom.setDocumentCanvasColor(origBackground);
+	}
+	
+	// restore selection
+	//fw.selection = origSel; //setting back the selection is causing a crash on exit.
+	
+	if (exportErrors) {
+		throw new Error(" exporting the following\n"+exportErrors);
+	}
+}
+
+/**
+ * Determines a class name from a Fireworks object
+ * The class name usually exists in elem.customData.flexClassName
+ */
+FlexClasses.prototype.getClassName = function(elem) {
+
+	// By default, check for flexClassName property
+	if (elem.customData.flexClassName) return elem.customData.flexClassName;
+
+	// rectangles can be interpreted as canvases
+	if (gRectangleAsCanvas && String(elem) == "[object RectanglePrimitive]") {
+		return "Canvas";
+	}
+	
+	// if still no className, try using the MXML property if it exists
+	// LEGACY:
+	var className = null;
+	var values = this.getValuesFromElem(elem);
+	if (values.MXML) className = values.MXML.split(" ")[0].split(":")[1];
+	
+	return className;
+}
+
+/**
+ * Gets an object with the name-value pairs of those defined in the 
+ * Fireworks Widget (as defined in currentValues)
+ */
+FlexClasses.prototype.getValuesFromElem = function(elem, values) {
+
+	if (!values) values = new Object();
+	
+	// extract values from currentValues
+	if (elem.customData.currentValues) {
+		var value;
+		var i = elem.customData.currentValues.length;
+		while (i--) {
+			value = elem.customData.currentValues[i];
+			
+			// special cases
+			switch(value.name) {
+			
+				// value also contains limits (e.g. 50,-100,100); split and get only current value
+				case "value":
+					if (typeof value.value == "string") {
+						parts = value.value.split(",");
+						values[value.name] = parts[0];
+						break;
+					}
+					
+				default:
+					values[value.name] = value.value;
+			}
+		}
+	}
+	
+	return values;
+}
+
+/**
+ * Extracts properties from a rectangle primitive for Canvas instances
+ */
+FlexClasses.prototype.getRectProperties = function(elem) {
+
+	var props = new Object();
+	var atts = elem.pathAttributes;
+	
+	// brush/stroke/border
+	if (atts.brush) {
+		props.borderStyle = "solid";
+		props.borderColor = atts.brushColor;
+		props.borderThickness = atts.brush.diameter;
+	}
+	
+	// fill
+	if (atts.fill) props.backgroundColor = atts.fillColor;
+	
+	// roundness (may only appear in Flex if border exists too)
+	if (elem.roundness) props.cornerRadius = Math.floor(Math.min(elem.width, elem.height)*.5*elem.roundness);
+	
+	return props;
+}
+
+/**
+ * Gets rectangle margins for strokes other than on inside (Flex only uses inside)
+ */
+FlexClasses.prototype.getRectMargin = function(elem) {
+
+	var atts = elem.pathAttributes;
+	if (atts.brush) {
+	
+		// create margins based on brush placement
+		switch (atts.brushPlacement) {
+		
+			case "center":
+			
+				// increase canvas size by half stroke size
+				var radius = -Math.round(atts.brush.diameter/2);
+				return {
+					left:radius,
+					right:radius,
+					top:radius,
+					bottom:radius
+				};
+				
+			case "outside":
+			
+				// increase canvas size by full stroke size
+				var diameter = -atts.brush.diameter;
+				return {
+					left:diameter,
+					right:diameter,
+					top:diameter,
+					bottom:diameter
+				};
+		}
+	}
+	
+	// no stroke or on inside, provide no change
+	return null;
+}
+
+/**
+ * Extracts properties from a text object for Label and Text instances
+ */
+FlexClasses.prototype.getTextProperties = function(elem) {
+
+	return {
+		text:		this.getTextElementText(elem),
+		color:		elem.pathAttributes.fillColor,
+		fontSize:	elem.fontsize,
+		fontFamily:	elem.font
+	};
+}
+
+/**
+ * Creates and sdds a FlexClass instance to the FlexClasses DOM
+ * based on an Fireworks Object
+ */
+FlexClasses.prototype.addInstance = function(elem) {
+
+	var className = this.getClassName(elem);
+	
+	// create instance
+	var depth = this.instances.length;
+	var padding;
+	var margin;
+	var sizeOffset;
+	var defaultProperties;
+	var attributeProperties;
+	var styleProperties;
+	var customValues;
+	var instanceClass;
+	var namespace;
+	var textOnly;
+	var nestedContainer;
+	
+	switch(className) {
+			
+		// containers
+		case "Accordion":
+			instanceClass = FlexClassNestedContainer;
+			padding = {top:23, right:1, bottom:1, left:1};
+			attributeProperties = ["enabled","label","selected"];
+			styleProperties = ["color","disabledColor","textRollOverColor","textSelectedColor"];
+			nestedContainer = new FlexClassContainer(null, null, null, "Canvas");
+			nestedContainer.properties = {width:"100%", height:"100%"};
+			break;
+			
+		case "Panel":
+			instanceClass = FlexClassContainer;
+			margin = {top:0, right:3, bottom:5, left:3};
+			padding = {top:31, right:10, bottom:10, left:10};
+			customValues = {layout:"absolute"};
+			attributeProperties = ["enabled","title","layout"];
+			styleProperties = ["color","disabledColor"];
+			break;
+			
+		case "Canvas": // currently using RectanglePrimitive instances only
+			instanceClass = FlexClassContainer;
+			customValues = this.getRectProperties(elem);
+			margin = this.getRectMargin(elem);
+			styleProperties = ["cornerRadius", "backgroundColor", "borderStyle", "borderColor", "borderThickness"];
+			break;
+			
+		case "ComboBox": // technically should only contain it's own values
+			instanceClass = FlexClassNestedContainer;
+			attributeProperties = ["editable","text","enabled"];
+			styleProperties = ["color","disabledColor","textRollOverColor","textSelectedColor"];
+			nestedContainer = new FlexClassArrayDataProvider();
+			break;
+		
+		// non-containers
+		case "Button":
+		case "PopUpButton":
+			instanceClass = FlexClass;
+			attributeProperties = ["enabled","label"];
+			styleProperties = ["color","disabledColor","textRollOverColor","textSelectedColor"];
+			break;
+			
+		case "CheckBox":
+		case "RadioButton":
+			instanceClass = FlexClass;
+			defaultProperties = ["x", "y", "height", "alpha", "id", "styleName"]; // no width
+			attributeProperties = ["enabled","label","selected"];
+			styleProperties = ["color","disabledColor","textRollOverColor","textSelectedColor"];
+			break;
+			
+		case "NumericStepper":
+			instanceClass = FlexClass;
+			attributeProperties = ["enabled","value"];
+			styleProperties = ["color","disabledColor"];
+			break;
+			
+		case "TextArea":
+		case "TextInput":
+			instanceClass = FlexClass;
+			attributeProperties = ["text","enabled"];
+			styleProperties = ["color","disabledColor"];
+			break;
+		
+		// ignored
+		case "Cursor":
+		case "ScrollBar":
+		case "Tab":
+		case "ToolTip":
+			instanceClass = FlexClassIgnored;
+			break;
+			
+		// non-symbol elements
+		default:
+		
+			// if still no className, check to see if text, otherwise use Image
+			if (!className) {
+				if (gTextAsTextAndLabel && String(elem) == "[object Text]") {
+					className = elem.autoExpand ? "Label" : "Text";
+					defaultProperties = (className == "Label") 
+						? ["x", "y", "alpha", "id", "styleName"] // no width/height
+						: ["x", "y", "width", "alpha", "id", "styleName"]; // no height
+
+					customValues = this.getTextProperties(elem);
+					attributeProperties = ["text"];
+					styleProperties = ["color","fontSize","fontFamily"];
+				}else{
+					className = gBitmapClassName;
+					attributeProperties = [];
+					styleProperties = [];
+				}
+			}
+			
+			// default class is a non-container flex class
+			instanceClass = FlexClass;
+	}
+	
+	// an instanceClass must be defined to continue
+	if (!instanceClass) return;
+	
+	// check for custom class definition
+	// custom definition will over-ride definitions within this script
+	if (elem.customData.flexClassDefinition) {
+		var def = elem.customData.flexClassDefinition;
+		
+		// check to see if ignored. If so, dont bother with other properties
+		if (def.ignored) {
+			instanceClass = FlexClassIgnored;
+			
+			// make sure no styles are created for this instance
+			styleProperties = [];
+			
+		// if a text-only instance, use only minimal properties that relate
+		}else if (def.textOnly) {
+			instanceClass = FlexClassText;
+			textOnly = def.textOnly;
+			
+			// make sure no styles are created for this instance
+			styleProperties = [];
+			
+		}else{
+			if (def.padding) {
+				padding = def.padding;
+				
+				// if padding is supplied, make sure class is a FlexClassContainer
+				if (instanceClass == FlexClass) {
+					instanceClass = FlexClassContainer;
+				}
+			}
+			if (def.margin) margin = def.margin;
+			if (def.sizeOffset) sizeOffset = def.sizeOffset;
+			if (def.customValues) customValues = def.customValues;
+			if (def.defaultProperties) defaultProperties = def.defaultProperties;
+			if (def.attributeProperties) attributeProperties = def.attributeProperties;
+			if (def.styleProperties) styleProperties = def.styleProperties;
+			if (def.namespace) namespace = def.namespace;
+		}
+	}
+	
+	// create instance
+	instance = new instanceClass(this.rootElement, elem, depth, className);
+	
+	// assign class-specific properties
+	if (padding) instance.padding = padding;
+	if (margin) instance.margin = margin;
+	if (sizeOffset) instance.sizeOffset = sizeOffset;
+	if (namespace) {
+		instance.namespace = namespace;
+		
+		// add namespace to the rootElement namespaces list
+		this.rootElement.namespaces.push(namespace);
+	}
+	if (textOnly) instance.text = textOnly;
+	if (nestedContainer) {
+		instance.nestedContainer = nestedContainer;
+		nestedContainer.parent = instance;
+	}
+	
+	// assign value properties
+	instance.properties = (className != gBitmapClassName)
+		? this.getValuesFromElem(elem, customValues)
+		: customValues;
+	
+	// delegate style and attribute properties
+	instance.updatePropertyDefinitions(defaultProperties, attributeProperties, styleProperties);
+	
+	// add to instances
+	this.instances.push(instance);
+}
+
+/**
+ * Extracts elements from the document into an instances list
+ */
+FlexClasses.prototype.extractInstances = function() {
+
+	// use a counter to help determine layer visibility
+	this.layerNum = -1; 
+
+	var topLayers = dom.topLayers;
+	var n = topLayers.length;
+	var i;
+	
+	// cycle through topLayers and get instances from
+	// each layer and it's sub layers
+	for (i=0; i<n; i++) {
+		this.getInstancesFromLayer(topLayers[i], true, true);
+	}
+}
+
+/**
+ * Extracts elements a layer examined by extractInstances
+ */
+FlexClasses.prototype.getInstancesFromLayer = function(layer, topLevel, validLayer) {
+
+	// update layer counter for visible check among dom FrameNLayerIntersections
+	this.layerNum++;
+	
+	// skip invalid layers; can't exit because we need 
+	// layerNum to be in sync with all layers so 
+	// getInstancesFromLayer needs to continue even for invalid layers
+	if (validLayer) {
+	
+		// invalid if a web layer or if hidden
+		if (!dom.frames[dom.currentFrameNum].layers[this.layerNum].visible
+		||  layer.layerType == "web") {
+			validLayer = false;
+		}
+	}
+	
+	// get elements/sublayers list; for topLevel, use FrameNLayerIntersections
+	var elems;
+	if (topLevel) {
+	
+		// if current frame is beyond bounds of the layer's
+		// skip this entire process for this layer
+		if (dom.currentFrameNum >= layer.frames.length){
+			return;
+		}
+		
+		// otherwise get FrameNLayerIntersections
+		elems = layer.frames[dom.currentFrameNum].elemsandsublayers;
+	}else{
+	
+		// get sublayers
+		elems = layer.elems;
+	}
+	
+	var elem;
+	var i = elems.length;
+	
+	// loop through all elements and sublayers
+	while(i--) {
+		
+		elem = elems[i];
+		
+		// if a layer, get instances from that layer
+		if (elem.isLayer) {
+			this.getInstancesFromLayer(elem, false, validLayer);
+			
+		// otherwise an element, test as instance if in valid layer
+		}else if (validLayer) {
+		
+			// validate element, then add as instance for MXML
+			if (elem.visible && elem.width >= 0 && elem.height >= 0) {
+				this.addInstance(elem);
+			}
+		}
+	}
+}
+
+/**
+ * Determines and defines the Flex DOM hierarchy based on arrangement of
+ * objects in the Fireworks document and the instance type of the object instances
+ */
+FlexClasses.prototype.defineHierarchy = function() {
+
+	// set parents
+	var i, n = this.instances.length;
+	var instance;
+	for(i=0; i<n; i++) {
+		instance = this.instances[i];
+		if (instance instanceof FlexClassContainer) {
+			this.setParentsForElementsIn(instance);
+		}
+	}
+	
+	// set children based on assigned parents
+	i = n;
+	while(i--) {
+		instance = this.instances[i];
+		instance.parent.children.push(instance);
+	}
+}
+
+/**
+ * Determines which objects are contained within the instance provided
+ * and makes them children of that instance
+ */
+FlexClasses.prototype.setParentsForElementsIn = function(instance) {
+
+	// get instances intersecting with this instance
+	var containerRect = instance.getContainerRect();
+	var intersects = dom.elementsAt(containerRect);
+	intersects = this.removeDuplicateElems(intersects);
+	intersects = this.convertToInstanceArray(intersects);
+	
+	// set parent to instance for all children within instance
+	var i = intersects.length;
+	var child;
+	while (i--) {
+		child = intersects[i];
+		
+		// set child parent if valid parent is found
+		if (child != instance && child.depth > instance.depth
+		&&  this.isRectWithinRect(child.getRect(), containerRect)) {
+			child.parent = instance;
+		}
+	}
+}
+
+/**
+ * Removes duplicate element references from an array
+ */
+FlexClasses.prototype.removeDuplicateElems = function(arr) {
+
+	// work from duplicate array
+	var elems = new Array().concat(arr);
+	var di, i = elems.length;
+	while (i--) {
+		di = i;
+		while (di--) {
+		
+			// relies on comparison using customData object
+			if (elems[di].customData == elems[i].customData) {
+				elems.splice(i, 1);
+				break;
+			}
+		}
+	}
+	
+	return elems;
+}
+
+/**
+ * Takes an elements array and converts it a respective array
+ * containing the instance objects respective to those elements
+ */
+FlexClasses.prototype.convertToInstanceArray = function(elems) {
+
+	var instances = new Array();
+	var i = elems.length;
+	var instance;
+	while(i--) {
+	
+		// use instanceLookup to link element with instance
+		// using custom flexClassInstanceID defined in element
+		instance = FlexClass.instanceLookup[elems[i].customData.flexClassInstanceID];
+		if (instance) instances.unshift(instance);
+	}
+	
+	return instances;		
+}
+
+/**
+ * Determines if a rectangle is within another rectangle
+ */
+FlexClasses.prototype.isRectWithinRect = function(testRect, containerRect) {
+
+	if (testRect.left < containerRect.left || testRect.right > containerRect.right) return false;
+	if (testRect.top < containerRect.top || testRect.bottom > containerRect.bottom) return false;
+	
+	return true;
+}
+
+/**
+ * Returns text contained within a Fireworks text object
+ */
+FlexClasses.prototype.getTextElementText = function(elem) {
+
+	// validate as text element
+	if (String(elem) == "[object Text]") {
+		return elem.textChars;
+	}
+	
+	return "";
+}
+
+/**
+ * Class representing a basic Flex component
+ */
+function FlexClass(parent, elem, depth, className) {
+
+	if (parent) this.parent = parent;
+	if (elem) this.elem = elem;
+	if (depth) this.depth = depth;
+	if (className) this.className = className;
+	
+	if (this.elem && this.depth) {
+	
+		// unique id associated with each element; same to be used in lookup
+		this.elem.customData.flexClassInstanceID = this.depth;
+		FlexClass.instanceLookup[this.depth] = this;
+	}
+	
+	this.properties = new Object();
+	this.attributeProperties = new Object();
+	this.styleProperties = new Object();
+}
+
+// Static:
+FlexClass.instanceLookup = new Object();	// hash table for looking up instances by element (id)
+FlexClass.uniqueNamingHash = new Object();	// hash for getUniqueName
+
+/**
+ * Returns a unique name for any number of names passed for the desired group
+ * Using keepCompare, the name is retained if the keepCompare value matches the
+ * keepCompare value used by another of the same name used previously
+ */
+FlexClass.getUniqueName = function(name, group, keepCompare) {
+
+	// default values
+	if (!group) group = "default";
+	if (!name) name = "unknown";
+	
+	// create a group if doesn't exist
+	if (FlexClass.uniqueNamingHash[group] == undefined) {
+		FlexClass.uniqueNamingHash[group] = new Object();
+	}
+	
+	var hash = FlexClass.uniqueNamingHash[group];
+	if (hash[name] == undefined) {
+	
+		// new hash, default values
+		hash[name] = new Object();
+		hash[name].suffixNum = 1;
+		hash[name].compares = new Object();
+		
+		// save as keepCompare in hash if being used
+		if (keepCompare) {
+			hash[name].compares[keepCompare] = name;
+		}
+		
+	}else{
+	
+		// existing hash, update values
+		hash = hash[name];
+		
+		// if using keepCompare and its value already exists within the hash
+		// return that saved value instead of making a unique one
+		if (keepCompare && hash.compares[keepCompare]) {
+			return hash.compares[keepCompare];
+		}
+		
+		// return a unique name
+		hash.suffixNum++;
+		name += hash.suffixNum;
+		
+		// save as keepCompare in hash if being used
+		if (keepCompare) {
+			hash.compares[keepCompare] = name;
+		}
+	}
+	
+	// returning unique name
+	return name;
+}
+
+FlexClass.prototype.elem = {top:0, left:0, width:0, height:0, opacity:100};	// element in Fireworks
+FlexClass.prototype.depth = 0;					// depth value in layers list
+FlexClass.prototype.className = "UNKNOWN";		// Flex class name being used for the object in MXML
+FlexClass.prototype.namespace = {mx:"http://www.adobe.com/2006/mxml"};		// namespace for MXML tag, default 'mx'
+FlexClass.prototype.styleName = null;			// selector name for the instance in CSS
+FlexClass.prototype.properties = null;			// properties defined as Widget properties or customValues
+FlexClass.prototype.attributeProperties = null;	// properties to be used as attributes
+FlexClass.prototype.styleProperties = null;		// properties to be used as styles
+FlexClass.prototype.defaultProperties = {x:1, y:1, width:1, height:1, alpha:1, id:1, source:1, styleName:1}; // lookup for which default properties are used
+FlexClass.prototype.src = "";					// source value for tags referencing an external source
+FlexClass.prototype.parent = FlexClassContainer.prototype;			// parent instance this instance is contained within
+FlexClass.prototype.margin = {top:0, right:0, bottom:0, left:0};	// default margin
+FlexClass.prototype.sizeOffset = {width:0, height:0};				// default size offset
+
+/**
+ * Basic string representation of a FlexClass and its subclasses
+ */
+ FlexClass.prototype.toString = function() {
+ 
+	var subname = this.elem.name ? this.elem.name : String(this.elem);
+	
+	return "[object FlexClass("+this.className+":"+subname+")]";
+}
+/**
+ * Gets prefix and uri properties from a {prefix:"uri"} object
+ */
+FlexClass.prototype.getNamespaceProperties = function(namespace) {
+
+	// get a valid namespace reference, the current namespace if one is not passed
+	if (namespace == undefined) namespace = this.namespace;
+	if (!namespace) return null;
+	
+	// get prefix and uri as separate properties
+	// from single property in namespace object
+	var ns = new Object();
+	var prefix;
+	for (prefix in namespace){
+		ns.prefix = prefix;
+		ns.uri = namespace[prefix];
+		break;
+	}
+	
+	return ns;
+}
+
+/**
+ * Takes user- or script-defined arrays and converts them into
+ * usable instance property list
+ */
+FlexClass.prototype.updatePropertyDefinitions = function(defaults, attributes, styles) {
+
+	var i, name;
+	
+	// defaults hash for whether or not to include default attributes
+	// if defaults not provided, class-defined defaults are used
+	if (defaults) {
+		var def = new Object();
+		i = defaults.length;
+		while (i--) def[defaults[i]] = 1;
+		this.defaultProperties = def;
+	}
+	
+	// assign properties as attributes
+	if (attributes) {
+		i = attributes.length;
+		while (i--) {
+			name = attributes[i];
+			if (this.properties[name] !== undefined) {
+				this.attributeProperties[name] = this.properties[name];
+			}
+		}
+	}else{
+	
+		// if no attributes provided, use all properties as attributes
+		for (name in this.properties) {
+			this.attributeProperties[name] = this.properties[name];
+		}
+	}
+	
+	// assign properties as styles, removing them from attributes if exist
+	if (styles) {
+		i = styles.length;
+		while (i--) {
+			name = styles[i];
+			if (this.properties[name]) {
+				this.styleProperties[name] = this.properties[name];
+				
+				// delete from attributes if exists as attribute
+				if (this.attributeProperties[name]) {
+					delete this.attributeProperties[name];
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Returns the rectangle associated with the instance taking into
+ * consideration margin values (does not use pixelRect)
+ */
+FlexClass.prototype.getRect = function() {
+
+	var rect = new Object();
+	rect.left = this.elem.left + this.margin.left;
+	rect.right = this.elem.left + this.elem.width - this.margin.right;
+	rect.top = this.elem.top + this.margin.top;
+	rect.bottom = this.elem.top + this.elem.height - this.margin.bottom;
+	
+	return rect;
+}
+
+/**
+ * Returns the MXML tag string for this instance
+ */
+FlexClass.prototype.getMXMLString = function(indent) {
+
+	if (indent == null) indent = "";
+	
+	// determine namespace prefix for MXML tag
+	var ns = this.getNamespaceProperties();
+	var prefix = (ns) ? ns.prefix+ ":" : "";
+	
+	return indent+'<'+prefix+this.className+this.getAttributeString()+'/>\n';
+}
+
+/**
+ * Returns the attribute string for the tag for this instance
+ */
+FlexClass.prototype.getAttributeString = function() {
+
+	var str = "";
+	var bound;
+	
+	// id from object name
+	if (this.defaultProperties.id && this.elem.name) {
+		var name = this.elem.name;
+		// if the name is the same as the class name, lowercase the first letter
+		if (name == this.className) name = lowerCaseFirst(name);
+		str += ' id="'+FlexClass.getUniqueName(name, "id")+'"';
+	}
+	
+	// image source
+	if (this.defaultProperties.source && this.src) {
+		str += ' source="'+this.src+'"';
+	}
+	
+	// styleName
+	if (this.defaultProperties.styleName && this.styleName) {
+		str += ' styleName="'+this.styleName+'"';
+	}
+	
+	// x and y positioning
+	var pRect = this.elem.pixelRect;
+	if (this.defaultProperties.x) {
+		bound = (this.className == gBitmapClassName) ? pRect.left : this.elem.left;
+		var x = bound + this.margin.left - this.parent.elem.left - this.parent.padding.left - this.parent.margin.left;
+		str += ' x="'+Math.ceil(x)+'"';
+	}
+	if (this.defaultProperties.y) {
+		bound = (this.className == gBitmapClassName) ? pRect.top : this.elem.top;
+		var y = bound + this.margin.top - this.parent.elem.top - this.parent.padding.top - this.parent.margin.top;
+		str += ' y="'+Math.ceil(y)+'"';
+	}
+	
+	if (this.defaultProperties.width) {
+		var width = (this.className == gBitmapClassName)
+			? pRect.right - pRect.left + this.sizeOffset.width
+			: this.elem.width - this.margin.left - this.margin.right + this.sizeOffset.width;
+		str += ' width="'+Math.ceil(width)+'"';
+	}
+	if (this.defaultProperties.height) {
+		var height = (this.className == gBitmapClassName)
+			? pRect.bottom - pRect.top + this.sizeOffset.height
+			: this.elem.height - this.margin.top - this.margin.bottom + this.sizeOffset.height;
+		str += ' height="'+Math.ceil(height)+'"';
+	}
+	
+	// account for component transparency (does not apply to images)
+	if (this.defaultProperties.alpha && this.className != gBitmapClassName && this.elem.opacity != 100) {
+		str += ' alpha="'+roundBy(this.elem.opacity/100, 2, true)+'"'; 
+	}
+	
+	// additional, attribute properties
+	str += this.getAttributePropertiesString();
+	
+	return str;
+}
+
+/**
+ * Returns attribute string for non-default properties
+ */
+FlexClass.prototype.getAttributePropertiesString = function() {
+
+	var str = "";
+	var name;
+	
+	// attribute properties to string
+	for (name in this.attributeProperties) {
+		
+		// assign value with formatting
+		str += ' '+name+'="'+this.formatValue(this.attributeProperties[name])+'"';
+	}
+	
+	// if not using styles, include styles as attributes
+	if (!gUseStyles) {
+		for (name in this.styleProperties) {
+			str += ' '+name+'="'+this.styleProperties[name]+'"';
+		}
+	}
+	
+	return str;
+}
+
+/**
+ * Formats a value for an attribute or style
+ */
+FlexClass.prototype.formatValue = function(value) {
+
+	value = String(value);
+	
+	// capitalize if a color
+	if (value.indexOf("#") == 0) {
+		value = value.toUpperCase();
+	}
+	
+	value = XMLEntities(value);
+	
+	return value;
+}
+
+/**
+ * Exports a bitmap for the element object in Fireworks
+ */
+FlexClass.prototype.exportElement = function() {
+
+	if (!gExportImagesDirectory) return "";
+
+	var expRect = this.elem.pixelRect;
+	var expOpt = dom.exportOptions;
+
+	var name;
+	if (this.elem.name) {
+	
+		// remove non-valid characters
+		name = this.elem.name.replace(/[<>:"\/\\\|]/g, "");
+		
+		// use keepCompare in getUniqueName to only provide a unique name
+		// if the pixelRect for this image does not match another
+		name = FlexClass.getUniqueName(name, "image", Math.ceil(this.elem.width)+","+Math.ceil(this.elem.height));
+	}else name = FlexClass.getUniqueName(this.className, "image");
+	
+	if (gImageNameSuffix) {
+		name += gImageNameSuffix;
+	}
+	
+	// KLUDGE: assuming no slices, slices[0][0] is full document settings
+	// Though not needed for export, it is needed for src
+	name += slices[0][0].imageSuffix;
+	
+	// document cropping to mark out image
+	var origCrop = expOpt.crop;
+	expOpt.crop = true;	
+	expOpt.cropLeft = expRect.left - dom.left;
+	expOpt.cropRight = expRect.right - dom.left;
+	expOpt.cropTop = expRect.top - dom.top;
+	expOpt.cropBottom = expRect.bottom - dom.top;
+	
+	// export
+	filename = gExportImagesDirectory + name;
+	fw.exportDocumentAs(dom, filename, expOpt);
+	
+	// restore original document crop
+	expOpt.crop = origCrop;
+	
+	// file references
+	this.src = slices.imagesDirPath ? slices.imagesDirPath + name : name;
+	
+	return filename;
+}
+
+/**
+ * Class representing components that contain other components
+ */
+function FlexClassContainer(parent, elem, depth, className) {
+
+	FlexClass.call(this, parent, elem, depth, className);
+	this.children = new Array();
+}
+
+FlexClassContainer.prototype.__proto__ = FlexClass.prototype;
+FlexClassContainer.prototype.children = new Array();						// child instances within this container
+FlexClassContainer.prototype.padding = {top:0, right:0, bottom:0, left:0};	// default padding
+
+/**
+ * Returns rectangle for area representing its container rectangle
+ * or where children need to be in order to be children
+ */
+FlexClassContainer.prototype.getContainerRect = function() {
+
+	var rect = this.getRect();
+	rect.left += this.padding.left;
+	rect.right -= this.padding.right;
+	rect.top += this.padding.top;
+	rect.bottom -= this.padding.bottom;
+	
+	return rect;
+}
+
+/**
+ * Returns the MXML tag string for this instance including
+ * the MXML for the children within this instance
+ */
+FlexClassContainer.prototype.getMXMLString = function(indent) {
+
+	if (indent == null) indent = "";
+	
+	// determine namespace prefix for MXML tag
+	var ns = this.getNamespaceProperties();
+	var prefix = (ns) ? ns.prefix+ ":" : "";
+	
+	return (this.hasChildren())
+		? indent+'<'+prefix+this.className+this.getAttributeString()+'>\n'+
+			this.getMXMLChildrenString(indent+'\t')+indent+'</'+prefix+this.className+'>\n'
+		: FlexClass.prototype.getMXMLString.call(this, indent);
+}
+
+/**
+ * Returns the MXML tag string for the children of this instance
+ */
+FlexClassContainer.prototype.getMXMLChildrenString = function(indent) {
+
+	if (indent == null) indent = "";
+	var str = "";
+	
+	// loop through all children getting their MXML strings
+	var i = this.children.length;
+	while(i--) {
+		str += this.children[i].getMXMLString(indent);
+	}
+	
+	return str;
+}
+
+/**
+ * Returns true if the instance has children
+ */
+FlexClassContainer.prototype.hasChildren = function() {
+	return Boolean(this.children.length);
+}
+
+/**
+ * Class representing text elements
+ * This may be any user-defined text which could include tags
+ */
+function FlexClassText(parent, elem, depth, className) {
+	FlexClass.call(this, parent, elem, depth, className);
+}
+
+FlexClassText.prototype.__proto__ = FlexClass.prototype;
+FlexClassText.prototype.text = "";	// text representing the contents of the class
+
+/**
+ * Returns the instance's text
+ */
+FlexClassText.prototype.getMXMLString = function(indent) { 
+	
+	var str = this.text;
+	
+	// replace indent tags with indention
+	str = str.replace(/{fireworks-indent}/g, indent);
+	
+	return str + '\n';
+}
+
+/**
+ * Class representing components that exist in Fireworks but will not be exported to MXML
+ */
+function FlexClassIgnored(parent, elem, depth, className) {
+	FlexClass.call(this, parent, elem, depth, className);
+}
+
+FlexClassIgnored.prototype.__proto__ = FlexClass.prototype;
+
+/**
+ * Returns no value as ignored instances have no MXML tags
+ */
+FlexClassIgnored.prototype.getMXMLString = function(indent) { return ""; }
+
+/**
+ * Returns no value as ignored instances have no attributes
+ */
+FlexClassIgnored.prototype.getAttributeString = function() { return ""; }
+
+/**
+ * Returns no value as ignored instances are not exported
+ */
+FlexClassIgnored.prototype.exportElement = function() { return ""; }
+
+/**
+ * Class representing style tag. Contains FlexClassStyleDeclaration as children
+ */
+function FlexClassStyle(parent, depth) {
+	FlexClassContainer.call(this, parent, null, depth, "Style");
+}
+
+FlexClassStyle.prototype.__proto__ = FlexClassContainer.prototype;
+FlexClassStyle.prototype.defaultProperties = {source:1};	// only default property for styles; source
+
+/**
+ * Provides style names to all targets of all declarations in the style
+ */
+FlexClassStyle.prototype.associateStylesWithTargets = function() {
+
+	var ci, i = this.children.length;
+	var child;
+	while (i--) {
+		child = this.children[i];
+		
+		// ignore declarations with type selectors
+		if (child.selectorType != "type") {
+			ci = child.targets.length;
+			while(ci--) {
+				child.targets[ci].styleName = child.selectorName;
+			}
+		}
+	}
+}
+
+/**
+ * Class representing style declarations used in an element (Application)
+ */
+function FlexClassStyleDeclaration(parent, targets, selectorName, styles) {
+
+	FlexClass.call(this, parent, null, null, "CSSStyleDeclaration");
+	this.targets = (targets) ? targets : new Array();
+	if (selectorName) this.selectorName = selectorName;
+	
+	// define properties from styles object
+	for (var name in styles) {
+		this.properties[name] = styles[name];
+	}
+}
+
+FlexClassStyleDeclaration.prototype.__proto__ = FlexClass.prototype;
+FlexClassStyleDeclaration.prototype.selectorName = "style";	// name of selector
+FlexClassStyleDeclaration.prototype.selectorType = "class";	// type of selector (class or type)
+FlexClassStyleDeclaration.prototype.targets = null;			// instances this declaration affects
+
+/**
+ * Determines if a declration has any properties or not
+ */
+FlexClassStyleDeclaration.prototype.hasProperties = function() {
+
+	// if any properties found via iteration, return true
+	for (name in this.properties) return true;
+
+	// no properties
+	return false;
+}
+
+/**
+ * Determines if a declaration has the same properties of the current declaration
+ */
+FlexClassStyleDeclaration.prototype.propertiesEqual = function(compare) {
+
+	// assumes toSource is sorted
+	return Boolean(this.properties.toSource() == compare.properties.toSource());
+}
+
+/**
+ * Get a name unique for this style based on types using the style if applicable
+ */
+FlexClassStyleDeclaration.prototype.getUniqueStyleName = function() {
+
+	var classNamesSimilar = true;
+	
+	// if all class names of all targets match, use the 
+	// class name in the unique name
+	var i = this.targets.length;
+	var nameCheck = this.targets[0].className;
+	while (i--) {
+		if (this.targets[i].className != nameCheck){
+			classNamesSimilar = false;
+			break;
+		}
+	}
+	
+	// define name based on classNamesSimilar
+	var name = (classNamesSimilar)
+		? lowerCaseFirst(this.targets[0].className)+"Style"
+		: gGenericStylePrefix + "Style";
+	
+	return FlexClass.getUniqueName(name, "style");
+}
+
+/**
+ * Returns the MXML tag string for this declaration
+ */
+FlexClassStyleDeclaration.prototype.getMXMLString = function(indent) {
+
+	var str = "";
+
+	// class selector or type selector
+	var selectorPrefix = (this.selectorType == "class") ? "." : "";
+	str += indent+selectorPrefix+this.selectorName+" {\n";
+	var innerIndent = indent+"\t";
+	var value;
+	
+	// all properties of the declaration
+	for (var name in this.properties) {
+	
+		// special cases:
+		switch(name) {
+			case "fontFamily":
+				value = this.formatValue(this.properties[name]);
+				if (value.indexOf(" ") != -1) {
+					value = '"'+value+'"';
+				}
+				str += innerIndent+name+":"+value+";\n";
+				break;
+				
+			default:
+				str += innerIndent+name+":"+this.formatValue(this.properties[name])+";\n";
+		}
+	}
+	
+	str += indent+"}\n";
+	
+	return str;
+}
+
+/**
+ * Returns no value as declarations have no attributes
+ */
+FlexClassStyleDeclaration.prototype.getAttributeString = function() { return ""; }
+
+/**
+ * Class representing a Flex Class whose children are in a nested 
+ * within a single predefined child container
+ */
+function FlexClassNestedContainer(parent, elem, depth, className, nestedContainer) {
+	FlexClassContainer.call(this, parent, elem, depth, className);
+	
+	// nested container definition; Canvas used if instance not passed
+	this.nestedContainer = (nestedContainer) ? nestedContainer : new FlexClassContainer(this, null, null, "Canvas");
+}
+
+FlexClassNestedContainer.prototype.__proto__ = FlexClassContainer.prototype;
+FlexClassNestedContainer.prototype.nestedContainer = null;						// nested instance
+FlexClassNestedContainer.prototype.transferredProperties = ["label", "text"];	// properties transfered to nested instance
+
+/**
+ * Takes user- or script-defined arrays and converts them into
+ * usable instance property list; here it accounts for the
+ * nestedContainer instance as well, transfering properties where needed
+ */
+FlexClassNestedContainer.prototype.updatePropertyDefinitions = function(defaults, attributes, styles) {
+	
+	// transfer nested properties from parent to nested container
+	var props = this.transferredProperties;
+	var i = props.length;
+	while (i--) {
+	
+		if (this.properties[props[i]] != undefined){
+		
+			// copy from parent to child
+			this.nestedContainer.properties[props[i]] = this.properties[props[i]];
+			
+			// remove property from parent
+			delete this.properties[props[i]];
+		}
+	}
+	
+	// update definitions as usual
+	FlexClass.prototype.updatePropertyDefinitions.call(this, defaults, attributes, styles);
+	
+	// update definitions for nested container; no elem, no default properties
+	this.nestedContainer.updatePropertyDefinitions([], null, null);
+}
+
+/**
+ * Returns the MXML tag string for the children of this instance
+ * but within the nestedContainer instance
+ */
+FlexClassNestedContainer.prototype.getMXMLChildrenString = function(indent) {
+
+	// propagate children to nested instance now only child
+	this.nestedContainer.children = this.children;
+	this.children = [this.nestedContainer];
+	
+	// get normal output string
+	var str = FlexClassContainer.prototype.getMXMLChildrenString.call(this, indent);
+	
+	// return children back to original owners
+	this.children = this.nestedContainer.children;
+	this.nestedContainer.children = new Array();
+	
+	return str;
+}
+
+/**
+ * Returns true; always has at least one child
+ */
+FlexClassNestedContainer.prototype.hasChildren = function() {
+	return true;
+}
+
+/**
+ * Class representing an array of string values
+ */
+function FlexClassArrayDataProvider(parent) {
+	FlexClassContainer.call(this, parent, null, null, "dataProvider");
+}
+FlexClassArrayDataProvider.prototype.__proto__ = FlexClassContainer.prototype;
+
+/**
+ * ArrayCollection uses no attributes
+ * properties are used as child String values
+ */
+FlexClassArrayDataProvider.prototype.getAttributeString = function() {
+	return "";
+}
+
+/**
+ * Returns child tags of the collection based on property values
+ * (The ComboBox provides a transfered text value from being a FlexClassNestedContainer)
+ */
+FlexClassArrayDataProvider.prototype.getMXMLChildrenString = function(indent) {
+
+	// use an Array container
+	var str = indent+'<mx:Array>\n';
+	
+	// have values of all properties as String contents of the Array
+	var innerIndent = indent+"\t";
+	var name;
+	for (name in this.properties) {
+		str += innerIndent+'<mx:String>'+this.properties[name]+'</mx:String>\n';
+	}
+	
+	// close Array container
+	str += indent+'</mx:Array>\n';
+	
+	return str;
+}
+
+/**
+ * Returns true if the instance has children (there are properties)
+ */
+FlexClassArrayDataProvider.prototype.hasChildren = function() {
+
+	// has children if it has properties
+	var name;
+	for (name in this.properties) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Class representing the Flex document
+ */
+function FlexClassApplication(style) {
+	FlexClassContainer.call(this, null, null, null, "Application");
+	this.namespaces = new Array();
+}
+
+FlexClassApplication.prototype.__proto__ = FlexClassContainer.prototype;
+FlexClassApplication.prototype.layout = gApplicationLayout;	// layout to be used in Application
+FlexClassApplication.prototype.namespaces = null;			// array of namespaces used within the application
+
+/**
+ * Returns the attribute string for the tag for this instance
+ */
+FlexClassApplication.prototype.getAttributeString = function() {
+	
+	// sizing of application based on canvas size in Fireworks
+	var sizing = "";
+	if (gApplicationUsesCanvasSize) {
+		sizing = ' width="'+dom.width+'" height="'+dom.height+'"';
+	}
+	
+	// layout of application if provided
+	var layout = "";
+	if (this.layout) {
+		layout = ' layout="'+this.layout+'"';
+	}
+
+	// only apply a color to Application if there is a defined canvas color
+	// otherwise leave it to the defaults
+	var background = "";
+	if (gApplicationUsesCanvasColor && dom.backgroundColor.toLowerCase() != "#ffffff00") {
+		var col = this.formatValue(dom.backgroundColor);
+		background = ' backgroundGradientColors="['+col+', '+col+']"';
+	}
+	
+	// generate list of namespaces
+	var namespaces = "";
+	var ns;
+	var usedNamespaces = {mx:1}; // namespaces not to be repeated in attribute string
+	var i = this.namespaces.length;
+	while (i--) {
+		ns = this.getNamespaceProperties(this.namespaces[i]);
+		
+		// do not include already used namespaces
+		if (ns && !usedNamespaces[ns.prefix]) {
+			namespaces += ' xmlns:'+ns.prefix+'="'+ns.uri+'"';
+			usedNamespaces[ns.prefix] = 1;
+		}
+	}
+	
+	return ' xmlns:mx="http://www.adobe.com/2006/mxml"'+sizing+layout+background+namespaces;
+}
+
+
+
+// FUNCTIONS:
+/**
+ * Rounds a numeric value to a certain place
+ * Using an asString value of true, you can assure precision using string parsing 
+ */
+function roundBy(num, amount, asString) {
+
+	// round using base of amount
+	var mult = Math.pow(10, amount);
+	num = Math.round(num*mult)/mult;
+	
+	if (asString) {
+	
+		// use string operations to assure rounding precision
+		num = String(num);
+		var end = amount + num.indexOf(".");
+		if (end > num.length) num = num.substring(0, end);
+	}
+	
+	return num;
+}
+
+/**
+ * Lowercases the first letter in a string
+ */
+function lowerCaseFirst(str){
+	return str.charAt(0).toLowerCase() + str.substring(1);
+}
+
+/**
+ * Replaces characters in a string with respective XML entities
+ */
+function XMLEntities(str) {
+
+	str = String(str);
+	str = str.replace(/&/g, "&amp;"); // &amp; first
+	str = str.replace(/</g, "&lt;");
+	str = str.replace(/>/g, "&gt;");
+	str = str.replace(/"/g, "&quot;");
+	
+	return str;
+}
+
+
+
+// INIT:
+try { main(); } catch(e) { e; }
+/*============================================================================*/
+/*                   Copyright (c) 2007 Adobe Systems Inc.                    */
+/*                            All rights reserved.                            */
+/*============================================================================*/

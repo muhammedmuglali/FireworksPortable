@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FWACPlayer>
+	<Player name="Player - Black (Flash)" preview="player_black.jpg" launch="index.html">
+		<File src="player_black.sw_"  dst="player_black.swf"/>
+		<File src="player_black.html" dst="index.html"      />
+		<File src="scripts/AC_RunActiveContent.js" dst="scripts/AC_RunActiveContent.js"       />
+		<Info src="player_Black_White_info.html"/>
+	</Player>
+	<Player name="Player - White (Flash)" preview="player_white.jpg" launch="index.html">
+		<File src="player_white.sw_"  dst="player_white.swf"/>
+		<File src="player_white.html" dst="index.html"      />
+		<File src="scripts/AC_RunActiveContent.js" dst="scripts/AC_RunActiveContent.js"       />
+		<Info src="player_Black_White_info.html"/>
+	</Player>
+</FWACPlayer>

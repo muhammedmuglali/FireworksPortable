@@ -1,0 +1,325 @@
+﻿
+fw.runScript(Files.getLanguageDirectory() + "/JSFStrings/Annotation.jsf");
+var t    = __tooltips;
+	
+
+// CUSTOM VARIABLES
+var defaultTextWidth = 150;
+var minTextWidth = 50;
+var defaultTextHeight = 50;
+var defaultAnnotationText = t.defaultText;
+var textPadding = 10;
+var controlPointPadding = 5;
+
+
+// INTERNAL VARIABLES
+var mouse = smartShape.currentMousePos;
+var cps = smartShape.elem.controlPoints;
+var data = smartShape.elem.customData;
+
+// OPERATIONS
+operation = new Object();
+operation.InsertSmartShapeAt = function(){
+	smartShape.elem.elements[0] = new Group();
+	smartShape.elem.elements[0].elements[0] = new Group(); // Bubble
+	smartShape.elem.elements[0].elements[1] = new Group(); // Note
+	smartShape.elem.elements[0].elements[2] = new Group(); // Preview
+	
+	data.width = defaultTextWidth;
+	data.height = defaultTextHeight;
+	var loc = EvaluateDefaultLocation();
+	data.locX = loc.x;
+	data.locY = loc.y;
+	var defaultTextRuns = { initialAttrs:{ alignment:"left", antiAliasSharpness:192, antiAliasStrength:64, baselineShift:0, bold:false, face:"Arial", fillColor:"#000000", horizontalScale:1, italic:false, leading:1, leadingMode:"percentage", overSample:8, paragraphIndent:0, paragraphSpacingAfter:0, paragraphSpacingBefore:0, rangeKerning:0, size:"12pt", underline:false }, textRuns:[ { changedAttrs:{  }, characters:defaultAnnotationText } ] };
+	data.text = defaultTextRuns.toSource();
+	data.mouse = mouse;
+	
+	DrawNoteShape(smartShape.elem.elements[0].elements[1], mouse);
+}
+operation.BeginDragControlPoint = function(){
+	data.mouse = mouse;
+	smartShape.getsDragEvents = true;
+	var bubbleElem = smartShape.elem.elements[0].elements[0];
+	if (cps.length > 1){
+		UpdateControlPointData(bubbleElem);
+	}
+}
+operation.DragControlPoint = function(){
+	var loc;
+	var previewElem = smartShape.elem.elements[0].elements[2];
+	var cp = smartShape.currentControlPoint;
+	switch(cp.name){
+		case "resize":
+			data.width = Math.max(minTextWidth, data.width + (mouse.x - data.mouse.x));
+			data.height = Math.max(20, data.height + (mouse.y - data.mouse.y));
+			DrawBubblePreview(previewElem);
+			data.mouse = mouse;
+			break;
+			
+		case "move":
+			loc = PointsAdd({x:data.locX, y:data.locY}, PointsDifference(mouse, data.mouse));
+			data.locX = loc.x;
+			data.locY = loc.y;
+			DrawBubblePreview(previewElem);
+			data.mouse = mouse;
+			break;
+			
+		case "open":
+			break;
+	}
+}
+operation.EndDragControlPoint = function(){
+	smartShape.elem.elements[0].elements[2].elements.length = 0; // kill preview if exists
+	
+	var bubbleElem = smartShape.elem.elements[0].elements[0];
+	var cp = smartShape.currentControlPoint;
+	switch(cp.name){
+		case "close":
+			UpdateTextData(bubbleElem);
+			cps.length = 1;
+			cps[0].visible = true;
+			cps[0].name = "open";
+			cps[0].toolTip = t.openAnnotation;
+			bubbleElem.elements.length = 0;
+			break;
+			
+		case "resize":
+		case "move":
+			DrawBubbleShape(bubbleElem);
+			break;
+			
+		case "open":
+			if (PointsEqual(mouse, data.mouse)){
+				DrawBubbleShape(bubbleElem);
+			}else{
+				DrawNoteShape(smartShape.elem.elements[0].elements[1], mouse);
+			}
+	}
+}
+operation.SmartShapeEdited = function(){
+	if (cps.length > 1){
+		var bubbleElem = smartShape.elem.elements[0].elements[0];
+		UpdateTextData(bubbleElem);
+		DrawBubbleShape_Bubble(bubbleElem.elements[1].contours[0].nodes);
+		DrawBubbleShape_Arm(bubbleElem.elements[2].contours[0].nodes);
+	}
+}
+
+// DRAWING FUNCTIONS
+DrawNoteShape = function(root, loc){
+	var nods;
+	var nod;
+	
+	// pen
+	root.elements[0] = new Path();
+	root.elements[0].pathAttributes.brush = null;
+	root.elements[0].pathAttributes.fill = { category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"antialiased", feather:0, gradient:null, name:"Solid", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false };
+	root.elements[0].pathAttributes.fillColor = "#cc6633";
+	root.elements[0].contours[0] = new Contour();
+	root.elements[0].contours[0].isClosed = true;
+	nods = root.elements[0].contours[0].nodes;
+	nods.length = 5;
+	SetNodePosition(nods[0], PointsAdd(loc, {x:-2, y:6}));
+	SetNodePosition(nods[1], PointsAdd(loc, {x:-3, y:9}));
+	SetNodePosition(nods[2], PointsAdd(loc, {x:0, y:8}));
+	SetNodePosition(nods[3], PointsAdd(loc, {x:14, y:-6}));
+	SetNodePosition(nods[4], PointsAdd(loc, {x:12, y:-8}));
+	
+	// paper
+	root.elements[1] = new Path();
+	root.elements[1].pathAttributes.brush = null;
+	root.elements[1].pathAttributes.fill = { category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"antialiased", feather:0, gradient:null, name:"Solid", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false };
+	root.elements[1].pathAttributes.fillColor = "#ffffff";
+	root.elements[1].effectList = { category:"UNUSED", effects:[ { BevelContrast:44, EffectIsVisible:true, EffectMoaID:"{2ba87123-8220-11d3-baad0000861f4d01}", GlowStartDistance:0, GlowWidth:2, MaskSoftness:4, OuterBevelColor:"#ffcc00", category:"Shadow and Glow", name:"Inner Glow" }, { EffectIsVisible:true, EffectMoaID:"{a7944db8-6ce2-11d1-8c76000502701850}", ShadowAngle:315, ShadowBlur:3, ShadowColor:"#00000080", ShadowDistance:4, ShadowType:0, category:"Shadow and Glow", name:"Drop Shadow" } ], name:"UNUSED" }
+	root.elements[1].contours[0] = new Contour();
+	root.elements[1].contours[0].isClosed = true;
+	nods = root.elements[1].contours[0].nodes;
+	nods.length = 4;
+	SetNodePosition(nods[0], PointsAdd(loc, {x:-8, y:-10}));
+	SetNodePosition(nods[1], PointsAdd(loc, {x:8, y:-10}));
+	nod = PointsAdd(loc, {x:5, y:10});
+	SetBezierNodePosition(nods[2], PointsAdd(nod, {x:4, y:-8}), nod, nod);
+	nod = PointsAdd(loc, {x:-11, y:10});
+	SetBezierNodePosition(nods[3], nod, nod, PointsAdd(nod, {x:4, y:-8}));
+	
+	
+	cps[0] = new ControlPoint();
+	SetControlPoint(cps[0], mouse, "open", t.openAnnotation);
+}
+DrawBubbleShape = function(root){
+	var nods;
+	var loc;
+	
+	root.elements[0] = new Group();
+	
+	AddText(root.elements[0]);
+	UpdateTextData(root);
+		
+	root.elements[1] = new Path();
+	root.elements[1].pathAttributes.brush = null;
+	root.elements[1].pathAttributes.fill = { category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"antialiased", feather:0, gradient:null, name:"Solid", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false };
+	root.elements[1].pathAttributes.fillColor = "#ffffff";
+	root.elements[1].contours[0] = new Contour();
+	root.elements[1].contours[0].isClosed = true;
+	nods = root.elements[1].contours[0].nodes;
+	nods.length = 8;
+	DrawBubbleShape_Bubble(nods);
+	
+	// bubble arm
+	root.elements[2] = new Path();
+	root.elements[2].pathAttributes.brush = null;
+	root.elements[2].pathAttributes.fill = { category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"antialiased", feather:0, gradient:null, name:"Solid", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false };
+	root.elements[2].pathAttributes.fillColor = "#ffffff";
+	root.elements[2].contours[0] = new Contour();
+	nods = root.elements[2].contours[0].nodes;
+	nods.length = 3;
+	DrawBubbleShape_Arm(nods);
+	
+	root.effectList = { category:"UNUSED", effects:[ { BevelContrast:44, EffectIsVisible:true, EffectMoaID:"{2ba87123-8220-11d3-baad0000861f4d01}", GlowStartDistance:0, GlowWidth:2, MaskSoftness:4, OuterBevelColor:"#ffcc00", category:"Shadow and Glow", name:"Inner Glow" }, { EffectIsVisible:true, EffectMoaID:"{a7944db8-6ce2-11d1-8c76000502701850}", ShadowAngle:315, ShadowBlur:3, ShadowColor:"#00000080", ShadowDistance:4, ShadowType:0, category:"Shadow and Glow", name:"Drop Shadow" } ], name:"UNUSED" }
+
+	cps.length = 4;
+	cps[0].visible = false;
+	cps[0].name = "close";
+	cps[0].toolTip = t.close;
+	loc = {x:data.locX, y:data.locY};
+	SetControlPoint(cps[1], PointsAdd(loc, {x:-controlPointPadding, y:-controlPointPadding}), "move", t.move);
+	SetControlPoint(cps[2], PointsAdd(loc, {x:data.width+controlPointPadding, y:-controlPointPadding}), "close", t.close);
+	SetControlPoint(cps[3], PointsAdd(loc, {x:data.width+controlPointPadding, y:data.height+controlPointPadding}), "resize", t.resize);
+}
+DrawBubbleShape_Bubble = function(nods){
+	var nod;
+	
+	var loc = PointsAdd({x:data.locX, y:data.locY}, {x:-textPadding, y:-textPadding});
+	var w = data.width + textPadding*2;
+	var h = data.height + textPadding*2;
+	nod = PointsAdd(loc, {x:0, y:10}); // top
+	SetBezierNodePosition(nods[0], nod, nod, PointsAdd(nod, {x:0, y:-5}));
+	nod = PointsAdd(loc, {x:10, y:0});
+	SetBezierNodePosition(nods[1], PointsAdd(nod, {x:-5, y:0}), nod, nod);
+	nod = PointsAdd(loc, {x:w-10, y:0});
+	SetBezierNodePosition(nods[2], nod, nod, PointsAdd(nod, {x:5, y:0}));
+	nod = PointsAdd(loc, {x:w, y:10});
+	SetBezierNodePosition(nods[3], PointsAdd(nod, {x:0, y:-5}), nod, nod);
+	
+	nod = PointsAdd(loc, {x:w, y:h-10}); // bottom
+	SetBezierNodePosition(nods[4], nod, nod, PointsAdd(nod, {x:0, y:5}));
+	nod = PointsAdd(loc, {x:w-10, y:h});
+	SetBezierNodePosition(nods[5], PointsAdd(nod, {x:5, y:0}), nod, nod);
+	nod = PointsAdd(loc, {x:10, y:h});
+	SetBezierNodePosition(nods[6], nod, nod, PointsAdd(nod, {x:-5, y:0}));
+	nod = PointsAdd(loc, {x:0, y:h-10});
+	SetBezierNodePosition(nods[7], PointsAdd(nod, {x:0, y:5}), nod, nod);
+}
+DrawBubbleShape_Arm = function(nods){
+	var ang;
+
+	var loc = {x:data.locX, y:data.locY};
+	var baseSize = Math.min(data.width, data.height)/3;
+	var baseLoc = PointsAdd(loc, {x:data.width/2, y:data.height/2});
+	var baseAngle = PointsAngleBetween(baseLoc, cps[0]);
+	
+	ang = baseAngle-Math.PI/2;
+	SetNodePosition(nods[0], PointsAdd(baseLoc, {x:Math.cos(ang)*baseSize, y:Math.sin(ang)*baseSize}));
+	
+	SetNodePosition(nods[1], cps[0]);
+	
+	ang = baseAngle+Math.PI/2;
+	SetNodePosition(nods[2], PointsAdd(baseLoc, {x:Math.cos(ang)*baseSize, y:Math.sin(ang)*baseSize}));
+}
+DrawBubblePreview = function(root){
+	if (!root.elements.length){
+		root.elements[0] = new Path();
+		root.elements[0].contours[0] = new Contour();
+		root.elements[0].contours[0].isClosed = true;
+		root.elements[0].contours[0].nodes.length = 4;
+	}
+	
+	nods = root.elements[0].contours[0].nodes;
+	var left = data.locX - textPadding;
+	var right = data.locX + data.width + textPadding;
+	var top = data.locY - textPadding;
+	var bottom = data.locY + data.height + textPadding;
+	SetNodePosition(nods[0], {x:left, y:top});
+	SetNodePosition(nods[1], {x:right, y:top});
+	SetNodePosition(nods[2], {x:right, y:bottom});
+	SetNodePosition(nods[3], {x:left, y:bottom});
+}
+
+// TEXT
+AddText = function(root){
+	root.elements[0] = new Group();
+	root.elements[1] = new Text();
+	var elem = root.elements[1];
+	elem.antiAliased = false;
+	elem.autoExpand = false;
+	elem.autoKern = false;
+	elem.orientation = "horizontal left to right";
+	elem.rawLeft = data.locX;
+	elem.rawTop = data.locY;
+	elem.rawWidth = data.width;
+	var pathattrs = { fill:{ category:"fc_Solid", ditherColors:[ "#000000", "#000000" ], edgeType:"hard", feather:0, gradient:null, name:"fn_Normal", pattern:null, shape:"solid", stampingMode:"blend opaque", textureBlend:0, webDitherTransparent:false }, fillColor:"#000000", fillHandle1:{ x:49, y:122 }, fillHandle2:{ x:98, y:122 }, fillHandle3:{ x:49, y:106 }, fillOnTop:false, fillTexture:null };
+	eval("elem.textRuns = " + data.text);
+}
+
+// SHAPE SPECIFIC FUNCTIONS
+EvaluateDefaultLocation = function(){
+	var dom = fw.getDocumentDOM();
+	var loc = {x:0, y:mouse.y};
+	var center = {x:dom.left + dom.width/2, y:dom.top + dom.height/2};
+	loc.x = (mouse.x < center.x) ? mouse.x + 10 + textPadding*2 : mouse.x - 10 - (defaultTextWidth + textPadding*4);
+	return loc;
+}
+UpdateTextData = function(bubbleElem){
+	if (bubbleElem.elements[0].elements.length > 1){
+		var textElem = bubbleElem.elements[0].elements[1];
+		data.locX = textElem.rawLeft
+		data.locY = textElem.rawTop;
+		data.width = Math.max(minTextWidth, textElem.rawWidth);
+		data.height = Math.max(data.height, textElem.rawHeight);
+		data.text = textElem.textRuns.toSource();
+	}
+}
+UpdateControlPointData = function(bubbleElem){
+	if (cps.length > 3){
+		var textElem = bubbleElem.elements[0].elements[1];
+		data.locX = cps[1].x+controlPointPadding;
+		data.locY = cps[1].y+controlPointPadding;
+		data.width = (cps[3].x - cps[1].x) - controlPointPadding*2;
+		data.height = (cps[3].y - cps[1].y) - controlPointPadding*2;
+		data.text = textElem.textRuns.toSource();
+	}
+}
+
+
+// GENERAL FUNCTIONS
+SetControlPoint = function(cp, pt, name, toolTip){
+	cp.x = pt.x;
+	cp.y = pt.y;
+	cp.name = name;
+	cp.toolTip = toolTip;
+}
+SetNodePosition = function(node, pt){
+	SetBezierNodePosition(node, pt,pt,pt);
+}
+SetBezierNodePosition = function(node, ptp, pt, pts){
+	node.predX	= ptp.x;	node.predY	= ptp.y;
+	node.x		= pt.x;	node.y		= pt.y;
+	node.succX	= pts.x;	node.succY	= pts.y;
+}
+PointsEqual = function(pt1, pt2){
+	return (pt1.x == pt2.x && pt1.y == pt2.y);
+}
+PointsAdd = function(pt1, pt2){
+	return {x:pt1.x + pt2.x, y:pt1.y + pt2.y};
+}
+PointsDifference = function(pt1, pt2){
+	return {x:pt1.x - pt2.x, y:pt1.y - pt2.y};
+}
+PointsAngleBetween = function(pt1, pt2){
+	return Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x); // use arc tangent 2 to get angle
+}
+
+// Operate
+if (operation[smartShape.operation])
+    operation[smartShape.operation]();
+	

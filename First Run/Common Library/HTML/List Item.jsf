@@ -1,0 +1,85 @@
+function setDefaultValues() {
+	Widget.elem.customData["type"] = "li";
+	Widget.elem.customData["currentValues"] = [
+		{name: "Text", type: "text", value: "List item"},
+		{name: "Color", type: "color", value: "#000000"},
+		{name: "Font", type: "combobox", value: "Arial - Helvetica - sans-serif,Arial - Helvetica - sans-serif,Arial Black - Gadget - sans-serif,Comic Sans MS - cursive,Courier New - Courier - monospace,Geneva - Arial - Helvetica - sans-serif,Georgia - Times New Roman - Times - serif,Impact - Charcoal - sans-serif,Lucinda Sans Unicode - Lucinda Grande - sans-serif,Palatino Linotype - Book Antiqua - Palatino - serif,Tahoma - Geneva - sans-serif,Times New Roman - Times - serif,Trebuchet MS - Helvetica - sans-serif,Verdana - Arial - Helvetica - sans-serif"},
+		{name: "Size", type: "number", value: "12"},
+		{name: "Weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Node type", type: "combobox", value: "normal,normal,first,last,both"},
+		{name: "Is link?", type: "combobox", value: "true,true,false"},
+		{name: "Href", type: "text", value: "#"},
+		{name: "Link color", type: "color", value: "#0000ee"},
+		{name: "Link weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Link decoration", type: "combobox", value: "underline,underline,overline,line-through,blink,none"},
+		{name: "Visited color", type: "color", value: "#551a8b"},
+		{name: "Visited weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Visited decoration", type: "combobox", value: "underline,underline,overline,line-through,blink,none"},
+		{name: "Hover color", type: "color", value: "#0000ee"},
+		{name: "Hover weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Hover decoration", type: "combobox", value: "underline,underline,overline,line-through,blink,none"},
+		{name: "Active color", type: "color", value: "#0000ee"},
+		{name: "Active weight", type: "combobox", value: "normal,normal,bold"},
+		{name: "Active decoration", type: "combobox", value: "underline,underline,overline,line-through,blink,none"}
+	];
+}
+
+function applyCurrentValues() {
+	var values = Widget.elem.customData["currentValues"];
+	var e = Widget.GetObjectByName("list item");
+	
+	var isLink = values[6].value.split(",")[0].toLowerCase();
+	var replaceThis = new RegExp("<br "+String.fromCharCode(47)+">","g");
+	values[0].value = values[0].value.replace(replaceThis,String.fromCharCode(13));
+	e.textChars = (values[0].value.length <= 0 ? "List item" : values[0].value);
+	e.font = values[2].value.split(" - ")[0];
+	e.fontsize = parseInt(values[3].value);
+
+	Widget.elem.customData["css"] = 		"";
+
+	if (isLink == "true") {
+		e.pathAttributes.fillColor = values[8].value;
+		e.bold = (values[9].value.split(",")[0].toLowerCase() == "bold");
+		switch(values[10].value.split(",")[0].toLowerCase()) {
+			case "underline":
+				e.underline = true;
+				break;
+			case "overline":
+				e.underline = false;
+				break;
+			case "line-through":
+				e.underline = false;
+				break;
+			case "blink":
+				//--
+				break;
+			case "none":
+				//--
+				break;
+		}
+		Widget.elem.customData["css"] +=	"\tcolor: "+values[8].value+
+											";\n\tfont-weight: "+values[9].value.split(",")[0]
+	}
+	else {
+		e.pathAttributes.fillColor = values[1].value;
+		e.bold = (values[4].value.split(",")[0].toLowerCase() == "bold");
+		e.underline = false;
+		Widget.elem.customData["css"] +=	"\tcolor: "+values[1].value+
+											";\n\tfont-weight: "+values[4].value.split(",")[0]
+	}
+	
+	Widget.elem.customData["css"] += 		";\n\tfont-family: "+values[2].value.split(",")[0].replace(/ - /g,", ")+
+											";\n\tfont-size: "+parseInt(values[3].value*10)+"%";
+	
+	Widget.elem.customData["css"] +=		";";
+	
+	Widget.elem.customData["mode"] = values[5].value.split(",")[0].toLowerCase();
+	Widget.elem.customData["isLink"] = isLink;
+									
+	
+}
+
+switch(Widget.opCode) {
+	case 1: setDefaultValues(); break;
+	case 2: applyCurrentValues(); break;
+}

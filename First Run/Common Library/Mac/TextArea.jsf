@@ -1,0 +1,68 @@
+function setDefaultValues()
+{
+	var values = new Array();
+
+	values.push({ name:"Text", type:"text", value:"Text" });
+	values.push({ name:"Text Color", type:"color", value:"#000000"});
+	values.push({ name:"Font Family", type:"font", value:"Verdana" });
+	values.push({ name:"Font Size", type:"number", value:"10" });
+	values.push({ name:"Enabled", type:"Boolean", value:"true"});
+
+	values.push({ name:"Hori.State (Left)",  type:"ComboBox", value:"Normal,Normal,Press" });
+	values.push({ name:"Hori.State (Right)", type:"ComboBox", value:"Normal,Normal,Press" });
+	values.push({ name:"Hori.scrollbar",       type:"Boolean",  value:"true"                });
+
+	values.push({ name:"Vert.State (Up)",   type:"ComboBox", value:"Normal,Normal,Press" });
+	values.push({ name:"Vert.State (Down)", type:"ComboBox", value:"Normal,Normal,Press" });
+	values.push({ name:"Vert.scrollbar",      type:"Boolean",  value:"true"                });
+	
+	Widget.elem.customData["currentValues"] = values;
+}
+
+function applyCurrentValues()
+{
+	var values = Widget.elem.customData["currentValues"];
+	Widget.GetObjectByName("Text").textChars = values[0].value;
+	Widget.GetObjectByName("Text").font = values[2].value;
+	Widget.GetObjectByName("Text").fontsize = values[3].value;
+	Widget.GetObjectByName("Text").pathAttributes.fillColor = values[1].value;
+
+	var enabled = (values[4].value.toString() == "true");
+
+	if(!enabled)
+		{ 
+			Widget.GetObjectByName("Text").pathAttributes.fillColor = "#cccccc";
+			Widget.GetObjectByName("enabled").pathAttributes.brushColor = "#cccccc";
+		}
+	
+	var hstateleft  = values[5].value.split(",")[0].substr(0,1).toLowerCase();
+	var hstateright = values[6].value.split(",")[0].substr(0,1).toLowerCase();
+	var hstate      = "h_"+hstateleft + hstateright;
+	var henabled    = (values[7].value.toString()=="true");
+	
+	Widget.GetObjectByName("h_pp").visible = ( henabled && (hstate=="h_pp"));
+	Widget.GetObjectByName("h_pn").visible = ( henabled && (hstate=="h_pn"));
+	Widget.GetObjectByName("h_np").visible = ( henabled && (hstate=="h_np"));
+	Widget.GetObjectByName("h_nn").visible = ( henabled && (hstate=="h_nn"));
+
+	Widget.GetObjectByName("h_disabled").visible  = (!(enabled) || (!(henabled)));
+	
+	var vstateup   = values[8].value.split(",")[0].substr(0,1).toLowerCase();
+	var vstatedown = values[9].value.split(",")[0].substr(0,1).toLowerCase();
+	var vstate     = vstateup + vstatedown;
+	var venabled   = (values[10].value.toString()=="true");
+
+	Widget.GetObjectByName("pp").visible = ( venabled && (vstate=="pp"));
+	Widget.GetObjectByName("pn").visible = ( venabled && (vstate=="pn"));
+	Widget.GetObjectByName("np").visible = ( venabled && (vstate=="np"));
+	Widget.GetObjectByName("nn").visible = ( venabled && (vstate=="nn"));
+
+	Widget.GetObjectByName("disabled").visible  = (!(enabled) || (!(venabled))); 
+	
+}
+switch (Widget.opCode)
+{
+	case 1: setDefaultValues();   break;
+	case 2: applyCurrentValues(); break;
+}
+
